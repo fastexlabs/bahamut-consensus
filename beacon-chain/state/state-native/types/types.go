@@ -4,6 +4,22 @@ import (
 	"github.com/pkg/errors"
 )
 
+// DataType signifies the data type of the field.
+type DataType int
+
+// List of current data types the state supports.
+const (
+	// BasicArray represents a simple array type for a field.
+	BasicArray DataType = iota
+	// CompositeArray represents a variable length array with
+	// a non primitive type.
+	CompositeArray
+	// CompressedArray represents a variable length array which
+	// can pack multiple elements into a leaf of the underlying
+	// trie.
+	CompressedArray
+)
+
 // FieldIndex represents the relevant field position in the
 // state struct for a field.
 type FieldIndex int
@@ -79,6 +95,14 @@ func (f FieldIndex) String(_ int) string {
 		return "nextSyncCommittee"
 	case LatestExecutionPayloadHeader:
 		return "latestExecutionPayloadHeader"
+	case LatestExecutionPayloadHeaderCapella:
+		return "LatestExecutionPayloadHeaderCapella"
+	case NextWithdrawalIndex:
+		return "NextWithdrawalIndex"
+	case NextWithdrawalValidatorIndex:
+		return "NextWithdrawalValidatorIndex"
+	case HistoricalSummaries:
+		return "HistoricalSummaries"
 	default:
 		return ""
 	}
@@ -150,8 +174,18 @@ func (f FieldIndex) RealPosition() int {
 		return 29
 	case NextSyncCommittee:
 		return 30
-	case LatestExecutionPayloadHeader:
+	case LatestExecutionPayloadHeader, LatestExecutionPayloadHeaderCapella:
 		return 31
+	case BaseFeePerEpoch:
+		return 32
+	case BaseFeePerPeriod:
+		return 33
+	case NextWithdrawalIndex:
+		return 34
+	case NextWithdrawalValidatorIndex:
+		return 35
+	case HistoricalSummaries:
+		return 36
 	default:
 		return -1
 	}
@@ -166,10 +200,6 @@ func (f FieldIndex) ElemsInChunk() (uint64, error) {
 	default:
 		return 0, errors.Errorf("field %d doesn't support element compression", f)
 	}
-}
-
-func (FieldIndex) Native() bool {
-	return true
 }
 
 // Below we define a set of useful enum values for the field
@@ -213,4 +243,10 @@ const (
 	CurrentSyncCommittee
 	NextSyncCommittee
 	LatestExecutionPayloadHeader
+	LatestExecutionPayloadHeaderCapella
+	BaseFeePerEpoch
+	BaseFeePerPeriod
+	NextWithdrawalIndex
+	NextWithdrawalValidatorIndex
+	HistoricalSummaries
 )

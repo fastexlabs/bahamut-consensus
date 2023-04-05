@@ -2,6 +2,7 @@ package state_native
 
 import (
 	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v3/runtime/version"
 )
 
 // Eth1Data corresponding to the proof-of-work chain information stored in the beacon state.
@@ -63,8 +64,8 @@ func (b *BeaconState) Eth1DepositIndex() uint64 {
 	return b.eth1DepositIndex
 }
 
-// LatestProcessedBlockActivities corresponds to the number of the block 
-// from which latest activity changes was retrieved.
+// LatestProcessedBlockActivities corresponds to the number of the block
+// from which latest activity changes was retrieved
 func (b *BeaconState) LatestProcessedBlockActivities() uint64 {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
@@ -72,8 +73,8 @@ func (b *BeaconState) LatestProcessedBlockActivities() uint64 {
 	return b.latestProcessedBlockActivities
 }
 
-// TransactionsGasPerPeriod corresponds to the amount of gas which was spent
-// to transaction execution during activity period.
+// TransactionsGasPerPeriod corresponds to the amount of gas used by
+// transactions during activity period.
 func (b *BeaconState) TransactionsGasPerPeriod() uint64 {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
@@ -81,8 +82,8 @@ func (b *BeaconState) TransactionsGasPerPeriod() uint64 {
 	return b.transactionsGasPerPeriod
 }
 
-// TransactionsGasPerPeriod corresponds to the amount of gas which was spent
-// to transaction execution during epoch.
+// TransactionsPerLatestEpoch corresponds to the number of transactions
+// executed during latest epoch.
 func (b *BeaconState) TransactionsPerLatestEpoch() uint64 {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
@@ -90,8 +91,8 @@ func (b *BeaconState) TransactionsPerLatestEpoch() uint64 {
 	return b.transactionsPerLatestEpoch
 }
 
-// TransactionsGasPerPeriod corresponds to the amount of gas which was spent
-// by contracts that is not in validators list during epoch.
+// NonStakersGasPerEpoch corresponds to the amount of gas used by
+// contracts that are not in validators' contracts list during latest epoch.
 func (b *BeaconState) NonStakersGasPerEpoch() uint64 {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
@@ -99,11 +100,37 @@ func (b *BeaconState) NonStakersGasPerEpoch() uint64 {
 	return b.nonStakersGasPerEpoch
 }
 
-// TransactionsGasPerPeriod corresponds to the amount of gas which was spent
-// by contracts that is not in validators list during activity period.
+// NonStakersGasPerEpoch corresponds to the amount of gas used by
+// contracts that are not in validators' contracts list during acitivity period.
 func (b *BeaconState) NonStakersGasPerPeriod() uint64 {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
 	return b.nonStakersGasPerPeriod
+}
+
+// BaseFeePerEpoch corresponds to the sum of base fee per gas from blocks
+// processed in during latest epoch.
+func (b *BeaconState) BaseFeePerEpoch() (uint64, error) {
+	if b.version < version.FastexPhase1 {
+		return 0, errNotSupported("BaseFeePerEpoch", b.version)
+	}
+
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+
+	return b.baseFeePerEpoch, nil
+}
+
+// BaseFeePerPeriod corresponds to the average base fee per gas
+// during activity period.
+func (b *BeaconState) BaseFeePerPeriod() (uint64, error) {
+	if b.version < version.FastexPhase1 {
+		return 0, errNotSupported("BaseFeePerPeriod", b.version)
+	}
+
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+
+	return b.baseFeePerPeriod, nil
 }

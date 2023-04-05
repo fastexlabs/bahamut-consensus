@@ -12,6 +12,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/builder"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache/activitycache"
+	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache/basefeecache"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache/depositcache"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/feed"
 	blockfeed "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/feed/block"
@@ -21,6 +22,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/db"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/execution"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/operations/attestations"
+	"github.com/prysmaticlabs/prysm/v3/beacon-chain/operations/blstoexec"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/operations/slashings"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/operations/synccommittee"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/operations/voluntaryexits"
@@ -53,6 +55,7 @@ type Server struct {
 	BlockFetcher           execution.POWBlockFetcher
 	DepositFetcher         depositcache.DepositFetcher
 	ActivityChangeFetcher  activitycache.ActivityChangesFetcher
+	BaseFeeFetcher         basefeecache.BaseFeeFetcher
 	ChainStartFetcher      execution.ChainStartFetcher
 	Eth1InfoFetcher        execution.ChainInfoFetcher
 	OptimisticModeFetcher  blockchain.OptimisticModeFetcher
@@ -75,6 +78,7 @@ type Server struct {
 	BeaconDB               db.HeadAccessDatabase
 	ExecutionEngineCaller  execution.EngineCaller
 	BlockBuilder           builder.BlockBuilder
+	BLSChangesPool         blstoexec.PoolManager
 }
 
 // WaitForActivation checks if a validator public key exists in the active validator registry of the current
@@ -122,7 +126,7 @@ func (vs *Server) WaitForActivation(req *ethpb.ValidatorActivationRequest, strea
 
 // ValidatorIndex is called by a validator to get its index location in the beacon state.
 func (vs *Server) ValidatorIndex(ctx context.Context, req *ethpb.ValidatorIndexRequest) (*ethpb.ValidatorIndexResponse, error) {
-	st, err := vs.HeadFetcher.HeadState(ctx)
+	st, err := vs.HeadFetcher.HeadStateReadOnly(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not determine head state: %v", err)
 	}
@@ -158,7 +162,7 @@ func (vs *Server) DomainData(_ context.Context, request *ethpb.DomainRequest) (*
 // subscribes to an event stream triggered by the powchain service whenever the ChainStart log does
 // occur in the Deposit Contract on ETH 1.0.
 func (vs *Server) WaitForChainStart(_ *emptypb.Empty, stream ethpb.BeaconNodeValidator_WaitForChainStartServer) error {
-	head, err := vs.HeadFetcher.HeadState(stream.Context())
+	head, err := vs.HeadFetcher.HeadStateReadOnly(stream.Context())
 	if err != nil {
 		return status.Errorf(codes.Internal, "Could not retrieve head state: %v", err)
 	}

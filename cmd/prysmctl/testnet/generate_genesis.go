@@ -6,12 +6,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/altair"
+	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/capella"
+	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/execution"
+	fastexphase1 "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/fastex-phase1"
+	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
+	state_native "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
+	"github.com/prysmaticlabs/prysm/v3/cmd/flags"
+	"github.com/prysmaticlabs/prysm/v3/container/trie"
+	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
-	fastssz "github.com/prysmaticlabs/fastssz"
 	"github.com/prysmaticlabs/prysm/v3/config/params"
 	"github.com/prysmaticlabs/prysm/v3/io/file"
 	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
@@ -22,14 +34,17 @@ import (
 
 var (
 	generateGenesisStateFlags = struct {
-		DepositJsonFile string
-		ChainConfigFile string
-		ConfigName      string
-		NumValidators   uint64
-		GenesisTime     uint64
-		OutputSSZ       string
-		OutputJSON      string
-		OutputYaml      string
+		DepositJsonFile   string
+		ChainConfigFile   string
+		ConfigName        string
+		NumValidators     uint64
+		GenesisTime       uint64
+		OutputSSZ         string
+		OutputJSON        string
+		OutputYaml        string
+		ForkName          string
+		OverrideEth1Data  bool
+		ExecutionEndpoint string
 	}{}
 	log           = logrus.WithField("prefix", "genesis")
 	outputSSZFlag = &cli.StringFlag{
@@ -51,9 +66,14 @@ var (
 		Value:       "",
 	}
 	generateGenesisStateCmd = &cli.Command{
-		Name:   "generate-genesis",
-		Usage:  "Generate a beacon chain genesis state",
-		Action: cliActionGenerateGenesisState,
+		Name:  "generate-genesis",
+		Usage: "Generate a beacon chain genesis state",
+		Action: func(cliCtx *cli.Context) error {
+			if err := cliActionGenerateGenesisState(cliCtx); err != nil {
+				log.WithError(err).Fatal("Could not generate beacon chain genesis state")
+			}
+			return nil
+		},
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "chain-config-file",
@@ -67,7 +87,7 @@ var (
 			},
 			&cli.StringFlag{
 				Name:        "config-name",
-				Usage:       "Config kind to be used for generating the genesis state. Default: mainnet. Options include mainnet, interop, minimal, prater, ropsten, sepolia. --chain-config-file will override this flag.",
+				Usage:       "Config kind to be used for generating the genesis state. Default: mainnet. Options include mainnet, interop, minimal, prater, sepolia. --chain-config-file will override this flag.",
 				Destination: &generateGenesisStateFlags.ConfigName,
 				Value:       params.MainnetName,
 			},
@@ -82,12 +102,40 @@ var (
 				Destination: &generateGenesisStateFlags.GenesisTime,
 				Usage:       "Unix timestamp seconds used as the genesis time in the genesis state. If unset, defaults to now()",
 			},
+			&cli.BoolFlag{
+				Name:        "override-eth1data",
+				Destination: &generateGenesisStateFlags.OverrideEth1Data,
+				Usage:       "Overrides Eth1Data with values from execution client. If unset, defaults to false",
+				Value:       false,
+			},
+			&cli.StringFlag{
+				Name:        "execution-endpoint",
+				Destination: &generateGenesisStateFlags.ExecutionEndpoint,
+				Usage:       "Endpoint to preferred execution client. If unset, defaults to Geth",
+				Value:       "http://localhost:8545",
+			},
+			flags.EnumValue{
+				Name:        "fork",
+				Usage:       fmt.Sprintf("Name of the BeaconState schema to use in output encoding [%s]", strings.Join(versionNames(), ",")),
+				Enum:        versionNames(),
+				Value:       versionNames()[0],
+				Destination: &generateGenesisStateFlags.ForkName,
+			}.GenericFlag(),
 			outputSSZFlag,
 			outputYamlFlag,
 			outputJsonFlag,
 		},
 	}
 )
+
+func versionNames() []string {
+	enum := version.All()
+	names := make([]string, len(enum))
+	for i := range enum {
+		names[i] = version.String(enum[i])
+	}
+	return names
+}
 
 // Represents a json object of hex string and uint64 values for
 // validators on Ethereum. This file can be generated using the official staking-deposit-cli.
@@ -122,30 +170,82 @@ func cliActionGenerateGenesisState(cliCtx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not generate genesis state: %v", err)
 	}
+	st, err := upgradeStateToForkName(cliCtx.Context, genesisState, generateGenesisStateFlags.ForkName)
+	if err != nil {
+		return err
+	}
+
 	if outputJson != "" {
-		if err := writeToOutputFile(outputJson, genesisState, json.Marshal); err != nil {
+		if err := writeToOutputFile(outputJson, st, json.Marshal); err != nil {
 			return err
 		}
 	}
 	if outputYaml != "" {
-		if err := writeToOutputFile(outputJson, genesisState, yaml.Marshal); err != nil {
+		if err := writeToOutputFile(outputYaml, st, yaml.Marshal); err != nil {
 			return err
 		}
 	}
 	if outputSSZ != "" {
+		type MinimumSSZMarshal interface {
+			MarshalSSZ() ([]byte, error)
+		}
 		marshalFn := func(o interface{}) ([]byte, error) {
-			marshaler, ok := o.(fastssz.Marshaler)
+			marshaler, ok := o.(MinimumSSZMarshal)
 			if !ok {
 				return nil, errors.New("not a marshaler")
 			}
 			return marshaler.MarshalSSZ()
 		}
-		if err := writeToOutputFile(outputSSZ, genesisState, marshalFn); err != nil {
+		if err := writeToOutputFile(outputSSZ, st, marshalFn); err != nil {
 			return err
 		}
 	}
 	log.Info("Command completed")
 	return nil
+}
+
+func upgradeStateToForkName(ctx context.Context, pbst *ethpb.BeaconState, name string) (state.BeaconState, error) {
+	st, err := state_native.InitializeFromProtoUnsafePhase0(pbst)
+	if err != nil {
+		return nil, err
+	}
+	if name == "" || name == "phase0" {
+		return st, nil
+	}
+
+	st, err = altair.UpgradeToAltair(ctx, st)
+	if err != nil {
+		return nil, err
+	}
+	if name == "altair" {
+		return st, nil
+	}
+
+	st, err = execution.UpgradeToBellatrix(st)
+	if err != nil {
+		return nil, err
+	}
+	if name == "bellatrix" {
+		return st, nil
+	}
+
+	st, err = fastexphase1.UpgradeToFastexPhase1(st)
+	if err != nil {
+		return nil, err
+	}
+	if name == "fastex-phase1" {
+		return st, nil
+	}
+
+	st, err = capella.UpgradeToCapella(st)
+	if err != nil {
+		return nil, err
+	}
+	if name == "capella" {
+		return st, nil
+	}
+
+	return nil, fmt.Errorf("unrecognized fork name '%s'", name)
 }
 
 func setGlobalParams() error {
@@ -165,6 +265,7 @@ func generateGenesis(ctx context.Context) (*ethpb.BeaconState, error) {
 	genesisTime := generateGenesisStateFlags.GenesisTime
 	numValidators := generateGenesisStateFlags.NumValidators
 	depositJsonFile := generateGenesisStateFlags.DepositJsonFile
+	overrideEth1Data := generateGenesisStateFlags.OverrideEth1Data
 	if depositJsonFile != "" {
 		expanded, err := file.ExpandPath(depositJsonFile)
 		if err != nil {
@@ -191,6 +292,35 @@ func generateGenesis(ctx context.Context) (*ethpb.BeaconState, error) {
 	genesisState, _, err := interop.GenerateGenesisState(ctx, genesisTime, numValidators)
 	if err != nil {
 		return nil, err
+	}
+	if overrideEth1Data {
+		log.Print("Overriding Eth1Data with data from execution client")
+		conn, err := rpc.Dial(generateGenesisStateFlags.ExecutionEndpoint)
+		if err != nil {
+			return nil, errors.Wrapf(
+				err,
+				"could not dial %s please make sure you are running your execution client",
+				generateGenesisStateFlags.ExecutionEndpoint)
+		}
+		client := ethclient.NewClient(conn)
+		header, err := client.HeaderByNumber(ctx, big.NewInt(0))
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get header by number")
+		}
+		t, err := trie.NewTrie(params.BeaconConfig().DepositContractTreeDepth)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not create deposit tree")
+		}
+		depositRoot, err := t.HashTreeRoot()
+		if err != nil {
+			return nil, errors.Wrap(err, "could not get hash tree root")
+		}
+		genesisState.Eth1Data = &ethpb.Eth1Data{
+			DepositRoot:  depositRoot[:],
+			DepositCount: 0,
+			BlockHash:    header.Hash().Bytes(),
+		}
+		genesisState.Eth1DepositIndex = 0
 	}
 	return genesisState, err
 }

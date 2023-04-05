@@ -164,7 +164,8 @@ func RecomputeFromLayerVariable(changedLeaves [][32]byte, changedIdx []uint64, l
 // this method assumes that the provided trie already has all its elements included
 // in the base depth.
 func recomputeRootFromLayer(idx int, layers [][]*[32]byte, chunks []*[32]byte,
-	hasher func([]byte) [32]byte) ([32]byte, [][]*[32]byte, error) {
+	hasher func([]byte) [32]byte,
+) ([32]byte, [][]*[32]byte, error) {
 	root := *chunks[idx]
 	layers[0] = chunks
 	// The merkle tree structure looks as follows:
@@ -173,12 +174,12 @@ func recomputeRootFromLayer(idx int, layers [][]*[32]byte, chunks []*[32]byte,
 	// only its branch up the tree.
 	currentIndex := idx
 	// Allocate only once.
-	combinedChunks := [64]byte{}
+	var combinedChunks [64]byte
 	for i := 0; i < len(layers)-1; i++ {
 		isLeft := currentIndex%2 == 0
 		neighborIdx := currentIndex ^ 1
 
-		neighbor := [32]byte{}
+		var neighbor [32]byte
 		if layers[i] != nil && len(layers[i]) != 0 && neighborIdx < len(layers[i]) {
 			neighbor = *layers[i][neighborIdx]
 		}
@@ -214,7 +215,8 @@ func recomputeRootFromLayer(idx int, layers [][]*[32]byte, chunks []*[32]byte,
 // trie. Instead missing leaves are assumed to be zerohashes, following the structure
 // of a sparse merkle trie.
 func recomputeRootFromLayerVariable(idx int, item [32]byte, layers [][]*[32]byte,
-	hasher func([]byte) [32]byte) ([32]byte, [][]*[32]byte, error) {
+	hasher func([]byte) [32]byte,
+) ([32]byte, [][]*[32]byte, error) {
 	for idx >= len(layers[0]) {
 		zerohash := trie.ZeroHashes[0]
 		layers[0] = append(layers[0], &zerohash)
@@ -224,8 +226,8 @@ func recomputeRootFromLayerVariable(idx int, item [32]byte, layers [][]*[32]byte
 	currentIndex := idx
 	root := item
 	// Allocate only once.
-	neighbor := [32]byte{}
-	combinedChunks := [64]byte{}
+	var neighbor [32]byte
+	var combinedChunks [64]byte
 
 	for i := 0; i < len(layers)-1; i++ {
 		isLeft := currentIndex%2 == 0
@@ -279,8 +281,14 @@ func AddInMixin(root [32]byte, length uint64) ([32]byte, error) {
 func Merkleize(leaves [][]byte) [][][]byte {
 	hashFunc := hash.CustomSHA256Hasher()
 	layers := make([][][]byte, ssz.Depth(uint64(len(leaves)))+1)
-	for len(leaves) != 32 {
-		leaves = append(leaves, make([]byte, 32))
+	if len(leaves) < 32 {
+		for len(leaves) != 32 {
+			leaves = append(leaves, make([]byte, 32))
+		}
+	} else if len(leaves) < 64 {
+		for len(leaves) != 64 {
+			leaves = append(leaves, make([]byte, 32))
+		}
 	}
 	currentLayer := leaves
 	layers[0] = currentLayer
@@ -306,7 +314,8 @@ func Merkleize(leaves [][]byte) [][][]byte {
 
 // MerkleizeTrieLeaves merkleize the trie leaves.
 func MerkleizeTrieLeaves(layers [][][32]byte, hashLayer [][32]byte,
-	hasher func([]byte) [32]byte) ([][][32]byte, [][32]byte, error) {
+	hasher func([]byte) [32]byte,
+) ([][][32]byte, [][32]byte, error) {
 	// We keep track of the hash layers of a Merkle trie until we reach
 	// the top layer of length 1, which contains the single root element.
 	//        [Root]      -> Top layer has length 1.

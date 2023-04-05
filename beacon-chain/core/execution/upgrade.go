@@ -35,6 +35,10 @@ func UpgradeToBellatrix(state state.BeaconState) (state.BeaconState, error) {
 		return nil, err
 	}
 
+	hrs, err := state.HistoricalRoots()
+	if err != nil {
+		return nil, err
+	}
 	s := &ethpb.BeaconStateBellatrix{
 		GenesisTime:           state.GenesisTime(),
 		GenesisValidatorsRoot: state.GenesisValidatorsRoot(),
@@ -47,28 +51,31 @@ func UpgradeToBellatrix(state state.BeaconState) (state.BeaconState, error) {
 		LatestBlockHeader:              state.LatestBlockHeader(),
 		BlockRoots:                     state.BlockRoots(),
 		StateRoots:                     state.StateRoots(),
-		HistoricalRoots:                state.HistoricalRoots(),
+		HistoricalRoots:                hrs,
 		Eth1Data:                       state.Eth1Data(),
 		Eth1DataVotes:                  state.Eth1DataVotes(),
 		Eth1DepositIndex:               state.Eth1DepositIndex(),
 		LatestProcessedBlockActivities: state.LatestProcessedBlockActivities(),
 		TransactionsGasPerPeriod:       state.TransactionsGasPerPeriod(),
 		TransactionsPerLatestEpoch:     state.TransactionsPerLatestEpoch(),
-		Validators:                     state.Validators(),
-		Balances:                       state.Balances(),
-		Contracts:                      state.Contracts(),
-		Activities:                     state.Activities(),
-		RandaoMixes:                    state.RandaoMixes(),
-		Slashings:                      state.Slashings(),
-		PreviousEpochParticipation:     prevEpochParticipation,
-		CurrentEpochParticipation:      currentEpochParticipation,
-		JustificationBits:              state.JustificationBits(),
-		PreviousJustifiedCheckpoint:    state.PreviousJustifiedCheckpoint(),
-		CurrentJustifiedCheckpoint:     state.CurrentJustifiedCheckpoint(),
-		FinalizedCheckpoint:            state.FinalizedCheckpoint(),
-		InactivityScores:               inactivityScores,
-		CurrentSyncCommittee:           currentSyncCommittee,
-		NextSyncCommittee:              nextSyncCommittee,
+		// TODO(fastex): Uncomment this lines before mainnet start.
+		// NonStakersGasPerPeriod:         state.NonStakersGasPerPeriod(),
+		// NonStakersGasPerEpoch:          state.NonStakersGasPerEpoch(),
+		Validators:                  state.Validators(),
+		Balances:                    state.Balances(),
+		Contracts:                   state.Contracts(),
+		Activities:                  state.Activities(),
+		RandaoMixes:                 state.RandaoMixes(),
+		Slashings:                   state.Slashings(),
+		PreviousEpochParticipation:  prevEpochParticipation,
+		CurrentEpochParticipation:   currentEpochParticipation,
+		JustificationBits:           state.JustificationBits(),
+		PreviousJustifiedCheckpoint: state.PreviousJustifiedCheckpoint(),
+		CurrentJustifiedCheckpoint:  state.CurrentJustifiedCheckpoint(),
+		FinalizedCheckpoint:         state.FinalizedCheckpoint(),
+		InactivityScores:            inactivityScores,
+		CurrentSyncCommittee:        currentSyncCommittee,
+		NextSyncCommittee:           nextSyncCommittee,
 		LatestExecutionPayloadHeader: &enginev1.ExecutionPayloadHeader{
 			ParentHash:       make([]byte, 32),
 			FeeRecipient:     make([]byte, 20),

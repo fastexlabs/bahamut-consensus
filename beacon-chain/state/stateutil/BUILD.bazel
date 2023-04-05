@@ -3,19 +3,19 @@ load("@prysm//tools/go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "block_header_root.go",
         "contracts_map_handler.go",
         "contracts_root.go",
-        "block_header_root.go",
         "eth1_root.go",
-        "field_root_contracts.go",
         "field_root_attestation.go",
+        "field_root_contracts.go",
         "field_root_eth1.go",
         "field_root_validator.go",
         "field_root_vector.go",
+        "historical_summaries_root.go",
         "participation_bit_root.go",
         "pending_attestation_root.go",
         "reference.go",
-        "state_hasher.go",
         "sync_committee.root.go",
         "trie_helpers.go",
         "unrealized_justification.go",
@@ -48,7 +48,6 @@ go_library(
         "//math:go_default_library",
         "//proto/prysm/v1alpha1:go_default_library",
         "@com_github_pkg_errors//:go_default_library",
-        "@io_opencensus_go//trace:go_default_library",
     ],
 )
 

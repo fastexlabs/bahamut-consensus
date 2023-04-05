@@ -31,5 +31,10 @@ func TestReadOnlyContractsContaier_ContractAtIndex(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	assert.Equal(t, contract, rocc.ContractAtIndex(0))
+	c, err := rocc.ContractAtIndex(0)
+	require.NoError(t, err)
+	assert.Equal(t, contract, c)
+	_, err = rocc.ContractAtIndex(1)
+	e := statenative.NewContractIndexOutOfRangeError(1)
+	require.Equal(t, err.Error(), e.Error())
 }

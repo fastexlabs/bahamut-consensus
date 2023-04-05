@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 
 	"github.com/pkg/errors"
-	nativetypes "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
 	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v3/config/params"
@@ -33,34 +33,38 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 		fieldRoots = make([][]byte, params.BeaconConfig().BeaconStateAltairFieldCount)
 	case version.Bellatrix:
 		fieldRoots = make([][]byte, params.BeaconConfig().BeaconStateBellatrixFieldCount)
+	case version.FastexPhase1:
+		fieldRoots = make([][]byte, params.BeaconConfig().BeaconStateFastexPhase1FieldCount)
+	case version.Capella:
+		fieldRoots = make([][]byte, params.BeaconConfig().BeaconStateCapellaFieldCount)
 	}
 
 	// Genesis time root.
 	genesisRoot := ssz.Uint64Root(state.genesisTime)
-	fieldRoots[nativetypes.GenesisTime.RealPosition()] = genesisRoot[:]
+	fieldRoots[types.GenesisTime.RealPosition()] = genesisRoot[:]
 
 	// Genesis validators root.
-	r := [32]byte{}
+	var r [32]byte
 	copy(r[:], state.genesisValidatorsRoot[:])
-	fieldRoots[nativetypes.GenesisValidatorsRoot.RealPosition()] = r[:]
+	fieldRoots[types.GenesisValidatorsRoot.RealPosition()] = r[:]
 
 	// Slot root.
 	slotRoot := ssz.Uint64Root(uint64(state.slot))
-	fieldRoots[nativetypes.Slot.RealPosition()] = slotRoot[:]
+	fieldRoots[types.Slot.RealPosition()] = slotRoot[:]
 
 	// Fork data structure root.
 	forkHashTreeRoot, err := ssz.ForkRoot(state.fork)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute fork merkleization")
 	}
-	fieldRoots[nativetypes.Fork.RealPosition()] = forkHashTreeRoot[:]
+	fieldRoots[types.Fork.RealPosition()] = forkHashTreeRoot[:]
 
 	// BeaconBlockHeader data structure root.
 	headerHashTreeRoot, err := stateutil.BlockHeaderRoot(state.latestBlockHeader)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute block header merkleization")
 	}
-	fieldRoots[nativetypes.LatestBlockHeader.RealPosition()] = headerHashTreeRoot[:]
+	fieldRoots[types.LatestBlockHeader.RealPosition()] = headerHashTreeRoot[:]
 
 	// BlockRoots array root.
 	bRoots := make([][]byte, len(state.blockRoots))
@@ -71,7 +75,7 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute block roots merkleization")
 	}
-	fieldRoots[nativetypes.BlockRoots.RealPosition()] = blockRootsRoot[:]
+	fieldRoots[types.BlockRoots.RealPosition()] = blockRootsRoot[:]
 
 	// StateRoots array root.
 	sRoots := make([][]byte, len(state.stateRoots))
@@ -82,7 +86,7 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute state roots merkleization")
 	}
-	fieldRoots[nativetypes.StateRoots.RealPosition()] = stateRootsRoot[:]
+	fieldRoots[types.StateRoots.RealPosition()] = stateRootsRoot[:]
 
 	// HistoricalRoots slice root.
 	hRoots := make([][]byte, len(state.historicalRoots))
@@ -93,78 +97,78 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute historical roots merkleization")
 	}
-	fieldRoots[nativetypes.HistoricalRoots.RealPosition()] = historicalRootsRt[:]
+	fieldRoots[types.HistoricalRoots.RealPosition()] = historicalRootsRt[:]
 
 	// Eth1Data data structure root.
 	eth1HashTreeRoot, err := stateutil.Eth1Root(hasher, state.eth1Data)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute eth1data merkleization")
 	}
-	fieldRoots[nativetypes.Eth1Data.RealPosition()] = eth1HashTreeRoot[:]
+	fieldRoots[types.Eth1Data.RealPosition()] = eth1HashTreeRoot[:]
 
 	// Eth1DataVotes slice root.
 	eth1VotesRoot, err := stateutil.Eth1DataVotesRoot(state.eth1DataVotes)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute eth1data votes merkleization")
 	}
-	fieldRoots[nativetypes.Eth1DataVotes.RealPosition()] = eth1VotesRoot[:]
+	fieldRoots[types.Eth1DataVotes.RealPosition()] = eth1VotesRoot[:]
 
 	// Eth1DepositIndex root.
 	eth1DepositIndexBuf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(eth1DepositIndexBuf, state.eth1DepositIndex)
 	eth1DepositBuf := bytesutil.ToBytes32(eth1DepositIndexBuf)
-	fieldRoots[nativetypes.Eth1DepositIndex.RealPosition()] = eth1DepositBuf[:]
+	fieldRoots[types.Eth1DepositIndex.RealPosition()] = eth1DepositBuf[:]
 
 	latestProcessedBlockActivitiesBuf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(latestProcessedBlockActivitiesBuf, state.latestProcessedBlockActivities)
 	latestProcessedBlockActivities := bytesutil.ToBytes32(latestProcessedBlockActivitiesBuf)
-	fieldRoots[nativetypes.LatestProcessedBlockActivities.RealPosition()] = latestProcessedBlockActivities[:]
+	fieldRoots[types.LatestProcessedBlockActivities.RealPosition()] = latestProcessedBlockActivities[:]
 
 	transactionsGasPerPeriodBuf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(transactionsGasPerPeriodBuf, state.transactionsGasPerPeriod)
 	transactionsGasPerPeriod := bytesutil.ToBytes32(transactionsGasPerPeriodBuf)
-	fieldRoots[nativetypes.TransactionsGasPerPeriod.RealPosition()] = transactionsGasPerPeriod[:]
+	fieldRoots[types.TransactionsGasPerPeriod.RealPosition()] = transactionsGasPerPeriod[:]
 
 	transactionsPerLatestEpochBuf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(transactionsPerLatestEpochBuf, state.transactionsPerLatestEpoch)
 	transactionsPerLatestEpoch := bytesutil.ToBytes32(transactionsPerLatestEpochBuf)
-	fieldRoots[nativetypes.TransactionsPerLatestEpoch.RealPosition()] = transactionsPerLatestEpoch[:]
+	fieldRoots[types.TransactionsPerLatestEpoch.RealPosition()] = transactionsPerLatestEpoch[:]
 
 	nonStakersGasPerEpochBuf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(nonStakersGasPerEpochBuf, state.nonStakersGasPerEpoch)
 	nonStakersGasPerEpoch := bytesutil.ToBytes32(nonStakersGasPerEpochBuf)
-	fieldRoots[nativetypes.NonStakersGasPerEpoch.RealPosition()] = nonStakersGasPerEpoch[:]
+	fieldRoots[types.NonStakersGasPerEpoch.RealPosition()] = nonStakersGasPerEpoch[:]
 
 	nonStakersGasPerPeriodBuf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(nonStakersGasPerPeriodBuf, state.nonStakersGasPerPeriod)
 	nonStakersGasPerPeriod := bytesutil.ToBytes32(nonStakersGasPerPeriodBuf)
-	fieldRoots[nativetypes.NonStakersGasPerPeriod.RealPosition()] = nonStakersGasPerPeriod[:]
+	fieldRoots[types.NonStakersGasPerPeriod.RealPosition()] = nonStakersGasPerPeriod[:]
 
 	// Validators slice root.
 	validatorsRoot, err := stateutil.ValidatorRegistryRoot(state.validators)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute validator registry merkleization")
 	}
-	fieldRoots[nativetypes.Validators.RealPosition()] = validatorsRoot[:]
+	fieldRoots[types.Validators.RealPosition()] = validatorsRoot[:]
 
 	// Balances slice root.
 	balancesRoot, err := stateutil.Uint64ListRootWithRegistryLimit(state.balances)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute validator balances merkleization")
 	}
-	fieldRoots[nativetypes.Balances.RealPosition()] = balancesRoot[:]
+	fieldRoots[types.Balances.RealPosition()] = balancesRoot[:]
 
 	contractsRoot, err := stateutil.ContractsRoot(state.contracts)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute validator contracts merkleization")
 	}
-	fieldRoots[nativetypes.Contracts.RealPosition()] = contractsRoot[:]
+	fieldRoots[types.Contracts.RealPosition()] = contractsRoot[:]
 
 	activitiesRoot, err := stateutil.Uint64ListRootWithRegistryLimit(state.activities)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute validator activities merkleization")
 	}
-	fieldRoots[nativetypes.Activities.RealPosition()] = activitiesRoot[:]
+	fieldRoots[types.Activities.RealPosition()] = activitiesRoot[:]
 
 	// RandaoMixes array root.
 	mixes := make([][]byte, len(state.randaoMixes))
@@ -175,14 +179,14 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute randao roots merkleization")
 	}
-	fieldRoots[nativetypes.RandaoMixes.RealPosition()] = randaoRootsRoot[:]
+	fieldRoots[types.RandaoMixes.RealPosition()] = randaoRootsRoot[:]
 
 	// Slashings array root.
 	slashingsRootsRoot, err := ssz.SlashingsRoot(state.slashings)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute slashings merkleization")
 	}
-	fieldRoots[nativetypes.Slashings.RealPosition()] = slashingsRootsRoot[:]
+	fieldRoots[types.Slashings.RealPosition()] = slashingsRootsRoot[:]
 
 	if state.version == version.Phase0 {
 		// PreviousEpochAttestations slice root.
@@ -190,87 +194,125 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 		if err != nil {
 			return nil, errors.Wrap(err, "could not compute previous epoch attestations merkleization")
 		}
-		fieldRoots[nativetypes.PreviousEpochAttestations.RealPosition()] = prevAttsRoot[:]
+		fieldRoots[types.PreviousEpochAttestations.RealPosition()] = prevAttsRoot[:]
 
 		// CurrentEpochAttestations slice root.
 		currAttsRoot, err := stateutil.EpochAttestationsRoot(state.currentEpochAttestations)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not compute current epoch attestations merkleization")
 		}
-		fieldRoots[nativetypes.CurrentEpochAttestations.RealPosition()] = currAttsRoot[:]
+		fieldRoots[types.CurrentEpochAttestations.RealPosition()] = currAttsRoot[:]
 	}
 
-	if state.version == version.Altair || state.version == version.Bellatrix {
+	if state.version >= version.Altair {
 		// PreviousEpochParticipation slice root.
 		prevParticipationRoot, err := stateutil.ParticipationBitsRoot(state.previousEpochParticipation)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not compute previous epoch participation merkleization")
 		}
-		fieldRoots[nativetypes.PreviousEpochParticipationBits.RealPosition()] = prevParticipationRoot[:]
+		fieldRoots[types.PreviousEpochParticipationBits.RealPosition()] = prevParticipationRoot[:]
 
 		// CurrentEpochParticipation slice root.
 		currParticipationRoot, err := stateutil.ParticipationBitsRoot(state.currentEpochParticipation)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not compute current epoch participation merkleization")
 		}
-		fieldRoots[nativetypes.CurrentEpochParticipationBits.RealPosition()] = currParticipationRoot[:]
+		fieldRoots[types.CurrentEpochParticipationBits.RealPosition()] = currParticipationRoot[:]
 	}
 
 	// JustificationBits root.
 	justifiedBitsRoot := bytesutil.ToBytes32(state.justificationBits)
-	fieldRoots[nativetypes.JustificationBits.RealPosition()] = justifiedBitsRoot[:]
+	fieldRoots[types.JustificationBits.RealPosition()] = justifiedBitsRoot[:]
 
 	// PreviousJustifiedCheckpoint data structure root.
 	prevCheckRoot, err := ssz.CheckpointRoot(hasher, state.previousJustifiedCheckpoint)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute previous justified checkpoint merkleization")
 	}
-	fieldRoots[nativetypes.PreviousJustifiedCheckpoint.RealPosition()] = prevCheckRoot[:]
+	fieldRoots[types.PreviousJustifiedCheckpoint.RealPosition()] = prevCheckRoot[:]
 
 	// CurrentJustifiedCheckpoint data structure root.
 	currJustRoot, err := ssz.CheckpointRoot(hasher, state.currentJustifiedCheckpoint)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute current justified checkpoint merkleization")
 	}
-	fieldRoots[nativetypes.CurrentJustifiedCheckpoint.RealPosition()] = currJustRoot[:]
+	fieldRoots[types.CurrentJustifiedCheckpoint.RealPosition()] = currJustRoot[:]
 
 	// FinalizedCheckpoint data structure root.
 	finalRoot, err := ssz.CheckpointRoot(hasher, state.finalizedCheckpoint)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute finalized checkpoint merkleization")
 	}
-	fieldRoots[nativetypes.FinalizedCheckpoint.RealPosition()] = finalRoot[:]
+	fieldRoots[types.FinalizedCheckpoint.RealPosition()] = finalRoot[:]
 
-	if state.version == version.Altair || state.version == version.Bellatrix {
+	if state.version >= version.Altair {
 		// Inactivity scores root.
 		inactivityScoresRoot, err := stateutil.Uint64ListRootWithRegistryLimit(state.inactivityScores)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not compute inactivityScoreRoot")
 		}
-		fieldRoots[nativetypes.InactivityScores.RealPosition()] = inactivityScoresRoot[:]
+		fieldRoots[types.InactivityScores.RealPosition()] = inactivityScoresRoot[:]
 
 		// Current sync committee root.
 		currentSyncCommitteeRoot, err := stateutil.SyncCommitteeRoot(state.currentSyncCommittee)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not compute sync committee merkleization")
 		}
-		fieldRoots[nativetypes.CurrentSyncCommittee.RealPosition()] = currentSyncCommitteeRoot[:]
+		fieldRoots[types.CurrentSyncCommittee.RealPosition()] = currentSyncCommitteeRoot[:]
 
 		// Next sync committee root.
 		nextSyncCommitteeRoot, err := stateutil.SyncCommitteeRoot(state.nextSyncCommittee)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not compute sync committee merkleization")
 		}
-		fieldRoots[nativetypes.NextSyncCommittee.RealPosition()] = nextSyncCommitteeRoot[:]
+		fieldRoots[types.NextSyncCommittee.RealPosition()] = nextSyncCommitteeRoot[:]
 	}
 
-	if state.version == version.Bellatrix {
+	if state.version == version.Bellatrix || state.version == version.FastexPhase1 {
 		// Execution payload root.
 		executionPayloadRoot, err := state.latestExecutionPayloadHeader.HashTreeRoot()
 		if err != nil {
 			return nil, err
 		}
-		fieldRoots[nativetypes.LatestExecutionPayloadHeader.RealPosition()] = executionPayloadRoot[:]
+		fieldRoots[types.LatestExecutionPayloadHeader.RealPosition()] = executionPayloadRoot[:]
+	}
+
+	if state.version >= version.FastexPhase1 {
+		baseFeePerEpochBuf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(baseFeePerEpochBuf, state.baseFeePerEpoch)
+		baseFeePerEpoch := bytesutil.ToBytes32(baseFeePerEpochBuf)
+		fieldRoots[types.BaseFeePerEpoch.RealPosition()] = baseFeePerEpoch[:]
+
+		baseFeePerPeriodBuf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(baseFeePerPeriodBuf, state.baseFeePerPeriod)
+		baseFeePerPeriod := bytesutil.ToBytes32(baseFeePerPeriodBuf)
+		fieldRoots[types.BaseFeePerPeriod.RealPosition()] = baseFeePerPeriod[:]
+	}
+
+	if state.version == version.Capella {
+		// Execution payload root.
+		executionPayloadRoot, err := state.latestExecutionPayloadHeaderCapella.HashTreeRoot()
+		if err != nil {
+			return nil, err
+		}
+		fieldRoots[types.LatestExecutionPayloadHeaderCapella.RealPosition()] = executionPayloadRoot[:]
+
+		// Next withdrawal index root.
+		nextWithdrawalIndexRoot := make([]byte, 32)
+		binary.LittleEndian.PutUint64(nextWithdrawalIndexRoot, state.nextWithdrawalIndex)
+		fieldRoots[types.NextWithdrawalIndex.RealPosition()] = nextWithdrawalIndexRoot
+
+		// Next partial withdrawal validator index root.
+		nextWithdrawalValidatorIndexRoot := make([]byte, 32)
+		binary.LittleEndian.PutUint64(nextWithdrawalValidatorIndexRoot, uint64(state.nextWithdrawalValidatorIndex))
+		fieldRoots[types.NextWithdrawalValidatorIndex.RealPosition()] = nextWithdrawalValidatorIndexRoot
+
+		// Historical summary root.
+		historicalSummaryRoot, err := stateutil.HistoricalSummariesRoot(state.historicalSummaries)
+		if err != nil {
+			return nil, errors.Wrap(err, "could not compute historical summary merkleization")
+		}
+		fieldRoots[types.HistoricalSummaries.RealPosition()] = historicalSummaryRoot[:]
 	}
 
 	return fieldRoots, nil

@@ -7,14 +7,16 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/altair"
+	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/capella"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/execution"
+	fastexphase1 "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/fastex-phase1"
 	prysmtime "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/db/filters"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
 	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
 	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	types "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v3/monitoring/tracing"
 	"github.com/prysmaticlabs/prysm/v3/runtime/version"
 	"github.com/sirupsen/logrus"
@@ -27,19 +29,20 @@ import (
 func (_ *State) replayBlocks(
 	ctx context.Context,
 	state state.BeaconState,
-	signed []interfaces.SignedBeaconBlock,
-	targetSlot types.Slot,
+	signed []interfaces.ReadOnlySignedBeaconBlock,
+	targetSlot primitives.Slot,
 ) (state.BeaconState, error) {
 	ctx, span := trace.StartSpan(ctx, "stateGen.replayBlocks")
 	defer span.End()
 	var err error
 
 	start := time.Now()
-	log.WithFields(logrus.Fields{
+	log = log.WithFields(logrus.Fields{
 		"startSlot": state.Slot(),
 		"endSlot":   targetSlot,
 		"diff":      targetSlot - state.Slot(),
-	}).Debug("Replaying state")
+	})
+	log.Debug("Replaying state")
 	// The input block list is sorted in decreasing slots order.
 	if len(signed) > 0 {
 		for i := len(signed) - 1; i >= 0; i-- {
@@ -78,10 +81,10 @@ func (_ *State) replayBlocks(
 
 // loadBlocks loads the blocks between start slot and end slot by recursively fetching from end block root.
 // The Blocks are returned in slot-descending order.
-func (s *State) loadBlocks(ctx context.Context, startSlot, endSlot types.Slot, endBlockRoot [32]byte) ([]interfaces.SignedBeaconBlock, error) {
+func (s *State) loadBlocks(ctx context.Context, startSlot, endSlot primitives.Slot, endBlockRoot [32]byte) ([]interfaces.ReadOnlySignedBeaconBlock, error) {
 	// Nothing to load for invalid range.
-	if endSlot < startSlot {
-		return nil, fmt.Errorf("start slot %d >= end slot %d", startSlot, endSlot)
+	if startSlot > endSlot {
+		return nil, fmt.Errorf("start slot %d > end slot %d", startSlot, endSlot)
 	}
 	filter := filters.NewFilter().SetStartSlot(startSlot).SetEndSlot(endSlot)
 	blocks, blockRoots, err := s.beaconDB.Blocks(ctx, filter)
@@ -116,7 +119,7 @@ func (s *State) loadBlocks(ctx context.Context, startSlot, endSlot types.Slot, e
 		return nil, errors.New("end block roots don't match")
 	}
 
-	filteredBlocks := []interfaces.SignedBeaconBlock{blocks[length-1]}
+	filteredBlocks := []interfaces.ReadOnlySignedBeaconBlock{blocks[length-1]}
 	// Starting from second to last index because the last block is already in the filtered block list.
 	for i := length - 2; i >= 0; i-- {
 		if ctx.Err() != nil {
@@ -140,7 +143,7 @@ func (s *State) loadBlocks(ctx context.Context, startSlot, endSlot types.Slot, e
 func executeStateTransitionStateGen(
 	ctx context.Context,
 	state state.BeaconState,
-	signed interfaces.SignedBeaconBlock,
+	signed interfaces.ReadOnlySignedBeaconBlock,
 ) (state.BeaconState, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
@@ -173,7 +176,7 @@ func executeStateTransitionStateGen(
 // There's no skip slot cache involved given state gen only works with already stored block and state in DB.
 //
 // WARNING: This method should not be used for future slot.
-func ReplayProcessSlots(ctx context.Context, state state.BeaconState, slot types.Slot) (state.BeaconState, error) {
+func ReplayProcessSlots(ctx context.Context, state state.BeaconState, slot primitives.Slot) (state.BeaconState, error) {
 	ctx, span := trace.StartSpan(ctx, "stategen.ReplayProcessSlots")
 	defer span.End()
 	if state == nil || state.IsNil() {
@@ -209,6 +212,12 @@ func ReplayProcessSlots(ctx context.Context, state state.BeaconState, slot types
 					tracing.AnnotateError(span, err)
 					return nil, errors.Wrap(err, "could not process epoch")
 				}
+			case version.FastexPhase1, version.Capella:
+				state, err = fastexphase1.ProcessEpoch(ctx, state)
+				if err != nil {
+					tracing.AnnotateError(span, err)
+					return nil, errors.Wrap(err, "could not process epoch")
+				}
 			default:
 				return nil, fmt.Errorf("unsupported beacon state version: %s", version.String(state.Version()))
 			}
@@ -233,6 +242,22 @@ func ReplayProcessSlots(ctx context.Context, state state.BeaconState, slot types
 				return nil, err
 			}
 		}
+
+		if prysmtime.CanUpgradeToFastexPhase1(state.Slot()) {
+			state, err = fastexphase1.UpgradeToFastexPhase1(state)
+			if err != nil {
+				tracing.AnnotateError(span, err)
+				return nil, err
+			}
+		}
+
+		if prysmtime.CanUpgradeToCapella(state.Slot()) {
+			state, err = capella.UpgradeToCapella(state)
+			if err != nil {
+				tracing.AnnotateError(span, err)
+				return nil, err
+			}
+		}
 	}
 
 	return state, nil
@@ -240,7 +265,7 @@ func ReplayProcessSlots(ctx context.Context, state state.BeaconState, slot types
 
 // Given the start slot and the end slot, this returns the finalized beacon blocks in between.
 // Since hot states don't have finalized blocks, this should ONLY be used for replaying cold state.
-func (s *State) loadFinalizedBlocks(ctx context.Context, startSlot, endSlot types.Slot) ([]interfaces.SignedBeaconBlock, error) {
+func (s *State) loadFinalizedBlocks(ctx context.Context, startSlot, endSlot primitives.Slot) ([]interfaces.ReadOnlySignedBeaconBlock, error) {
 	f := filters.NewFilter().SetStartSlot(startSlot).SetEndSlot(endSlot)
 	bs, bRoots, err := s.beaconDB.Blocks(ctx, f)
 	if err != nil {
@@ -249,7 +274,7 @@ func (s *State) loadFinalizedBlocks(ctx context.Context, startSlot, endSlot type
 	if len(bs) != len(bRoots) {
 		return nil, errors.New("length of blocks and roots don't match")
 	}
-	fbs := make([]interfaces.SignedBeaconBlock, 0, len(bs))
+	fbs := make([]interfaces.ReadOnlySignedBeaconBlock, 0, len(bs))
 	for i := len(bs) - 1; i >= 0; i-- {
 		if s.beaconDB.IsFinalizedBlock(ctx, bRoots[i]) {
 			fbs = append(fbs, bs[i])

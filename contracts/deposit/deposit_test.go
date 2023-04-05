@@ -23,6 +23,8 @@ func TestDepositInput_GeneratesPb(t *testing.T) {
 	require.NoError(t, err)
 	assert.DeepEqual(t, k1.PublicKey().Marshal(), result.PublicKey)
 
+	contract := []byte{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}
+	nonce := uint64(0)
 	sig, err := bls.SignatureFromBytes(result.Signature)
 	require.NoError(t, err)
 	testData := &ethpb.DepositMessage{
@@ -30,7 +32,7 @@ func TestDepositInput_GeneratesPb(t *testing.T) {
 		WithdrawalCredentials: result.WithdrawalCredentials,
 		Amount:                result.Amount,
 		DeployedContract:      []byte{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11},
-		DeploymentNonce:       1,
+		DeploymentNonce:       0,
 	}
 	sr, err := testData.HashTreeRoot()
 	require.NoError(t, err)

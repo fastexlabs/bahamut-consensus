@@ -9,9 +9,9 @@ import (
 	"go.opencensus.io/trace"
 )
 
-// activityChanges returns a list of activityChanges that are ready for inclusion in the next beacon block.
-func (vs *Server) activityChanges(ctx context.Context, beaconState state.BeaconState) ([]*ethpb.ActivityChange, uint64, uint64, error) {
-	ctx, span := trace.StartSpan(ctx, "ProposerServer.activityChanges")
+// getActivityChanges returns a list of activityChanges that are ready for inclusion in the next beacon block.
+func (vs *Server) getActivityChanges(ctx context.Context, beaconState state.BeaconState) ([]*ethpb.ActivityChange, uint64, uint64, error) {
+	ctx, span := trace.StartSpan(ctx, "ProposerServer.getActivityChanges")
 	defer span.End()
 
 	if !vs.Eth1InfoFetcher.ExecutionClientConnected() {

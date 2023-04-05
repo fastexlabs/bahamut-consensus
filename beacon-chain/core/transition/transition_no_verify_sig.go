@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/altair"
 	b "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/blocks"
+	fastexphase1 "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/fastex-phase1"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition/interop"
 	v "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/validators"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
@@ -28,22 +29,23 @@ import (
 // This method also modifies the passed in state.
 //
 // Spec pseudocode definition:
-//  def state_transition(state: BeaconState, signed_block: SignedBeaconBlock, validate_result: bool=True) -> None:
-//    block = signed_block.message
-//    # Process slots (including those with no blocks) since block
-//    process_slots(state, block.slot)
-//    # Verify signature
-//    if validate_result:
-//        assert verify_block_signature(state, signed_block)
-//    # Process block
-//    process_block(state, block)
-//    # Verify state root
-//    if validate_result:
-//        assert block.state_root == hash_tree_root(state)
+//
+//	def state_transition(state: BeaconState, signed_block: ReadOnlySignedBeaconBlock, validate_result: bool=True) -> None:
+//	  block = signed_block.message
+//	  # Process slots (including those with no blocks) since block
+//	  process_slots(state, block.slot)
+//	  # Verify signature
+//	  if validate_result:
+//	      assert verify_block_signature(state, signed_block)
+//	  # Process block
+//	  process_block(state, block)
+//	  # Verify state root
+//	  if validate_result:
+//	      assert block.state_root == hash_tree_root(state)
 func ExecuteStateTransitionNoVerifyAnySig(
 	ctx context.Context,
 	st state.BeaconState,
-	signed interfaces.SignedBeaconBlock,
+	signed interfaces.ReadOnlySignedBeaconBlock,
 ) (*bls.SignatureBatch, state.BeaconState, error) {
 	if ctx.Err() != nil {
 		return nil, nil, ctx.Err()
@@ -52,7 +54,7 @@ func ExecuteStateTransitionNoVerifyAnySig(
 		return nil, nil, errors.New("nil block")
 	}
 
-	ctx, span := trace.StartSpan(ctx, "core.state.ExecuteStateTransitionNoVerifyAttSigs")
+	ctx, span := trace.StartSpan(ctx, "core.state.ExecuteStateTransitionNoVerifyAnySig")
 	defer span.End()
 	var err error
 
@@ -94,22 +96,23 @@ func ExecuteStateTransitionNoVerifyAnySig(
 // This is used for proposer to compute state root before proposing a new block, and this does not modify state.
 //
 // Spec pseudocode definition:
-//  def state_transition(state: BeaconState, signed_block: SignedBeaconBlock, validate_result: bool=True) -> None:
-//    block = signed_block.message
-//    # Process slots (including those with no blocks) since block
-//    process_slots(state, block.slot)
-//    # Verify signature
-//    if validate_result:
-//        assert verify_block_signature(state, signed_block)
-//    # Process block
-//    process_block(state, block)
-//    # Verify state root
-//    if validate_result:
-//        assert block.state_root == hash_tree_root(state)
+//
+//	def state_transition(state: BeaconState, signed_block: ReadOnlySignedBeaconBlock, validate_result: bool=True) -> None:
+//	  block = signed_block.message
+//	  # Process slots (including those with no blocks) since block
+//	  process_slots(state, block.slot)
+//	  # Verify signature
+//	  if validate_result:
+//	      assert verify_block_signature(state, signed_block)
+//	  # Process block
+//	  process_block(state, block)
+//	  # Verify state root
+//	  if validate_result:
+//	      assert block.state_root == hash_tree_root(state)
 func CalculateStateRoot(
 	ctx context.Context,
 	state state.BeaconState,
-	signed interfaces.SignedBeaconBlock,
+	signed interfaces.ReadOnlySignedBeaconBlock,
 ) ([32]byte, error) {
 	ctx, span := trace.StartSpan(ctx, "core.state.CalculateStateRoot")
 	defer span.End()
@@ -151,15 +154,15 @@ func CalculateStateRoot(
 //
 // Spec pseudocode definition:
 //
-//  def process_block(state: BeaconState, block: BeaconBlock) -> None:
-//    process_block_header(state, block)
-//    process_randao(state, block.body)
-//    process_eth1_data(state, block.body)
-//    process_operations(state, block.body)
+//	def process_block(state: BeaconState, block: ReadOnlyBeaconBlock) -> None:
+//	  process_block_header(state, block)
+//	  process_randao(state, block.body)
+//	  process_eth1_data(state, block.body)
+//	  process_operations(state, block.body)
 func ProcessBlockNoVerifyAnySig(
 	ctx context.Context,
 	st state.BeaconState,
-	signed interfaces.SignedBeaconBlock,
+	signed interfaces.ReadOnlySignedBeaconBlock,
 ) (*bls.SignatureBatch, state.BeaconState, error) {
 	ctx, span := trace.StartSpan(ctx, "core.state.ProcessBlockNoVerifyAnySig")
 	defer span.End()
@@ -198,6 +201,17 @@ func ProcessBlockNoVerifyAnySig(
 	set := bls.NewSet()
 	set.Join(bSet).Join(rSet).Join(aSet)
 
+	if blk.Version() >= version.Capella {
+		changes, err := signed.Block().Body().BLSToExecutionChanges()
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "could not get BLSToExecutionChanges")
+		}
+		cSet, err := b.BLSChangesSignatureBatch(st, changes)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "could not get BLSToExecutionChanges signatures")
+		}
+		set.Join(cSet)
+	}
 	return set, st, nil
 }
 
@@ -209,23 +223,24 @@ func ProcessBlockNoVerifyAnySig(
 //
 // Spec pseudocode definition:
 //
-//  def process_operations(state: BeaconState, body: BeaconBlockBody) -> None:
-//    # Verify that outstanding deposits are processed up to the maximum number of deposits
-//    assert len(body.deposits) == min(MAX_DEPOSITS, state.eth1_data.deposit_count - state.eth1_deposit_index)
+//	def process_operations(state: BeaconState, body: ReadOnlyBeaconBlockBody) -> None:
+//	  # Verify that outstanding deposits are processed up to the maximum number of deposits
+//	  assert len(body.deposits) == min(MAX_DEPOSITS, state.eth1_data.deposit_count - state.eth1_deposit_index)
 //
-//    def for_ops(operations: Sequence[Any], fn: Callable[[BeaconState, Any], None]) -> None:
-//        for operation in operations:
-//            fn(state, operation)
+//	  def for_ops(operations: Sequence[Any], fn: Callable[[BeaconState, Any], None]) -> None:
+//	      for operation in operations:
+//	          fn(state, operation)
 //
-//    for_ops(body.proposer_slashings, process_proposer_slashing)
-//    for_ops(body.attester_slashings, process_attester_slashing)
-//    for_ops(body.attestations, process_attestation)
-//    for_ops(body.deposits, process_deposit)
-//    for_ops(body.voluntary_exits, process_voluntary_exit)
+//	  for_ops(body.proposer_slashings, process_proposer_slashing)
+//	  for_ops(body.attester_slashings, process_attester_slashing)
+//	  for_ops(body.attestations, process_attestation)
+//	  for_ops(body.deposits, process_deposit)
+//	  for_ops(body.voluntary_exits, process_voluntary_exit)
 func ProcessOperationsNoVerifyAttsSigs(
 	ctx context.Context,
 	state state.BeaconState,
-	signedBeaconBlock interfaces.SignedBeaconBlock) (state.BeaconState, error) {
+	signedBeaconBlock interfaces.ReadOnlySignedBeaconBlock,
+) (state.BeaconState, error) {
 	ctx, span := trace.StartSpan(ctx, "core.state.ProcessOperationsNoVerifyAttsSigs")
 	defer span.End()
 	if err := blocks.BeaconBlockIsNil(signedBeaconBlock); err != nil {
@@ -248,6 +263,11 @@ func ProcessOperationsNoVerifyAttsSigs(
 		if err != nil {
 			return nil, err
 		}
+	case version.FastexPhase1, version.Capella:
+		state, err = fastexPhase1Operations(ctx, state, signedBeaconBlock)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, errors.New("block does not have correct version")
 	}
@@ -259,18 +279,19 @@ func ProcessOperationsNoVerifyAttsSigs(
 // and randao signature verifications.
 //
 // Spec pseudocode definition:
-// def process_block(state: BeaconState, block: BeaconBlock) -> None:
-//    process_block_header(state, block)
-//    if is_execution_enabled(state, block.body):
-//        process_execution_payload(state, block.body.execution_payload, EXECUTION_ENGINE)  # [New in Bellatrix]
-//    process_randao(state, block.body)
-//    process_eth1_data(state, block.body)
-//    process_operations(state, block.body)
-//    process_sync_aggregate(state, block.body.sync_aggregate)
+// def process_block(state: BeaconState, block: ReadOnlyBeaconBlock) -> None:
+//
+//	process_block_header(state, block)
+//	if is_execution_enabled(state, block.body):
+//	    process_execution_payload(state, block.body.execution_payload, EXECUTION_ENGINE)  # [New in Bellatrix]
+//	process_randao(state, block.body)
+//	process_eth1_data(state, block.body)
+//	process_operations(state, block.body)
+//	process_sync_aggregate(state, block.body.sync_aggregate)
 func ProcessBlockForStateRoot(
 	ctx context.Context,
 	state state.BeaconState,
-	signed interfaces.SignedBeaconBlock,
+	signed interfaces.ReadOnlySignedBeaconBlock,
 ) (state.BeaconState, error) {
 	ctx, span := trace.StartSpan(ctx, "core.state.ProcessBlockForStateRoot")
 	defer span.End()
@@ -337,19 +358,74 @@ func ProcessBlockForStateRoot(
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get sync aggregate from block")
 	}
-	state, err = altair.ProcessSyncAggregate(ctx, state, sa)
+
+	if signed.Block().Version() <= version.Bellatrix {
+		state, _, err = altair.ProcessSyncAggregate(ctx, state, sa)
+		if err != nil {
+			return nil, errors.Wrap(err, "process_sync_aggregate failed")
+		}
+
+		return state, nil
+	}
+
+	state, _, err = fastexphase1.ProcessSyncAggregate(ctx, state, sa)
 	if err != nil {
-		return nil, errors.Wrap(err, "process_sync_aggregate failed")
+		return nil, errors.Wrap(err, "process_sync_aggregate (fastex-phase1) failed")
 	}
 
 	return state, nil
 }
 
 // This calls altair block operations.
+func fastexPhase1Operations(
+	ctx context.Context,
+	st state.BeaconState,
+	signedBeaconBlock interfaces.ReadOnlySignedBeaconBlock,
+) (state.BeaconState, error) {
+	st, err := b.ProcessProposerSlashings(ctx, st, signedBeaconBlock.Block().Body().ProposerSlashings(), v.SlashValidator)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process altair proposer slashing")
+	}
+	st, err = b.ProcessAttesterSlashings(ctx, st, signedBeaconBlock.Block().Body().AttesterSlashings(), v.SlashValidator)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process altair attester slashing")
+	}
+	st, err = fastexphase1.ProcessAttestationsNoVerifySignature(ctx, st, signedBeaconBlock)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process fastex-phase1 attestation")
+	}
+	if _, err := altair.ProcessDeposits(ctx, st, signedBeaconBlock.Block().Body().Deposits()); err != nil {
+		return nil, errors.Wrap(err, "could not process altair deposit")
+	}
+	st, err = b.ProcessBlockActivities(ctx, st, signedBeaconBlock.Block().Body().ActivityChanges())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process activity changes")
+	}
+	st, err = b.ProcessLatestProcessedBlock(ctx, st, signedBeaconBlock.Block().Body().LatestProcessedBlock())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process latest processed block attribute")
+	}
+	st, err = b.ProcessTransactionsCount(ctx, st, signedBeaconBlock.Block().Body().TransactionsCount())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process transactions count")
+	}
+	st, err = b.ProcessVoluntaryExits(ctx, st, signedBeaconBlock.Block().Body().VoluntaryExits())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process voluntary exits")
+	}
+	st, err = fastexphase1.ProcessBaseFeePerEpoch(ctx, st, signedBeaconBlock)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process base fee")
+	}
+	return b.ProcessBLSToExecutionChanges(st, signedBeaconBlock)
+}
+
+// This calls altair block operations.
 func altairOperations(
 	ctx context.Context,
 	st state.BeaconState,
-	signedBeaconBlock interfaces.SignedBeaconBlock) (state.BeaconState, error) {
+	signedBeaconBlock interfaces.ReadOnlySignedBeaconBlock,
+) (state.BeaconState, error) {
 	st, err := b.ProcessProposerSlashings(ctx, st, signedBeaconBlock.Block().Body().ProposerSlashings(), v.SlashValidator)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process altair proposer slashing")
@@ -365,26 +441,31 @@ func altairOperations(
 	if _, err := altair.ProcessDeposits(ctx, st, signedBeaconBlock.Block().Body().Deposits()); err != nil {
 		return nil, errors.Wrap(err, "could not process altair deposit")
 	}
-	st, err = b.ProcessBlockActivitiesNoVerifySignature(ctx, st, signedBeaconBlock.Block().Body().ActivityChanges())
+	st, err = b.ProcessBlockActivities(ctx, st, signedBeaconBlock.Block().Body().ActivityChanges())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process activity changes")
 	}
-	st, err = b.ProcessLatestProcessedBlockNoVerifySignature(ctx, st, signedBeaconBlock.Block().Body().LatestProcessedBlock())
+	st, err = b.ProcessLatestProcessedBlock(ctx, st, signedBeaconBlock.Block().Body().LatestProcessedBlock())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process latest processed block attribute")
 	}
-	st, err = b.ProcessTransactionsCountNoVerifySignature(ctx, st, signedBeaconBlock.Block().Body().TransactionsCount())
+	st, err = b.ProcessTransactionsCount(ctx, st, signedBeaconBlock.Block().Body().TransactionsCount())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process transactions count")
 	}
-	return b.ProcessVoluntaryExits(ctx, st, signedBeaconBlock.Block().Body().VoluntaryExits())
+	st, err = b.ProcessVoluntaryExits(ctx, st, signedBeaconBlock.Block().Body().VoluntaryExits())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process voluntary exits")
+	}
+	return b.ProcessBLSToExecutionChanges(st, signedBeaconBlock)
 }
 
 // This calls phase 0 block operations.
 func phase0Operations(
 	ctx context.Context,
 	st state.BeaconState,
-	signedBeaconBlock interfaces.SignedBeaconBlock) (state.BeaconState, error) {
+	signedBeaconBlock interfaces.ReadOnlySignedBeaconBlock,
+) (state.BeaconState, error) {
 	st, err := b.ProcessProposerSlashings(ctx, st, signedBeaconBlock.Block().Body().ProposerSlashings(), v.SlashValidator)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process block proposer slashings")
@@ -400,15 +481,15 @@ func phase0Operations(
 	if _, err := b.ProcessDeposits(ctx, st, signedBeaconBlock.Block().Body().Deposits()); err != nil {
 		return nil, errors.Wrap(err, "could not process deposits")
 	}
-	st, err = b.ProcessBlockActivitiesNoVerifySignature(ctx, st, signedBeaconBlock.Block().Body().ActivityChanges())
+	st, err = b.ProcessBlockActivities(ctx, st, signedBeaconBlock.Block().Body().ActivityChanges())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process activity changes")
 	}
-	st, err = b.ProcessLatestProcessedBlockNoVerifySignature(ctx, st, signedBeaconBlock.Block().Body().LatestProcessedBlock())
+	st, err = b.ProcessLatestProcessedBlock(ctx, st, signedBeaconBlock.Block().Body().LatestProcessedBlock())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process latest processed block attribute")
 	}
-	st, err = b.ProcessTransactionsCountNoVerifySignature(ctx, st, signedBeaconBlock.Block().Body().TransactionsCount())
+	st, err = b.ProcessTransactionsCount(ctx, st, signedBeaconBlock.Block().Body().TransactionsCount())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process transactions count")
 	}

@@ -90,14 +90,14 @@ message BeaconBlockBody {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
-	// At most 1024 activity change.
+    // At max MAX_ACTIVITY_CHANGES.
     repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
 
-	// The number of latest processed block from execution layer.
+    // The block number from which activity changes were processed.
     uint64 latest_processed_block = 10;
 
-	// The number of transactions in the latest processed block.
-	uint64 transactions_count = 11;
+    // The number of transactions in latest processed block.
+    uint64 transactions_count = 11;
 }
 
 // Proposer slashings are proofs that a slashable offense has been committed by

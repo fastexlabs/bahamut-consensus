@@ -1,9 +1,10 @@
 package state_native
 
 import (
-	nativetypes "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
 	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v3/runtime/version"
 )
 
 // SetEth1Data for the beacon state.
@@ -12,7 +13,7 @@ func (b *BeaconState) SetEth1Data(val *ethpb.Eth1Data) error {
 	defer b.lock.Unlock()
 
 	b.eth1Data = val
-	b.markFieldAsDirty(nativetypes.Eth1Data)
+	b.markFieldAsDirty(types.Eth1Data)
 	return nil
 }
 
@@ -22,12 +23,12 @@ func (b *BeaconState) SetEth1DataVotes(val []*ethpb.Eth1Data) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	b.sharedFieldReferences[nativetypes.Eth1DataVotes].MinusRef()
-	b.sharedFieldReferences[nativetypes.Eth1DataVotes] = stateutil.NewRef(1)
+	b.sharedFieldReferences[types.Eth1DataVotes].MinusRef()
+	b.sharedFieldReferences[types.Eth1DataVotes] = stateutil.NewRef(1)
 
 	b.eth1DataVotes = val
-	b.markFieldAsDirty(nativetypes.Eth1DataVotes)
-	b.rebuildTrie[nativetypes.Eth1DataVotes] = true
+	b.markFieldAsDirty(types.Eth1DataVotes)
+	b.rebuildTrie[types.Eth1DataVotes] = true
 	return nil
 }
 
@@ -37,7 +38,7 @@ func (b *BeaconState) SetEth1DepositIndex(val uint64) error {
 	defer b.lock.Unlock()
 
 	b.eth1DepositIndex = val
-	b.markFieldAsDirty(nativetypes.Eth1DepositIndex)
+	b.markFieldAsDirty(types.Eth1DepositIndex)
 	return nil
 }
 
@@ -48,17 +49,17 @@ func (b *BeaconState) AppendEth1DataVotes(val *ethpb.Eth1Data) error {
 	defer b.lock.Unlock()
 
 	votes := b.eth1DataVotes
-	if b.sharedFieldReferences[nativetypes.Eth1DataVotes].Refs() > 1 {
+	if b.sharedFieldReferences[types.Eth1DataVotes].Refs() > 1 {
 		// Copy elements in underlying array by reference.
 		votes = make([]*ethpb.Eth1Data, len(b.eth1DataVotes))
 		copy(votes, b.eth1DataVotes)
-		b.sharedFieldReferences[nativetypes.Eth1DataVotes].MinusRef()
-		b.sharedFieldReferences[nativetypes.Eth1DataVotes] = stateutil.NewRef(1)
+		b.sharedFieldReferences[types.Eth1DataVotes].MinusRef()
+		b.sharedFieldReferences[types.Eth1DataVotes] = stateutil.NewRef(1)
 	}
 
 	b.eth1DataVotes = append(votes, val)
-	b.markFieldAsDirty(nativetypes.Eth1DataVotes)
-	b.addDirtyIndices(nativetypes.Eth1DataVotes, []uint64{uint64(len(b.eth1DataVotes) - 1)})
+	b.markFieldAsDirty(types.Eth1DataVotes)
+	b.addDirtyIndices(types.Eth1DataVotes, []uint64{uint64(len(b.eth1DataVotes) - 1)})
 	return nil
 }
 
@@ -68,7 +69,7 @@ func (b *BeaconState) SetLatestProcessedBlockActivities(val uint64) error {
 	defer b.lock.Unlock()
 
 	b.latestProcessedBlockActivities = val
-	b.markFieldAsDirty(nativetypes.LatestProcessedBlockActivities)
+	b.markFieldAsDirty(types.LatestProcessedBlockActivities)
 	return nil
 }
 
@@ -78,7 +79,7 @@ func (b *BeaconState) SetTransactionsGasPerPeriod(val uint64) error {
 	defer b.lock.Unlock()
 
 	b.transactionsGasPerPeriod = val
-	b.markFieldAsDirty(nativetypes.TransactionsGasPerPeriod)
+	b.markFieldAsDirty(types.TransactionsGasPerPeriod)
 	return nil
 }
 
@@ -88,7 +89,7 @@ func (b *BeaconState) SetTransactionsPerLatestEpoch(val uint64) error {
 	defer b.lock.Unlock()
 
 	b.transactionsPerLatestEpoch = val
-	b.markFieldAsDirty(nativetypes.TransactionsPerLatestEpoch)
+	b.markFieldAsDirty(types.TransactionsPerLatestEpoch)
 	return nil
 }
 
@@ -98,7 +99,7 @@ func (b *BeaconState) SetNonStakersGasPerEpoch(val uint64) error {
 	defer b.lock.Unlock()
 
 	b.nonStakersGasPerEpoch = val
-	b.markFieldAsDirty(nativetypes.NonStakersGasPerEpoch)
+	b.markFieldAsDirty(types.NonStakersGasPerEpoch)
 	return nil
 }
 
@@ -108,6 +109,32 @@ func (b *BeaconState) SetNonStakersGasPerPeriod(val uint64) error {
 	defer b.lock.Unlock()
 
 	b.nonStakersGasPerPeriod = val
-	b.markFieldAsDirty(nativetypes.NonStakersGasPerPeriod)
+	b.markFieldAsDirty(types.NonStakersGasPerPeriod)
+	return nil
+}
+
+func (b *BeaconState) SetBaseFeePerEpoch(val uint64) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	if b.version < version.FastexPhase1 {
+		return errNotSupported("SetBaseFeePerEpoch", b.version)
+	}
+
+	b.baseFeePerEpoch = val
+	b.markFieldAsDirty(types.BaseFeePerEpoch)
+	return nil
+}
+
+func (b *BeaconState) SetBaseFeePerPeriod(val uint64) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	if b.version < version.FastexPhase1 {
+		return errNotSupported("SetBaseFeePerPeriod", b.version)
+	}
+
+	b.baseFeePerPeriod = val
+	b.markFieldAsDirty(types.BaseFeePerPeriod)
 	return nil
 }

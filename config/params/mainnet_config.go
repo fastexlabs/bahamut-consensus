@@ -114,8 +114,10 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	SafeSlotsToUpdateJustified:       8,
 
 	// Fork choice algorithm constants.
-	ProposerScoreBoost: 40,
-	IntervalsPerSlot:   3,
+	ProposerScoreBoost:              40,
+	ReorgWeightThreshold:            20,
+	ReorgMaxEpochsSinceFinalization: 2,
+	IntervalsPerSlot:                3,
 
 	// Ethereum PoW parameters.
 	DepositChainID:         1, // Chain ID of eth1 mainnet.
@@ -142,6 +144,7 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 
 	// Reward and penalty quotients constants.
 	BaseRewardFactor:               64,
+	BaseRewardFactorFTN:            156,
 	WhistleBlowerRewardQuotient:    512,
 	ProposerRewardQuotient:         8,
 	InactivityPenaltyQuotient:      67108864,
@@ -149,11 +152,14 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	ProportionalSlashingMultiplier: 1,
 
 	// Max operations per block constants.
-	MaxProposerSlashings: 16,
-	MaxAttesterSlashings: 2,
-	MaxAttestations:      128,
-	MaxDeposits:          16,
-	MaxVoluntaryExits:    16,
+	MaxProposerSlashings:             16,
+	MaxAttesterSlashings:             2,
+	MaxAttestations:                  128,
+	MaxDeposits:                      16,
+	MaxVoluntaryExits:                16,
+	MaxWithdrawalsPerPayload:         16,
+	MaxBlsToExecutionChanges:         16,
+	MaxValidatorsPerWithdrawalsSweep: 16384,
 
 	// BLS domain values.
 	DomainBeaconProposer:              bytesutil.Uint32ToBytes4(0x00000000),
@@ -171,25 +177,28 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	DomainBLSToExecutionChange:        bytesutil.Uint32ToBytes4(0x0A000000),
 
 	// Prysm constants.
-	GweiPerEth:                     1000000000,
-	BLSSecretKeyLength:             32,
-	BLSPubkeyLength:                48,
-	DefaultBufferSize:              10000,
-	WithdrawalPrivkeyFileName:      "/shardwithdrawalkey",
-	ValidatorPrivkeyFileName:       "/validatorprivatekey",
-	RPCSyncCheck:                   1,
-	EmptySignature:                 [96]byte{},
-	DefaultPageSize:                250,
-	MaxPeersToSync:                 15,
-	SlotsPerArchivedPoint:          2048,
-	GenesisCountdownInterval:       time.Minute,
-	ConfigName:                     MainnetName,
-	PresetBase:                     "mainnet",
-	BeaconStateFieldCount:          28,
-	BeaconStateAltairFieldCount:    31,
-	BeaconStateBellatrixFieldCount: 32,
+	GweiPerEth:                        1000000000,
+	WeiPerGwei:                        1000000000,
+	BLSSecretKeyLength:                32,
+	BLSPubkeyLength:                   48,
+	DefaultBufferSize:                 10000,
+	WithdrawalPrivkeyFileName:         "/shardwithdrawalkey",
+	ValidatorPrivkeyFileName:          "/validatorprivatekey",
+	RPCSyncCheck:                      1,
+	EmptySignature:                    [96]byte{},
+	DefaultPageSize:                   250,
+	MaxPeersToSync:                    15,
+	SlotsPerArchivedPoint:             2048,
+	GenesisCountdownInterval:          time.Minute,
+	ConfigName:                        MainnetName,
+	PresetBase:                        "mainnet",
+	BeaconStateFieldCount:             28,
+	BeaconStateAltairFieldCount:       31,
+	BeaconStateBellatrixFieldCount:    32,
+	BeaconStateFastexPhase1FieldCount: 34,
+	BeaconStateCapellaFieldCount:      37,
 
-	EpochsPerActivityPeriod: 10,
+	EpochsPerActivityPeriod: 1575,
 	EpochsPerAcrivityUpdate: 1,
 
 	// Slasher related values.
@@ -201,16 +210,16 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	SafetyDecay: 10,
 
 	// Fork related values.
-	GenesisEpoch:         genesisForkEpoch,
-	GenesisForkVersion:   []byte{0, 0, 0, 0},
-	AltairForkVersion:    []byte{1, 0, 0, 0},
-	AltairForkEpoch:      mainnetAltairForkEpoch,
-	BellatrixForkVersion: []byte{2, 0, 0, 0},
-	BellatrixForkEpoch:   mainnetBellatrixForkEpoch,
-	CapellaForkVersion:   []byte{3, 0, 0, 0},
-	CapellaForkEpoch:     math.MaxUint64,
-	ShardingForkVersion:  []byte{4, 0, 0, 0},
-	ShardingForkEpoch:    math.MaxUint64,
+	GenesisEpoch:            genesisForkEpoch,
+	GenesisForkVersion:      []byte{0, 0, 0, 0},
+	AltairForkVersion:       []byte{1, 0, 0, 0},
+	AltairForkEpoch:         mainnetAltairForkEpoch,
+	BellatrixForkVersion:    []byte{2, 0, 0, 0},
+	BellatrixForkEpoch:      mainnetBellatrixForkEpoch,
+	FastexPhase1ForkVersion: []byte{3, 0, 0, 0},
+	FastexPhase1ForkEpoch:   math.MaxUint64,
+	CapellaForkVersion:      []byte{4, 0, 0, 0},
+	CapellaForkEpoch:        math.MaxUint64,
 
 	// New values introduced in Altair hard fork 1.
 	// Participation flag indices.
@@ -219,12 +228,13 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	TimelyHeadFlagIndex:   2,
 
 	// Incentivization weight values.
-	TimelySourceWeight: 14,
-	TimelyTargetWeight: 26,
-	TimelyHeadWeight:   14,
-	SyncRewardWeight:   2,
-	ProposerWeight:     8,
-	WeightDenominator:  64,
+	TimelySourceWeight:   14,
+	TimelyTargetWeight:   26,
+	TimelyHeadWeight:     14,
+	SyncRewardWeight:     2,
+	ProposerWeight:       8,
+	WeightDenominator:    64,
+	WeightDenominatorFTN: 56,
 
 	// Validator related values.
 	TargetAggregatorsPerSyncSubcommittee: 16,
@@ -257,6 +267,9 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	// Mevboost circuit breaker
 	MaxBuilderConsecutiveMissedSlots: 3,
 	MaxBuilderEpochMissedSlots:       8,
+
+	// Execution engine timeout value
+	ExecutionEngineTimeoutValue: 8, // 8 seconds default based on: https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md#core
 }
 
 // MainnetTestConfig provides a version of the mainnet config that has a different name
@@ -269,21 +282,21 @@ func MainnetTestConfig() *BeaconChainConfig {
 	return mn
 }
 
-// FillTestVersions replaces the byte in the last position of each fork version
-// so that
+// FillTestVersions replaces the fork schedule in the given BeaconChainConfig with test values, using the given
+// byte argument as the high byte (common across forks).
 func FillTestVersions(c *BeaconChainConfig, b byte) {
 	c.GenesisForkVersion = make([]byte, fieldparams.VersionLength)
 	c.AltairForkVersion = make([]byte, fieldparams.VersionLength)
 	c.BellatrixForkVersion = make([]byte, fieldparams.VersionLength)
-	c.ShardingForkVersion = make([]byte, fieldparams.VersionLength)
+	c.CapellaForkVersion = make([]byte, fieldparams.VersionLength)
 
 	c.GenesisForkVersion[fieldparams.VersionLength-1] = b
 	c.AltairForkVersion[fieldparams.VersionLength-1] = b
 	c.BellatrixForkVersion[fieldparams.VersionLength-1] = b
-	c.ShardingForkVersion[fieldparams.VersionLength-1] = b
+	c.CapellaForkVersion[fieldparams.VersionLength-1] = b
 
 	c.GenesisForkVersion[0] = 0
 	c.AltairForkVersion[0] = 1
 	c.BellatrixForkVersion[0] = 2
-	c.ShardingForkVersion[0] = 3
+	c.CapellaForkVersion[0] = 3
 }

@@ -67,6 +67,8 @@ func MinimalSpecConfig() *BeaconChainConfig {
 	minimalConfig.MaxAttestations = 128
 	minimalConfig.MaxDeposits = 16
 	minimalConfig.MaxVoluntaryExits = 16
+	minimalConfig.MaxWithdrawalsPerPayload = 4
+	minimalConfig.MaxValidatorsPerWithdrawalsSweep = 16
 
 	// Signature domains
 	minimalConfig.DomainBeaconProposer = bytesutil.ToBytes4(bytesutil.Bytes4(0))
@@ -85,10 +87,10 @@ func MinimalSpecConfig() *BeaconChainConfig {
 	minimalConfig.AltairForkEpoch = math.MaxUint64
 	minimalConfig.BellatrixForkVersion = []byte{2, 0, 0, 1}
 	minimalConfig.BellatrixForkEpoch = math.MaxUint64
-	minimalConfig.CapellaForkVersion = []byte{3, 0, 0, 1}
+	minimalConfig.FastexPhase1ForkVersion = []byte{3, 0, 0, 1}
 	minimalConfig.CapellaForkEpoch = math.MaxUint64
-	minimalConfig.ShardingForkVersion = []byte{4, 0, 0, 1}
-	minimalConfig.ShardingForkEpoch = math.MaxUint64
+	minimalConfig.CapellaForkVersion = []byte{4, 0, 0, 1}
+	minimalConfig.CapellaForkEpoch = math.MaxUint64
 
 	minimalConfig.SyncCommitteeSize = 32
 	minimalConfig.InactivityScoreBias = 4

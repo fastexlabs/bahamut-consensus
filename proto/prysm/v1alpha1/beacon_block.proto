@@ -18,6 +18,7 @@ package ethereum.eth.v1alpha1;
 import "proto/eth/ext/options.proto";
 import "proto/prysm/v1alpha1/attestation.proto";
 import "proto/prysm/v1alpha1/withdrawals.proto";
+import "proto/prysm/v1alpha1/blobs.proto";
 import "proto/engine/v1/execution_engine.proto";
 
 option csharp_namespace = "Ethereum.Eth.v1alpha1";
@@ -41,11 +42,17 @@ message GenericSignedBeaconBlock {
         // Representing a signed, post-Bellatrix fork blinded beacon block.
         SignedBlindedBeaconBlockBellatrix blinded_bellatrix = 4;
 
+        // Representing a signed, post-FastexPhase1 fork beacon block.
+        SignedBeaconBlockFastexPhase1 fastex_phase1 = 5;
+
+        // Representing a signed, post-FastexPhase1 fork blinded beacon block.
+        SignedBlindedBeaconBlockFastexPhase1 blinded_fastex_phase1 = 6;
+
         // Representing a signed, post-Capella fork beacon block.
-        SignedBeaconBlockCapella capella = 5;
+        SignedBeaconBlockCapella capella = 7;
 
         // Representing a signed, post-Capella fork blinded beacon block.
-        SignedBlindedBeaconBlockCapella blinded_capella = 6;
+        SignedBlindedBeaconBlockCapella blinded_capella = 8;
     }
 }
 
@@ -63,11 +70,17 @@ message GenericBeaconBlock {
         // Representing a post-Bellatrix fork blinded beacon block.
         BlindedBeaconBlockBellatrix blinded_bellatrix = 4;
 
+        // Representing a post-FastexPhase1 fork beacon block.
+        BeaconBlockFastexPhase1 fastex_phase1 = 5;
+
+        // Representing a post-FastexPhase1 fork blinded beacon block.
+        BlindedBeaconBlockFastexPhase1 blinded_fastex_phase1 = 6;
+
         // Representing a post-Capella fork beacon block.
-        BeaconBlockCapella capella = 5;
+        BeaconBlockCapella capella = 7;
 
         // Representing a post-Capella fork blinded beacon block.
-        BlindedBeaconBlockCapella blinded_capella = 6;
+        BlindedBeaconBlockCapella blinded_capella = 8;
     }
 }
 
@@ -155,11 +168,14 @@ message BeaconBlockBody {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
+    // At most MAX_ACTIVITY_CHANGES.
     repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
 
+    // The block number from which activity changes were processed.
     uint64 latest_processed_block = 10;
 
-	uint64 transactions_count = 11;
+    // The number of transactions in latest processed block.
+    uint64 transactions_count = 11;
 }
 
 
@@ -194,11 +210,14 @@ message BeaconBlockBodyAltair {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
+    // At most MAX_ACTIVITY_CHANGES.
     repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
 
+    // The block number from which activity changes were processed.
     uint64 latest_processed_block = 10;
 
-	uint64 transactions_count = 11;
+    // The number of transactions in latest processed block.
+    uint64 transactions_count = 11;
 
     // Sync aggregate object to track sync committee votes for light client support. [New in ]
     SyncAggregate sync_aggregate = 12;
@@ -394,11 +413,14 @@ message BeaconBlockBodyBellatrix {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
+    // At most MAX_ACTIVITY_CHANGES.
     repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
 
+    // The block number from which activity changes were processed.
     uint64 latest_processed_block = 10;
 
-	uint64 transactions_count = 11;
+    // The number of transactions in latest processed block.
+    uint64 transactions_count = 11;
 
     // Sync aggregate object for the beacon chain to track sync committee votes. New in Altair network upgrade.
     SyncAggregate sync_aggregate = 12;
@@ -458,17 +480,172 @@ message BlindedBeaconBlockBodyBellatrix {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
+    // At most MAX_ACTIVITY_CHANGES.
     repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
 
+    // The block number from which activity changes were processed.
     uint64 latest_processed_block = 10;
 
-	uint64 transactions_count = 11;
+    // The number of transactions in latest processed block.
+    uint64 transactions_count = 11;
 
     // Sync aggregate object for the beacon chain to track sync committee votes. New in Altair network upgrade.
     SyncAggregate sync_aggregate = 12;
 
     // Execution payload header from the execution chain. New in Bellatrix network upgrade to accommodate MEV interaction.
     ethereum.engine.v1.ExecutionPayloadHeader execution_payload_header = 13;
+}
+
+message SignedBeaconBlockFastexPhase1 {
+    // The unsigned beacon block itself.
+    BeaconBlockFastexPhase1 block = 1;
+
+    // 96 byte BLS signature from the validator that produced this block.
+    bytes signature = 2 [(ethereum.eth.ext.ssz_size) = "96"];
+}
+
+message BeaconBlockFastexPhase1 {
+    // Beacon chain slot that this block represents.
+    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
+
+    // Validator index of the validator that proposed the block header.
+    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+
+    // 32 byte root of the parent block.
+    bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];
+
+    // 32 byte root of the resulting state after processing this block.
+    bytes state_root = 4 [(ethereum.eth.ext.ssz_size) = "32"];
+
+    // The beacon block body.
+    BeaconBlockBodyFastexPhase1 body = 5;
+}
+
+message BeaconBlockBodyFastexPhase1 {
+    // The validators RANDAO reveal 96 byte value.
+    bytes randao_reveal = 1 [(ethereum.eth.ext.ssz_size) = "96"];
+
+    // A reference to the Ethereum 1.x chain.
+    Eth1Data eth1_data = 2;
+
+    // 32 byte field of arbitrary data. This field may contain any data and
+    // is not used for anything other than a fun message.
+    bytes graffiti = 3 [(ethereum.eth.ext.ssz_size) = "32"];
+
+    // Block operations
+    // Refer to spec constants at https://github.com/ethereum/consensus-specs/blob/dev/specs/core/0_beacon-chain.md#max-operations-per-block
+
+    // At most MAX_PROPOSER_SLASHINGS.
+    repeated ProposerSlashing proposer_slashings = 4 [(ethereum.eth.ext.ssz_max) = "16"];
+
+    // At most MAX_ATTESTER_SLASHINGS.
+    repeated AttesterSlashing attester_slashings = 5 [(ethereum.eth.ext.ssz_max) = "2"];
+
+    // At most MAX_ATTESTATIONS.
+    repeated Attestation attestations = 6 [(ethereum.eth.ext.ssz_max) = "128"];
+
+    // At most MAX_DEPOSITS.
+    repeated Deposit deposits = 7 [(ethereum.eth.ext.ssz_max) = "16"];
+
+    // At most MAX_VOLUNTARY_EXITS.
+    repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
+
+    // At most MAX_ACTIVITY_CHANGES.
+    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
+
+    // The block number from which activity changes were processed.
+    uint64 latest_processed_block = 10;
+
+    // The number of transactions in latest processed block.
+    uint64 transactions_count = 11;
+
+    // Sync aggregate object for the beacon chain to track sync committee votes. New in Altair network upgrade.
+    SyncAggregate sync_aggregate = 12;
+
+    // Execution payload from the execution chain. New in Bellatrix network upgrade.
+    ethereum.engine.v1.ExecutionPayload execution_payload = 13;
+
+    // Base fee per gas in latest processed block.
+    uint64 base_fee = 14;
+}
+
+message SignedBlindedBeaconBlockFastexPhase1 {
+    // The unsigned blinded beacon block itself.
+    BlindedBeaconBlockFastexPhase1 block = 1;
+
+    // 96 byte BLS signature from the validator that produced this blinded block.
+    bytes signature = 2 [(ethereum.eth.ext.ssz_size) = "96"];
+}
+
+message BlindedBeaconBlockFastexPhase1 {
+    // Beacon chain slot that this blinded block represents.
+    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
+
+    // Validator index of the validator that proposed the block header.
+    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+
+    // 32 byte root of the parent block.
+    bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];
+
+    // 32 byte root of the resulting state after processing this blinded block.
+    bytes state_root = 4 [(ethereum.eth.ext.ssz_size) = "32"];
+
+    // The blinded beacon block body.
+    BlindedBeaconBlockBodyFastexPhase1 body = 5;
+}
+
+message BlindedBeaconBlockBodyFastexPhase1 {
+    // The validators RANDAO reveal 96 byte value.
+    bytes randao_reveal = 1 [(ethereum.eth.ext.ssz_size) = "96"];
+
+    // A reference to the Ethereum 1.x chain.
+    Eth1Data eth1_data = 2;
+
+    // 32 byte field of arbitrary data. This field may contain any data and
+    // is not used for anything other than a fun message.
+    bytes graffiti = 3 [(ethereum.eth.ext.ssz_size) = "32"];
+
+    // At most MAX_PROPOSER_SLASHINGS.
+    repeated ProposerSlashing proposer_slashings = 4 [(ethereum.eth.ext.ssz_max) = "16"];
+
+    // At most MAX_ATTESTER_SLASHINGS.
+    repeated AttesterSlashing attester_slashings = 5 [(ethereum.eth.ext.ssz_max) = "2"];
+
+    // At most MAX_ATTESTATIONS.
+    repeated Attestation attestations = 6 [(ethereum.eth.ext.ssz_max) = "128"];
+
+    // At most MAX_DEPOSITS.
+    repeated Deposit deposits = 7 [(ethereum.eth.ext.ssz_max) = "16"];
+
+    // At most MAX_VOLUNTARY_EXITS.
+    repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
+
+    // At most MAX_ACTIVITY_CHANGES.
+    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
+
+    // The block number from which activity changes were processed.
+    uint64 latest_processed_block = 10;
+
+    // The number of transactions in latest processed block.
+    uint64 transactions_count = 11;
+
+    // Sync aggregate object for the beacon chain to track sync committee votes. New in Altair network upgrade.
+    SyncAggregate sync_aggregate = 12;
+
+    // Execution payload header from the execution chain. New in Bellatrix network upgrade to accommodate MEV interaction.
+    ethereum.engine.v1.ExecutionPayloadHeader execution_payload_header = 13;
+
+    // Base fee per gas in latest processed block.
+    uint64 base_fee = 14;
+}
+
+// This contains beacon block and the blob sidecar objects under single container.
+// It is to be gossip'ed over p2p to peers to validate and process.
+message SignedBeaconBlockAndBlobsSidecar {
+    // The block of the beacon chain.
+    SignedBeaconBlockCapella beacon_block = 1;
+    // The blob sidecar which corresponds to the block itself.
+    BlobsSidecar blobs_sidecar = 2;
 }
 
 message SignedBeaconBlockCapella {
@@ -525,11 +702,14 @@ message BeaconBlockBodyCapella {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
+    // At most MAX_ACTIVITY_CHANGES.
     repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
 
+    // The block number from which activity changes were processed.
     uint64 latest_processed_block = 10;
 
-	uint64 transactions_count = 11;
+    // The number of transactions in latest processed block.
+    uint64 transactions_count = 11;
 
     // Sync aggregate object for the beacon chain to track sync committee votes. New in Altair network upgrade.
     SyncAggregate sync_aggregate = 12;
@@ -537,8 +717,11 @@ message BeaconBlockBodyCapella {
     // Execution payload from the execution chain. New in Bellatrix network upgrade.
     ethereum.engine.v1.ExecutionPayloadCapella execution_payload = 13;
 
+    // Base fee per gas in latest processed block.
+    uint64 base_fee = 14;
+
     // At most MAX_BLS_TO_EXECUTION_CHANGES. New in Capella network upgrade.
-    repeated SignedBLSToExecutionChange bls_to_execution_changes = 14 [(ethereum.eth.ext.ssz_max) = "16"];
+    repeated SignedBLSToExecutionChange bls_to_execution_changes = 15 [(ethereum.eth.ext.ssz_max) = "16"];
 }
 
 message SignedBlindedBeaconBlockCapella {
@@ -592,11 +775,14 @@ message BlindedBeaconBlockBodyCapella {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
+    // At most MAX_ACTIVITY_CHANGES.
     repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
 
+    // The block number from which activity changes were processed.
     uint64 latest_processed_block = 10;
 
-	uint64 transactions_count = 11;
+    // The number of transactions in latest processed block.
+    uint64 transactions_count = 11;
 
     // Sync aggregate object for the beacon chain to track sync committee votes. New in Altair network upgrade.
     SyncAggregate sync_aggregate = 12;
@@ -604,15 +790,18 @@ message BlindedBeaconBlockBodyCapella {
     // Execution payload header from the execution chain. New in Bellatrix network upgrade to accommodate MEV interaction.
     ethereum.engine.v1.ExecutionPayloadHeaderCapella execution_payload_header = 13;
 
+    // Base fee per gas in latest processed block.
+    uint64 base_fee = 14;
+
     // At most MAX_BLS_TO_EXECUTION_CHANGES. New in Capella network upgrade.
-    repeated SignedBLSToExecutionChange bls_to_execution_changes = 14 [(ethereum.eth.ext.ssz_max) = "16"];
+    repeated SignedBLSToExecutionChange bls_to_execution_changes = 15 [(ethereum.eth.ext.ssz_max) = "16"];
 }
 
 message ValidatorRegistrationV1 {
-    bytes fee_recipient         = 1 [(ethereum.eth.ext.ssz_size) = "20"];
-    uint64 gas_limit             = 2;
-    uint64 timestamp            = 3;
-    bytes pubkey      = 4 [(ethereum.eth.ext.ssz_size) = "48"];
+    bytes fee_recipient = 1 [(ethereum.eth.ext.ssz_size) = "20"];
+    uint64 gas_limit = 2;
+    uint64 timestamp = 3;
+    bytes pubkey = 4 [(ethereum.eth.ext.ssz_size) = "48"];
 }
 
 message SignedValidatorRegistrationsV1 {
@@ -620,17 +809,28 @@ message SignedValidatorRegistrationsV1 {
 }
 
 message SignedValidatorRegistrationV1 {
-    ValidatorRegistrationV1 message         = 1 ;
-    bytes signature      = 2 [(ethereum.eth.ext.ssz_size) = "96"];
+    ValidatorRegistrationV1 message = 1 ;
+    bytes signature = 2 [(ethereum.eth.ext.ssz_size) = "96"];
 }
 
 message BuilderBid {
-    ethereum.engine.v1.ExecutionPayloadHeader header         = 1 ;
+    ethereum.engine.v1.ExecutionPayloadHeader header = 1;
     bytes value = 2 [(ethereum.eth.ext.ssz_size) = "32"];
-    bytes pubkey      = 3 [(ethereum.eth.ext.ssz_size) = "48"];
+    bytes pubkey = 3 [(ethereum.eth.ext.ssz_size) = "48"];
 }
 
 message SignedBuilderBid {
-    BuilderBid message         = 1 ;
-    bytes signature      = 2 [(ethereum.eth.ext.ssz_size) = "96"];
+    BuilderBid message = 1 ;
+    bytes signature = 2 [(ethereum.eth.ext.ssz_size) = "96"];
+}
+
+message BuilderBidCapella {
+    ethereum.engine.v1.ExecutionPayloadHeaderCapella header = 1 ;
+    bytes value = 2 [(ethereum.eth.ext.ssz_size) = "32"];
+    bytes pubkey = 3 [(ethereum.eth.ext.ssz_size) = "48"];
+}
+
+message SignedBuilderBidCapella {
+    BuilderBidCapella message = 1 ;
+    bytes signature = 2 [(ethereum.eth.ext.ssz_size) = "96"];
 }

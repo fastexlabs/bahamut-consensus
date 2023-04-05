@@ -26,6 +26,7 @@ func FastexChainTestnetConfig() *BeaconChainConfig {
 	cfg.DepositNetworkID = 424242
 	cfg.SecondsPerETH1Block = 12
 	cfg.EpochsPerEth1VotingPeriod = 64
+	cfg.EpochsPerActivityPeriod = 10
 	cfg.MaxEffectiveBalance = 8192 * 1e9
 	cfg.EjectionBalance = 4096 * 1e9
 	cfg.SigmoidExpCoefficient = -1.5
@@ -35,8 +36,10 @@ func FastexChainTestnetConfig() *BeaconChainConfig {
 	cfg.AltairForkVersion = []byte{0x01, 0x00, 0x00, 0x2A}
 	cfg.BellatrixForkEpoch = 2
 	cfg.BellatrixForkVersion = []byte{0x02, 0x00, 0x00, 0x2A}
+	cfg.FastexPhase1ForkEpoch = math.MaxUint64
+	cfg.FastexPhase1ForkVersion = []byte{0x03, 0x00, 0x00, 0x2A}
 	cfg.CapellaForkEpoch = math.MaxUint64
-	cfg.CapellaForkVersion = []byte{0x03, 0x00, 0x00, 0x2A}
+	cfg.CapellaForkVersion = []byte{0x04, 0x00, 0x00, 0x2A}
 	cfg.TerminalTotalDifficulty = "113400"
 	cfg.GenesisDelay = 44000
 	cfg.DepositContractAddress = "0x0000000006011920201511051404051615190920"

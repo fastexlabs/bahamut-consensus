@@ -12,16 +12,16 @@ import (
 	"go.opencensus.io/trace"
 )
 
-// ProcessBlockActivitiesNoVerifySignature applies processing operations to a block's inner
+// ProcessBlockActivities applies processing operations to a block's inner
 // activities records.
-func ProcessBlockActivitiesNoVerifySignature(
+func ProcessBlockActivities(
 	ctx context.Context,
 	beaconState state.BeaconState,
 	activities []*ethpb.ActivityChange,
 ) (state.BeaconState, error) {
 	var err error
 	for _, activity := range activities {
-		beaconState, err = ProcessActivityNoVerifySignature(ctx, beaconState, activity)
+		beaconState, err = ProcessActivity(ctx, beaconState, activity)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not process activties changes")
 		}
@@ -29,9 +29,9 @@ func ProcessBlockActivitiesNoVerifySignature(
 	return beaconState, nil
 }
 
-// ProcessBlockActivityNoVerifySignature applies processing operations to a single inner
+// ProcessActivity applies processing operations to a single inner
 // activities record.
-func ProcessActivityNoVerifySignature(
+func ProcessActivity(
 	ctx context.Context,
 	beaconState state.BeaconState,
 	activity *ethpb.ActivityChange,
@@ -78,8 +78,8 @@ func ProcessActivityNoVerifySignature(
 	return beaconState, nil
 }
 
-// ProcessLatestProcessedBlockNoVerifySignature applies latest processed block activities number to state.
-func ProcessLatestProcessedBlockNoVerifySignature(
+// ProcessLatestProcessedBlock applies latest processed block activities number to state.
+func ProcessLatestProcessedBlock(
 	ctx context.Context,
 	beaconState state.BeaconState,
 	val uint64,
@@ -95,8 +95,8 @@ func ProcessLatestProcessedBlockNoVerifySignature(
 	return beaconState, nil
 }
 
-// ProcessTransactionsCountNoVerifySignature applies transactions count in latest processed block to state.
-func ProcessTransactionsCountNoVerifySignature(
+// ProcessTransactionsCount applies transactions count in latest processed block to state.
+func ProcessTransactionsCount(
 	ctx context.Context,
 	beaconState state.BeaconState,
 	val uint64,

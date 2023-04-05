@@ -2,7 +2,10 @@ load("@prysm//tools/go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["validator_index_map.go", "contracts_index_map.go"],
+    srcs = [
+        "contracts_index_map.go",
+        "validator_index_map.go",
+    ],
     importpath = "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition/stateutils",
     visibility = [
         "//beacon-chain:__subpackages__",
@@ -19,7 +22,10 @@ go_library(
 go_test(
     name = "go_default_test",
     size = "small",
-    srcs = ["validator_index_map_test.go", "contracts_index_map_test.go"],
+    srcs = [
+        "contracts_index_map_test.go",
+        "validator_index_map_test.go",
+    ],
     deps = [
         ":go_default_library",
         "//beacon-chain/state/state-native:go_default_library",

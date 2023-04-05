@@ -118,6 +118,83 @@ func (b *BeaconState) ToProtoUnsafe() interface{} {
 			NextSyncCommittee:              b.nextSyncCommittee,
 			LatestExecutionPayloadHeader:   b.latestExecutionPayloadHeader,
 		}
+	case version.FastexPhase1:
+		return &ethpb.BeaconStateFastexPhase1{
+			GenesisTime:                    b.genesisTime,
+			GenesisValidatorsRoot:          gvrCopy[:],
+			Slot:                           b.slot,
+			Fork:                           b.fork,
+			LatestBlockHeader:              b.latestBlockHeader,
+			BlockRoots:                     b.blockRoots.Slice(),
+			StateRoots:                     b.stateRoots.Slice(),
+			HistoricalRoots:                b.historicalRoots.Slice(),
+			Eth1Data:                       b.eth1Data,
+			Eth1DataVotes:                  b.eth1DataVotes,
+			Eth1DepositIndex:               b.eth1DepositIndex,
+			LatestProcessedBlockActivities: b.latestProcessedBlockActivities,
+			TransactionsGasPerPeriod:       b.transactionsGasPerPeriod,
+			TransactionsPerLatestEpoch:     b.transactionsPerLatestEpoch,
+			NonStakersGasPerEpoch:          b.nonStakersGasPerEpoch,
+			NonStakersGasPerPeriod:         b.nonStakersGasPerPeriod,
+			Validators:                     b.validators,
+			Balances:                       b.balances,
+			Contracts:                      b.contracts,
+			Activities:                     b.activities,
+			RandaoMixes:                    b.randaoMixes.Slice(),
+			Slashings:                      b.slashings,
+			PreviousEpochParticipation:     b.previousEpochParticipation,
+			CurrentEpochParticipation:      b.currentEpochParticipation,
+			JustificationBits:              b.justificationBits,
+			PreviousJustifiedCheckpoint:    b.previousJustifiedCheckpoint,
+			CurrentJustifiedCheckpoint:     b.currentJustifiedCheckpoint,
+			FinalizedCheckpoint:            b.finalizedCheckpoint,
+			InactivityScores:               b.inactivityScores,
+			CurrentSyncCommittee:           b.currentSyncCommittee,
+			NextSyncCommittee:              b.nextSyncCommittee,
+			LatestExecutionPayloadHeader:   b.latestExecutionPayloadHeader,
+			BaseFeePerEpoch:                b.baseFeePerEpoch,
+			BaseFeePerPeriod:               b.baseFeePerPeriod,
+		}
+	case version.Capella:
+		return &ethpb.BeaconStateCapella{
+			GenesisTime:                    b.genesisTime,
+			GenesisValidatorsRoot:          gvrCopy[:],
+			Slot:                           b.slot,
+			Fork:                           b.fork,
+			LatestBlockHeader:              b.latestBlockHeader,
+			BlockRoots:                     b.blockRoots.Slice(),
+			StateRoots:                     b.stateRoots.Slice(),
+			HistoricalRoots:                b.historicalRoots.Slice(),
+			Eth1Data:                       b.eth1Data,
+			Eth1DataVotes:                  b.eth1DataVotes,
+			Eth1DepositIndex:               b.eth1DepositIndex,
+			LatestProcessedBlockActivities: b.latestProcessedBlockActivities,
+			TransactionsGasPerPeriod:       b.transactionsGasPerPeriod,
+			TransactionsPerLatestEpoch:     b.transactionsPerLatestEpoch,
+			NonStakersGasPerEpoch:          b.nonStakersGasPerEpoch,
+			NonStakersGasPerPeriod:         b.nonStakersGasPerPeriod,
+			Validators:                     b.validators,
+			Balances:                       b.balances,
+			Contracts:                      b.contracts,
+			Activities:                     b.activities,
+			RandaoMixes:                    b.randaoMixes.Slice(),
+			Slashings:                      b.slashings,
+			PreviousEpochParticipation:     b.previousEpochParticipation,
+			CurrentEpochParticipation:      b.currentEpochParticipation,
+			JustificationBits:              b.justificationBits,
+			PreviousJustifiedCheckpoint:    b.previousJustifiedCheckpoint,
+			CurrentJustifiedCheckpoint:     b.currentJustifiedCheckpoint,
+			FinalizedCheckpoint:            b.finalizedCheckpoint,
+			InactivityScores:               b.inactivityScores,
+			CurrentSyncCommittee:           b.currentSyncCommittee,
+			NextSyncCommittee:              b.nextSyncCommittee,
+			LatestExecutionPayloadHeader:   b.latestExecutionPayloadHeaderCapella,
+			BaseFeePerEpoch:                b.baseFeePerEpoch,
+			BaseFeePerPeriod:               b.baseFeePerPeriod,
+			NextWithdrawalIndex:            b.nextWithdrawalIndex,
+			NextWithdrawalValidatorIndex:   b.nextWithdrawalValidatorIndex,
+			HistoricalSummaries:            b.historicalSummaries,
+		}
 	default:
 		return nil
 	}
@@ -238,6 +315,88 @@ func (b *BeaconState) ToProto() interface{} {
 			NextSyncCommittee:            b.nextSyncCommitteeVal(),
 			LatestExecutionPayloadHeader: b.latestExecutionPayloadHeaderVal(),
 		}
+	case version.FastexPhase1:
+		return &ethpb.BeaconStateFastexPhase1{
+			GenesisTime:                    b.genesisTime,
+			GenesisValidatorsRoot:          gvrCopy[:],
+			Slot:                           b.slot,
+			Fork:                           b.forkVal(),
+			LatestBlockHeader:              b.latestBlockHeaderVal(),
+			BlockRoots:                     b.blockRoots.Slice(),
+			StateRoots:                     b.stateRoots.Slice(),
+			HistoricalRoots:                b.historicalRoots.Slice(),
+			Eth1Data:                       b.eth1DataVal(),
+			Eth1DataVotes:                  b.eth1DataVotesVal(),
+			Eth1DepositIndex:               b.eth1DepositIndex,
+			LatestProcessedBlockActivities: b.latestProcessedBlockActivities,
+			TransactionsGasPerPeriod:       b.transactionsGasPerPeriod,
+			TransactionsPerLatestEpoch:     b.transactionsPerLatestEpoch,
+			NonStakersGasPerEpoch:          b.nonStakersGasPerEpoch,
+			NonStakersGasPerPeriod:         b.nonStakersGasPerPeriod,
+			Validators:                     b.validatorsVal(),
+			Balances:                       b.balancesVal(),
+			Contracts:                      b.contractsVal(),
+			Activities:                     b.activitiesVal(),
+
+			RandaoMixes:                  b.randaoMixes.Slice(),
+			Slashings:                    b.slashingsVal(),
+			PreviousEpochParticipation:   b.previousEpochParticipationVal(),
+			CurrentEpochParticipation:    b.currentEpochParticipationVal(),
+			JustificationBits:            b.justificationBitsVal(),
+			PreviousJustifiedCheckpoint:  b.previousJustifiedCheckpointVal(),
+			CurrentJustifiedCheckpoint:   b.currentJustifiedCheckpointVal(),
+			FinalizedCheckpoint:          b.finalizedCheckpointVal(),
+			InactivityScores:             b.inactivityScoresVal(),
+			CurrentSyncCommittee:         b.currentSyncCommitteeVal(),
+			NextSyncCommittee:            b.nextSyncCommitteeVal(),
+			LatestExecutionPayloadHeader: b.latestExecutionPayloadHeaderVal(),
+
+			BaseFeePerEpoch:  b.baseFeePerEpoch,
+			BaseFeePerPeriod: b.baseFeePerPeriod,
+		}
+	case version.Capella:
+		return &ethpb.BeaconStateCapella{
+			GenesisTime:                    b.genesisTime,
+			GenesisValidatorsRoot:          gvrCopy[:],
+			Slot:                           b.slot,
+			Fork:                           b.forkVal(),
+			LatestBlockHeader:              b.latestBlockHeaderVal(),
+			BlockRoots:                     b.blockRoots.Slice(),
+			StateRoots:                     b.stateRoots.Slice(),
+			HistoricalRoots:                b.historicalRoots.Slice(),
+			Eth1Data:                       b.eth1DataVal(),
+			Eth1DataVotes:                  b.eth1DataVotesVal(),
+			Eth1DepositIndex:               b.eth1DepositIndex,
+			LatestProcessedBlockActivities: b.latestProcessedBlockActivities,
+			TransactionsGasPerPeriod:       b.transactionsGasPerPeriod,
+			TransactionsPerLatestEpoch:     b.transactionsPerLatestEpoch,
+			NonStakersGasPerEpoch:          b.nonStakersGasPerEpoch,
+			NonStakersGasPerPeriod:         b.nonStakersGasPerPeriod,
+			Validators:                     b.validatorsVal(),
+			Balances:                       b.balancesVal(),
+			Contracts:                      b.contractsVal(),
+			Activities:                     b.activitiesVal(),
+
+			RandaoMixes:                  b.randaoMixes.Slice(),
+			Slashings:                    b.slashingsVal(),
+			PreviousEpochParticipation:   b.previousEpochParticipationVal(),
+			CurrentEpochParticipation:    b.currentEpochParticipationVal(),
+			JustificationBits:            b.justificationBitsVal(),
+			PreviousJustifiedCheckpoint:  b.previousJustifiedCheckpointVal(),
+			CurrentJustifiedCheckpoint:   b.currentJustifiedCheckpointVal(),
+			FinalizedCheckpoint:          b.finalizedCheckpointVal(),
+			InactivityScores:             b.inactivityScoresVal(),
+			CurrentSyncCommittee:         b.currentSyncCommitteeVal(),
+			NextSyncCommittee:            b.nextSyncCommitteeVal(),
+			LatestExecutionPayloadHeader: b.latestExecutionPayloadHeaderCapellaVal(),
+
+			BaseFeePerEpoch:  b.baseFeePerEpoch,
+			BaseFeePerPeriod: b.baseFeePerPeriod,
+
+			NextWithdrawalIndex:          b.nextWithdrawalIndex,
+			NextWithdrawalValidatorIndex: b.nextWithdrawalValidatorIndex,
+			HistoricalSummaries:          b.historicalSummariesVal(),
+		}
 	default:
 		return nil
 	}
@@ -312,13 +471,22 @@ func ProtobufBeaconStateBellatrix(s interface{}) (*ethpb.BeaconStateBellatrix, e
 	return pbState, nil
 }
 
-// InnerStateUnsafe returns the pointer value of the underlying
-// beacon state proto object, bypassing immutability. Use with care.
-func (b *BeaconState) InnerStateUnsafe() interface{} {
-	return b.ToProtoUnsafe()
+// ProtobufBeaconStateFastexPhase1 transforms an input into beacon state FastexPhase1 in the form of protobuf.
+// Error is returned if the input is not type protobuf beacon state.
+func ProtobufBeaconStateFastexPhase1(s interface{}) (*ethpb.BeaconStateFastexPhase1, error) {
+	pbState, ok := s.(*ethpb.BeaconStateFastexPhase1)
+	if !ok {
+		return nil, errors.New("input is not type pb.BeaconStateBellatrix")
+	}
+	return pbState, nil
 }
 
-// CloneInnerState the beacon state into a protobuf for usage.
-func (b *BeaconState) CloneInnerState() interface{} {
-	return b.ToProto()
+// ProtobufBeaconStateCapella transforms an input into beacon state Capella in the form of protobuf.
+// Error is returned if the input is not type protobuf beacon state.
+func ProtobufBeaconStateCapella(s interface{}) (*ethpb.BeaconStateCapella, error) {
+	pbState, ok := s.(*ethpb.BeaconStateCapella)
+	if !ok {
+		return nil, errors.New("input is not type pb.BeaconStateCapella")
+	}
+	return pbState, nil
 }

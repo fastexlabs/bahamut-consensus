@@ -15,6 +15,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v3/container/trie"
 	"github.com/prysmaticlabs/prysm/v3/crypto/bls"
 	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
+	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
 	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v3/time"
 )
@@ -66,7 +67,7 @@ func GenerateGenesisStateFromDepositData(
 		return nil, nil, errors.Wrap(err, "could not generate genesis state")
 	}
 
-	pbState, err := statenative.ProtobufBeaconStatePhase0(beaconState.InnerStateUnsafe())
+	pbState, err := statenative.ProtobufBeaconStatePhase0(beaconState.ToProtoUnsafe())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -117,7 +118,7 @@ func DepositDataFromKeys(privKeys []bls.SecretKey, pubKeys []bls.PublicKey) ([]*
 	depositDataItems := make([]*ethpb.Deposit_Data, len(privKeys))
 	depositDataRoots := make([][]byte, len(privKeys))
 	results, err := async.Scatter(len(privKeys), func(offset int, entries int, _ *sync.RWMutex) (interface{}, error) {
-		items, roots, err := depositDataFromKeys(privKeys[offset:offset+entries], pubKeys[offset:offset+entries])
+		items, roots, err := depositDataFromKeys(privKeys[offset:offset+entries], pubKeys[offset:offset+entries], 0)
 		return &depositData{items: items, roots: roots}, err
 	})
 	if err != nil {
@@ -134,11 +135,17 @@ func DepositDataFromKeys(privKeys []bls.SecretKey, pubKeys []bls.PublicKey) ([]*
 	return depositDataItems, depositDataRoots, nil
 }
 
-func depositDataFromKeys(privKeys []bls.SecretKey, pubKeys []bls.PublicKey) ([]*ethpb.Deposit_Data, [][]byte, error) {
+// DepositDataFromKeysWithExecCreds generates a list of deposit data items from a set of BLS validator keys.
+func DepositDataFromKeysWithExecCreds(privKeys []bls.SecretKey, pubKeys []bls.PublicKey, numOfCreds uint64) ([]*ethpb.Deposit_Data, [][]byte, error) {
+	return depositDataFromKeys(privKeys, pubKeys, numOfCreds)
+}
+
+func depositDataFromKeys(privKeys []bls.SecretKey, pubKeys []bls.PublicKey, numOfCreds uint64) ([]*ethpb.Deposit_Data, [][]byte, error) {
 	dataRoots := make([][]byte, len(privKeys))
 	depositDataItems := make([]*ethpb.Deposit_Data, len(privKeys))
 	for i := 0; i < len(privKeys); i++ {
-		data, err := createDepositData(privKeys[i], pubKeys[i])
+		withCred := uint64(i) < numOfCreds
+		data, err := createDepositData(privKeys[i], pubKeys[i], withCred)
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "could not create deposit data for key: %#x", privKeys[i].Marshal())
 		}
@@ -153,13 +160,19 @@ func depositDataFromKeys(privKeys []bls.SecretKey, pubKeys []bls.PublicKey) ([]*
 }
 
 // Generates a deposit data item from BLS keys and signs the hash tree root of the data.
-func createDepositData(privKey bls.SecretKey, pubKey bls.PublicKey) (*ethpb.Deposit_Data, error) {
+func createDepositData(privKey bls.SecretKey, pubKey bls.PublicKey, withExecCreds bool) (*ethpb.Deposit_Data, error) {
 	depositMessage := &ethpb.DepositMessage{
 		PublicKey:             pubKey.Marshal(),
 		WithdrawalCredentials: withdrawalCredentialsHash(pubKey.Marshal()),
 		Amount:                params.BeaconConfig().MaxEffectiveBalance,
-		DeployedContract:      []byte{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11},
-		DeploymentNonce:       1,
+		DeployedContract:      []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		DeploymentNonce:       0,
+	}
+	if withExecCreds {
+		newCredentials := make([]byte, 12)
+		newCredentials[0] = params.BeaconConfig().ETH1AddressWithdrawalPrefixByte
+		execAddr := bytesutil.ToBytes20(pubKey.Marshal())
+		depositMessage.WithdrawalCredentials = append(newCredentials, execAddr[:]...)
 	}
 	sr, err := depositMessage.HashTreeRoot()
 	if err != nil {
@@ -188,8 +201,10 @@ func createDepositData(privKey bls.SecretKey, pubKey bls.PublicKey) (*ethpb.Depo
 // address.
 //
 // The specification is as follows:
-//   withdrawal_credentials[:1] == BLS_WITHDRAWAL_PREFIX_BYTE
-//   withdrawal_credentials[1:] == hash(withdrawal_pubkey)[1:]
+//
+//	withdrawal_credentials[:1] == BLS_WITHDRAWAL_PREFIX_BYTE
+//	withdrawal_credentials[1:] == hash(withdrawal_pubkey)[1:]
+//
 // where withdrawal_credentials is of type bytes32.
 func withdrawalCredentialsHash(pubKey []byte) []byte {
 	h := hash.Hash(pubKey)

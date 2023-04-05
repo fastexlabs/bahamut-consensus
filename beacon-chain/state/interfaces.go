@@ -9,7 +9,7 @@ import (
 	"github.com/prysmaticlabs/go-bitfield"
 	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	types "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
 	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
 	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
 )
@@ -21,7 +21,6 @@ type BeaconState interface {
 	WriteOnlyBeaconState
 	Copy() BeaconState
 	HashTreeRoot(ctx context.Context) ([32]byte, error)
-	FutureForkStub
 	StateProver
 }
 
@@ -51,20 +50,25 @@ type ReadOnlyBeaconState interface {
 	ReadOnlyActivities
 	ReadOnlyCheckpoint
 	ReadOnlyAttestations
-	InnerStateUnsafe() interface{}
-	CloneInnerState() interface{}
+	ReadOnlyWithdrawals
+	ReadOnlyParticipation
+	ReadOnlyInactivity
+	ReadOnlySyncCommittee
+	ToProtoUnsafe() interface{}
+	ToProto() interface{}
 	GenesisTime() uint64
 	GenesisValidatorsRoot() []byte
-	Slot() types.Slot
+	Slot() primitives.Slot
 	Fork() *ethpb.Fork
 	LatestBlockHeader() *ethpb.BeaconBlockHeader
-	HistoricalRoots() [][]byte
+	HistoricalRoots() ([][]byte, error)
+	HistoricalSummaries() ([]*ethpb.HistoricalSummary, error)
 	Slashings() []uint64
 	FieldReferencesCount() map[string]uint64
 	MarshalSSZ() ([]byte, error)
 	IsNil() bool
 	Version() int
-	LatestExecutionPayloadHeader() (*enginev1.ExecutionPayloadHeader, error)
+	LatestExecutionPayloadHeader() (interfaces.ExecutionData, error)
 }
 
 // WriteOnlyBeaconState defines a struct which only has write access to beacon state methods.
@@ -79,28 +83,37 @@ type WriteOnlyBeaconState interface {
 	WriteOnlyActivities
 	WriteOnlyCheckpoint
 	WriteOnlyAttestations
+	WriteOnlyParticipation
+	WriteOnlyInactivity
+	WriteOnlySyncCommittee
 	SetGenesisTime(val uint64) error
 	SetGenesisValidatorsRoot(val []byte) error
-	SetSlot(val types.Slot) error
+	SetSlot(val primitives.Slot) error
 	SetFork(val *ethpb.Fork) error
 	SetLatestBlockHeader(val *ethpb.BeaconBlockHeader) error
 	SetHistoricalRoots(val [][]byte) error
 	SetSlashings(val []uint64) error
 	UpdateSlashingsAtIndex(idx, val uint64) error
 	AppendHistoricalRoots(root [32]byte) error
+	AppendHistoricalSummaries(*ethpb.HistoricalSummary) error
 	SetLatestExecutionPayloadHeader(payload interfaces.ExecutionData) error
+	SetNextWithdrawalIndex(i uint64) error
+	SetNextWithdrawalValidatorIndex(i primitives.ValidatorIndex) error
 }
 
 // ReadOnlyValidator defines a struct which only has read access to validator methods.
 type ReadOnlyValidator interface {
 	EffectiveBalance() uint64
 	EffectiveActivity() uint64
-	ActivationEligibilityEpoch() types.Epoch
-	ActivationEpoch() types.Epoch
-	WithdrawableEpoch() types.Epoch
-	ExitEpoch() types.Epoch
+	ActivationEligibilityEpoch() primitives.Epoch
+	ActivationEpoch() primitives.Epoch
+	WithdrawableEpoch() primitives.Epoch
+	ExitEpoch() primitives.Epoch
 	PublicKey() [fieldparams.BLSPubkeyLength]byte
 	WithdrawalCredentials() []byte
+	HasETH1WithdrawalCredential() bool
+	IsFullyWithdrawable(primitives.Epoch) bool
+	IsPartiallyWithdrawable(uint64) bool
 	Slashed() bool
 	IsNil() bool
 }
@@ -108,10 +121,10 @@ type ReadOnlyValidator interface {
 // ReadOnlyValidators defines a struct which only has read access to validators methods.
 type ReadOnlyValidators interface {
 	Validators() []*ethpb.Validator
-	ValidatorAtIndex(idx types.ValidatorIndex) (*ethpb.Validator, error)
-	ValidatorAtIndexReadOnly(idx types.ValidatorIndex) (ReadOnlyValidator, error)
-	ValidatorIndexByPubkey(key [fieldparams.BLSPubkeyLength]byte) (types.ValidatorIndex, bool)
-	PubkeyAtIndex(idx types.ValidatorIndex) [fieldparams.BLSPubkeyLength]byte
+	ValidatorAtIndex(idx primitives.ValidatorIndex) (*ethpb.Validator, error)
+	ValidatorAtIndexReadOnly(idx primitives.ValidatorIndex) (ReadOnlyValidator, error)
+	ValidatorIndexByPubkey(key [fieldparams.BLSPubkeyLength]byte) (primitives.ValidatorIndex, bool)
+	PubkeyAtIndex(idx primitives.ValidatorIndex) [fieldparams.BLSPubkeyLength]byte
 	NumValidators() int
 	ReadFromEveryValidator(f func(idx int, val ReadOnlyValidator) error) error
 	TransactionsGasPerPeriod() uint64
@@ -122,30 +135,30 @@ type ReadOnlyValidators interface {
 // ReadOnlyBalances defines a struct which only has read access to balances methods.
 type ReadOnlyBalances interface {
 	Balances() []uint64
-	BalanceAtIndex(idx types.ValidatorIndex) (uint64, error)
+	BalanceAtIndex(idx primitives.ValidatorIndex) (uint64, error)
 	BalancesLength() int
 }
 
 // ReadOnlyContractsContainers defines a struct which only has read access to contract containers methods.
 type ReadOnlyContractsContainers interface {
 	Contracts() []*ethpb.ContractsContainer
-	ContractsAtIndex(idx types.ValidatorIndex) (*ethpb.ContractsContainer, error)
-	ContractsAtIndexReadOnly(idx types.ValidatorIndex) (ReadOnlyContractsContainer, error)
-	ValidatorIndexByContractAddress(key [fieldparams.ExecutionLayerAddressLength]byte) (types.ValidatorIndex, bool)
+	ContractsAtIndex(idx primitives.ValidatorIndex) (*ethpb.ContractsContainer, error)
+	ContractsAtIndexReadOnly(idx primitives.ValidatorIndex) (ReadOnlyContractsContainer, error)
+	ValidatorIndexByContractAddress(key [fieldparams.ExecutionLayerAddressLength]byte) (primitives.ValidatorIndex, bool)
 	ContractsLength() int
 }
 
 // ReadOnlyContractsContainer defines a struct which only has read access to contract container methods.
 type ReadOnlyContractsContainer interface {
 	Contracts() [][fieldparams.ExecutionLayerAddressLength]byte
-	ContractAtIndex(idx int) [fieldparams.ExecutionLayerAddressLength]byte
+	ContractAtIndex(idx int) ([fieldparams.ExecutionLayerAddressLength]byte, error)
 	IsNil() bool
 }
 
 // ReadOnlyActivities defines a struct which only has read access to activities methods.
 type ReadOnlyActivities interface {
 	Activities() []uint64
-	ActivityAtIndex(idx types.ValidatorIndex) (uint64, error)
+	ActivityAtIndex(idx primitives.ValidatorIndex) (uint64, error)
 	ActivitiesLength() int
 }
 
@@ -156,8 +169,9 @@ type ReadOnlyCheckpoint interface {
 	MatchCurrentJustifiedCheckpoint(c *ethpb.Checkpoint) bool
 	MatchPreviousJustifiedCheckpoint(c *ethpb.Checkpoint) bool
 	FinalizedCheckpoint() *ethpb.Checkpoint
-	FinalizedCheckpointEpoch() types.Epoch
+	FinalizedCheckpointEpoch() primitives.Epoch
 	JustificationBits() bitfield.Bitvector4
+	UnrealizedCheckpointBalances() (uint64, uint64, uint64, error)
 }
 
 // ReadOnlyBlockRoots defines a struct which only has read access to block roots methods.
@@ -189,12 +203,38 @@ type ReadOnlyEth1Data interface {
 	TransactionsPerLatestEpoch() uint64
 	NonStakersGasPerEpoch() uint64
 	NonStakersGasPerPeriod() uint64
+	BaseFeePerEpoch() (uint64, error)
+	BaseFeePerPeriod() (uint64, error)
 }
 
 // ReadOnlyAttestations defines a struct which only has read access to attestations methods.
 type ReadOnlyAttestations interface {
 	PreviousEpochAttestations() ([]*ethpb.PendingAttestation, error)
 	CurrentEpochAttestations() ([]*ethpb.PendingAttestation, error)
+}
+
+// ReadOnlyWithdrawals defines a struct which only has read access to withdrawal methods.
+type ReadOnlyWithdrawals interface {
+	ExpectedWithdrawals() ([]*enginev1.Withdrawal, error)
+	NextWithdrawalValidatorIndex() (primitives.ValidatorIndex, error)
+	NextWithdrawalIndex() (uint64, error)
+}
+
+// ReadOnlyParticipation defines a struct which only has read access to participation methods.
+type ReadOnlyParticipation interface {
+	CurrentEpochParticipation() ([]byte, error)
+	PreviousEpochParticipation() ([]byte, error)
+}
+
+// ReadOnlyInactivity defines a struct which only has read access to inactivity methods.
+type ReadOnlyInactivity interface {
+	InactivityScores() ([]uint64, error)
+}
+
+// ReadOnlySyncCommittee defines a struct which only has read access to sync committee methods.
+type ReadOnlySyncCommittee interface {
+	CurrentSyncCommittee() (*ethpb.SyncCommittee, error)
+	NextSyncCommittee() (*ethpb.SyncCommittee, error)
 }
 
 // WriteOnlyBlockRoots defines a struct which only has write access to block roots methods.
@@ -220,34 +260,36 @@ type WriteOnlyEth1Data interface {
 	SetTransactionsPerLatestEpoch(val uint64) error
 	SetNonStakersGasPerEpoch(val uint64) error
 	SetNonStakersGasPerPeriod(val uint64) error
+	SetBaseFeePerEpoch(val uint64) error
+	SetBaseFeePerPeriod(val uint64) error
 }
 
 // WriteOnlyValidators defines a struct which only has write access to validators methods.
 type WriteOnlyValidators interface {
 	SetValidators(val []*ethpb.Validator) error
 	ApplyToEveryValidator(f func(idx int, val *ethpb.Validator) (bool, *ethpb.Validator, error)) error
-	UpdateValidatorAtIndex(idx types.ValidatorIndex, val *ethpb.Validator) error
+	UpdateValidatorAtIndex(idx primitives.ValidatorIndex, val *ethpb.Validator) error
 	AppendValidator(val *ethpb.Validator) error
 }
 
 // WriteOnlyBalances defines a struct which only has write access to balances methods.
 type WriteOnlyBalances interface {
 	SetBalances(val []uint64) error
-	UpdateBalancesAtIndex(idx types.ValidatorIndex, val uint64) error
+	UpdateBalancesAtIndex(idx primitives.ValidatorIndex, val uint64) error
 	AppendBalance(bal uint64) error
 }
 
 // WriteOnlyContractsContainers defines a struct which only has write access to contracts containers methods.
 type WriteOnlyContractsContainers interface {
 	SetContracts(cc []*ethpb.ContractsContainer) error
-	UpdateContractsAtIndex(idx types.ValidatorIndex, cc *ethpb.ContractsContainer) error
+	UpdateContractsAtIndex(idx primitives.ValidatorIndex, cc *ethpb.ContractsContainer) error
 	AppendContracts(cc *ethpb.ContractsContainer) error
 }
 
 // WriteOnlyActivities defines a struct which only has write access to activities methods.
 type WriteOnlyActivities interface {
 	SetActivities(activities []uint64) error
-	UpdateActivitiesAtIndex(idx types.ValidatorIndex, activity uint64) error
+	UpdateActivitiesAtIndex(idx primitives.ValidatorIndex, activity uint64) error
 	AppendActivity(activity uint64) error
 }
 
@@ -269,26 +311,29 @@ type WriteOnlyCheckpoint interface {
 type WriteOnlyAttestations interface {
 	AppendCurrentEpochAttestations(val *ethpb.PendingAttestation) error
 	AppendPreviousEpochAttestations(val *ethpb.PendingAttestation) error
+	SetPreviousEpochAttestations([]*ethpb.PendingAttestation) error
+	SetCurrentEpochAttestations([]*ethpb.PendingAttestation) error
 	RotateAttestations() error
 }
 
-// FutureForkStub defines methods that are used for future forks. This is a low cost solution to enable
-// various state casting of interface to work.
-type FutureForkStub interface {
+// WriteOnlyParticipation defines a struct which only has write access to participation methods.
+type WriteOnlyParticipation interface {
 	AppendCurrentParticipationBits(val byte) error
 	AppendPreviousParticipationBits(val byte) error
-	AppendInactivityScore(s uint64) error
-	CurrentEpochParticipation() ([]byte, error)
-	PreviousEpochParticipation() ([]byte, error)
-	UnrealizedCheckpointBalances() (uint64, uint64, uint64, error)
-	InactivityScores() ([]uint64, error)
-	SetInactivityScores(val []uint64) error
-	CurrentSyncCommittee() (*ethpb.SyncCommittee, error)
-	SetCurrentSyncCommittee(val *ethpb.SyncCommittee) error
 	SetPreviousParticipationBits(val []byte) error
 	SetCurrentParticipationBits(val []byte) error
 	ModifyCurrentParticipationBits(func(val []byte) ([]byte, error)) error
 	ModifyPreviousParticipationBits(func(val []byte) ([]byte, error)) error
-	NextSyncCommittee() (*ethpb.SyncCommittee, error)
+}
+
+// WriteOnlyInactivity defines a struct which only has write access to inactivity methods.
+type WriteOnlyInactivity interface {
+	AppendInactivityScore(s uint64) error
+	SetInactivityScores(val []uint64) error
+}
+
+// WriteOnlySyncCommittee defines a struct which only has write access to sync committee methods.
+type WriteOnlySyncCommittee interface {
+	SetCurrentSyncCommittee(val *ethpb.SyncCommittee) error
 	SetNextSyncCommittee(val *ethpb.SyncCommittee) error
 }

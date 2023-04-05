@@ -13,12 +13,13 @@ import (
 var GetBlockActivitiesMethod string = "eth_getBlockActivities"
 
 type BlockActivitiesResult struct {
+	BaseFee         uint64                  `json:"baseFee"`
 	TxCount         uint64                  `json:"txCount"`
 	ActivityChanges []*ethpb.ActivityChange `json:"activities"`
 }
 
 // GetBlockActivities from execution layer from particular block.
-func (s *Service) GetBlockActivities(ctx context.Context, blkNum *big.Int) ([]*ethpb.ActivityChange, uint64, error) {
+func (s *Service) GetBlockActivities(ctx context.Context, blkNum *big.Int) ([]*ethpb.ActivityChange, uint64, uint64, error) {
 	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.GetBlockActivities")
 	defer span.End()
 	var result BlockActivitiesResult
@@ -29,15 +30,15 @@ func (s *Service) GetBlockActivities(ctx context.Context, blkNum *big.Int) ([]*e
 		GetBlockActivitiesMethod,
 		fmt.Sprintf("0x%x", blkNum.Uint64()),
 	); err != nil {
-		return nil, 0, handleRPCError(err)
+		return nil, 0, 0, handleRPCError(err)
 	}
 
-	return result.ActivityChanges, result.TxCount, nil
+	return result.ActivityChanges, result.TxCount, result.BaseFee, nil
 }
 
 // ProcessBlockActivities insert activity change data into cache.
 func (s *Service) ProcessBlockActivities(ctx context.Context, blkNum *big.Int) error {
-	activityChanges, txCount, err := s.GetBlockActivities(ctx, blkNum)
+	activityChanges, txCount, baseFee, err := s.GetBlockActivities(ctx, blkNum)
 	if err != nil {
 		return err
 	}
@@ -50,6 +51,10 @@ func (s *Service) ProcessBlockActivities(ctx context.Context, blkNum *big.Int) e
 		if err := s.cfg.activityChangesCache.InsertActivityChanges(ctx, blkNum, activityChanges); err != nil {
 			return err
 		}
+	}
+
+	if err := s.cfg.baseFeeCache.InsertBaseFee(ctx, blkNum, baseFee); err != nil {
+		return err
 	}
 
 	log.WithFields(logrus.Fields{

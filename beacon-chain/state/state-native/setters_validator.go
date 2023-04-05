@@ -2,9 +2,9 @@ package state_native
 
 import (
 	"github.com/pkg/errors"
-	nativetypes "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
 	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
-	types "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
 	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v3/runtime/version"
@@ -17,10 +17,10 @@ func (b *BeaconState) SetValidators(val []*ethpb.Validator) error {
 	defer b.lock.Unlock()
 
 	b.validators = val
-	b.sharedFieldReferences[nativetypes.Validators].MinusRef()
-	b.sharedFieldReferences[nativetypes.Validators] = stateutil.NewRef(1)
-	b.markFieldAsDirty(nativetypes.Validators)
-	b.rebuildTrie[nativetypes.Validators] = true
+	b.sharedFieldReferences[types.Validators].MinusRef()
+	b.sharedFieldReferences[types.Validators] = stateutil.NewRef(1)
+	b.markFieldAsDirty(types.Validators)
+	b.rebuildTrie[types.Validators] = true
 	b.valMapHandler = stateutil.NewValMapHandler(b.validators)
 	return nil
 }
@@ -30,10 +30,10 @@ func (b *BeaconState) SetValidators(val []*ethpb.Validator) error {
 func (b *BeaconState) ApplyToEveryValidator(f func(idx int, val *ethpb.Validator) (bool, *ethpb.Validator, error)) error {
 	b.lock.Lock()
 	v := b.validators
-	if ref := b.sharedFieldReferences[nativetypes.Validators]; ref.Refs() > 1 {
+	if ref := b.sharedFieldReferences[types.Validators]; ref.Refs() > 1 {
 		v = b.validatorsReferences()
 		ref.MinusRef()
-		b.sharedFieldReferences[nativetypes.Validators] = stateutil.NewRef(1)
+		b.sharedFieldReferences[types.Validators] = stateutil.NewRef(1)
 	}
 	b.lock.Unlock()
 	var changedVals []uint64
@@ -52,15 +52,15 @@ func (b *BeaconState) ApplyToEveryValidator(f func(idx int, val *ethpb.Validator
 	defer b.lock.Unlock()
 
 	b.validators = v
-	b.markFieldAsDirty(nativetypes.Validators)
-	b.addDirtyIndices(nativetypes.Validators, changedVals)
+	b.markFieldAsDirty(types.Validators)
+	b.addDirtyIndices(types.Validators, changedVals)
 
 	return nil
 }
 
 // UpdateValidatorAtIndex for the beacon state. Updates the validator
 // at a specific index to a new value.
-func (b *BeaconState) UpdateValidatorAtIndex(idx types.ValidatorIndex, val *ethpb.Validator) error {
+func (b *BeaconState) UpdateValidatorAtIndex(idx primitives.ValidatorIndex, val *ethpb.Validator) error {
 	if uint64(len(b.validators)) <= uint64(idx) {
 		return errors.Errorf("invalid index provided %d", idx)
 	}
@@ -68,16 +68,16 @@ func (b *BeaconState) UpdateValidatorAtIndex(idx types.ValidatorIndex, val *ethp
 	defer b.lock.Unlock()
 
 	v := b.validators
-	if ref := b.sharedFieldReferences[nativetypes.Validators]; ref.Refs() > 1 {
+	if ref := b.sharedFieldReferences[types.Validators]; ref.Refs() > 1 {
 		v = b.validatorsReferences()
 		ref.MinusRef()
-		b.sharedFieldReferences[nativetypes.Validators] = stateutil.NewRef(1)
+		b.sharedFieldReferences[types.Validators] = stateutil.NewRef(1)
 	}
 
 	v[idx] = val
 	b.validators = v
-	b.markFieldAsDirty(nativetypes.Validators)
-	b.addDirtyIndices(nativetypes.Validators, []uint64{uint64(idx)})
+	b.markFieldAsDirty(types.Validators)
+	b.addDirtyIndices(types.Validators, []uint64{uint64(idx)})
 
 	return nil
 }
@@ -88,18 +88,18 @@ func (b *BeaconState) SetBalances(val []uint64) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	b.sharedFieldReferences[nativetypes.Balances].MinusRef()
-	b.sharedFieldReferences[nativetypes.Balances] = stateutil.NewRef(1)
+	b.sharedFieldReferences[types.Balances].MinusRef()
+	b.sharedFieldReferences[types.Balances] = stateutil.NewRef(1)
 
 	b.balances = val
-	b.markFieldAsDirty(nativetypes.Balances)
-	b.rebuildTrie[nativetypes.Balances] = true
+	b.markFieldAsDirty(types.Balances)
+	b.rebuildTrie[types.Balances] = true
 	return nil
 }
 
 // UpdateBalancesAtIndex for the beacon state. This method updates the balance
 // at a specific index to a new value.
-func (b *BeaconState) UpdateBalancesAtIndex(idx types.ValidatorIndex, val uint64) error {
+func (b *BeaconState) UpdateBalancesAtIndex(idx primitives.ValidatorIndex, val uint64) error {
 	if uint64(len(b.balances)) <= uint64(idx) {
 		return errors.Errorf("invalid index provided %d", idx)
 	}
@@ -107,16 +107,16 @@ func (b *BeaconState) UpdateBalancesAtIndex(idx types.ValidatorIndex, val uint64
 	defer b.lock.Unlock()
 
 	bals := b.balances
-	if b.sharedFieldReferences[nativetypes.Balances].Refs() > 1 {
+	if b.sharedFieldReferences[types.Balances].Refs() > 1 {
 		bals = b.balancesVal()
-		b.sharedFieldReferences[nativetypes.Balances].MinusRef()
-		b.sharedFieldReferences[nativetypes.Balances] = stateutil.NewRef(1)
+		b.sharedFieldReferences[types.Balances].MinusRef()
+		b.sharedFieldReferences[types.Balances] = stateutil.NewRef(1)
 	}
 
 	bals[idx] = val
 	b.balances = bals
-	b.markFieldAsDirty(nativetypes.Balances)
-	b.addDirtyIndices(nativetypes.Balances, []uint64{uint64(idx)})
+	b.markFieldAsDirty(types.Balances)
+	b.addDirtyIndices(types.Balances, []uint64{uint64(idx)})
 	return nil
 }
 
@@ -126,11 +126,11 @@ func (b *BeaconState) SetSlashings(val []uint64) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	b.sharedFieldReferences[nativetypes.Slashings].MinusRef()
-	b.sharedFieldReferences[nativetypes.Slashings] = stateutil.NewRef(1)
+	b.sharedFieldReferences[types.Slashings].MinusRef()
+	b.sharedFieldReferences[types.Slashings] = stateutil.NewRef(1)
 
 	b.slashings = val
-	b.markFieldAsDirty(nativetypes.Slashings)
+	b.markFieldAsDirty(types.Slashings)
 	return nil
 }
 
@@ -144,17 +144,17 @@ func (b *BeaconState) UpdateSlashingsAtIndex(idx, val uint64) error {
 	defer b.lock.Unlock()
 
 	s := b.slashings
-	if b.sharedFieldReferences[nativetypes.Slashings].Refs() > 1 {
+	if b.sharedFieldReferences[types.Slashings].Refs() > 1 {
 		s = b.slashingsVal()
-		b.sharedFieldReferences[nativetypes.Slashings].MinusRef()
-		b.sharedFieldReferences[nativetypes.Slashings] = stateutil.NewRef(1)
+		b.sharedFieldReferences[types.Slashings].MinusRef()
+		b.sharedFieldReferences[types.Slashings] = stateutil.NewRef(1)
 	}
 
 	s[idx] = val
 
 	b.slashings = s
 
-	b.markFieldAsDirty(nativetypes.Slashings)
+	b.markFieldAsDirty(types.Slashings)
 	return nil
 }
 
@@ -165,20 +165,20 @@ func (b *BeaconState) AppendValidator(val *ethpb.Validator) error {
 	defer b.lock.Unlock()
 
 	vals := b.validators
-	if b.sharedFieldReferences[nativetypes.Validators].Refs() > 1 {
+	if b.sharedFieldReferences[types.Validators].Refs() > 1 {
 		vals = b.validatorsReferences()
-		b.sharedFieldReferences[nativetypes.Validators].MinusRef()
-		b.sharedFieldReferences[nativetypes.Validators] = stateutil.NewRef(1)
+		b.sharedFieldReferences[types.Validators].MinusRef()
+		b.sharedFieldReferences[types.Validators] = stateutil.NewRef(1)
 	}
 
 	// append validator to slice
 	b.validators = append(vals, val)
-	valIdx := types.ValidatorIndex(len(b.validators) - 1)
+	valIdx := primitives.ValidatorIndex(len(b.validators) - 1)
 
 	b.valMapHandler.Set(bytesutil.ToBytes48(val.PublicKey), valIdx)
 
-	b.markFieldAsDirty(nativetypes.Validators)
-	b.addDirtyIndices(nativetypes.Validators, []uint64{uint64(valIdx)})
+	b.markFieldAsDirty(types.Validators)
+	b.addDirtyIndices(types.Validators, []uint64{uint64(valIdx)})
 	return nil
 }
 
@@ -189,16 +189,16 @@ func (b *BeaconState) AppendBalance(bal uint64) error {
 	defer b.lock.Unlock()
 
 	bals := b.balances
-	if b.sharedFieldReferences[nativetypes.Balances].Refs() > 1 {
+	if b.sharedFieldReferences[types.Balances].Refs() > 1 {
 		bals = b.balancesVal()
-		b.sharedFieldReferences[nativetypes.Balances].MinusRef()
-		b.sharedFieldReferences[nativetypes.Balances] = stateutil.NewRef(1)
+		b.sharedFieldReferences[types.Balances].MinusRef()
+		b.sharedFieldReferences[types.Balances] = stateutil.NewRef(1)
 	}
 
 	b.balances = append(bals, bal)
 	balIdx := len(b.balances) - 1
-	b.markFieldAsDirty(nativetypes.Balances)
-	b.addDirtyIndices(nativetypes.Balances, []uint64{uint64(balIdx)})
+	b.markFieldAsDirty(types.Balances)
+	b.addDirtyIndices(types.Balances, []uint64{uint64(balIdx)})
 	return nil
 }
 
@@ -212,14 +212,14 @@ func (b *BeaconState) AppendInactivityScore(s uint64) error {
 	}
 
 	scores := b.inactivityScores
-	if b.sharedFieldReferences[nativetypes.InactivityScores].Refs() > 1 {
+	if b.sharedFieldReferences[types.InactivityScores].Refs() > 1 {
 		scores = b.inactivityScoresVal()
-		b.sharedFieldReferences[nativetypes.InactivityScores].MinusRef()
-		b.sharedFieldReferences[nativetypes.InactivityScores] = stateutil.NewRef(1)
+		b.sharedFieldReferences[types.InactivityScores].MinusRef()
+		b.sharedFieldReferences[types.InactivityScores] = stateutil.NewRef(1)
 	}
 
 	b.inactivityScores = append(scores, s)
-	b.markFieldAsDirty(nativetypes.InactivityScores)
+	b.markFieldAsDirty(types.InactivityScores)
 	return nil
 }
 
@@ -233,11 +233,11 @@ func (b *BeaconState) SetInactivityScores(val []uint64) error {
 		return errNotSupported("SetInactivityScores", b.version)
 	}
 
-	b.sharedFieldReferences[nativetypes.InactivityScores].MinusRef()
-	b.sharedFieldReferences[nativetypes.InactivityScores] = stateutil.NewRef(1)
+	b.sharedFieldReferences[types.InactivityScores].MinusRef()
+	b.sharedFieldReferences[types.InactivityScores] = stateutil.NewRef(1)
 
 	b.inactivityScores = val
-	b.markFieldAsDirty(nativetypes.InactivityScores)
+	b.markFieldAsDirty(types.InactivityScores)
 	return nil
 }
 
@@ -248,17 +248,17 @@ func (b *BeaconState) SetContracts(cc []*ethpb.ContractsContainer) error {
 	defer b.lock.Unlock()
 
 	b.contracts = cc
-	b.sharedFieldReferences[nativetypes.Contracts].MinusRef()
-	b.sharedFieldReferences[nativetypes.Contracts] = stateutil.NewRef(1)
-	b.markFieldAsDirty(nativetypes.Contracts)
-	b.rebuildTrie[nativetypes.Contracts] = true
+	b.sharedFieldReferences[types.Contracts].MinusRef()
+	b.sharedFieldReferences[types.Contracts] = stateutil.NewRef(1)
+	b.markFieldAsDirty(types.Contracts)
+	b.rebuildTrie[types.Contracts] = true
 	b.contractsMapHandler = stateutil.NewContractsMapHandler(b.contracts)
 	return nil
 }
 
 // UpdateContractsAtIndex for the beacon state. Updates the contracts container
 // at a specific index to a new value.
-func (b *BeaconState) UpdateContractsAtIndex(idx types.ValidatorIndex, cc *ethpb.ContractsContainer) error {
+func (b *BeaconState) UpdateContractsAtIndex(idx primitives.ValidatorIndex, cc *ethpb.ContractsContainer) error {
 	if uint64(len(b.contracts)) <= uint64(idx) {
 		return errors.Errorf("invalid index provided %d", idx)
 	}
@@ -266,16 +266,16 @@ func (b *BeaconState) UpdateContractsAtIndex(idx types.ValidatorIndex, cc *ethpb
 	defer b.lock.Unlock()
 
 	c := b.contracts
-	if ref := b.sharedFieldReferences[nativetypes.Contracts]; ref.Refs() > 1 {
+	if ref := b.sharedFieldReferences[types.Contracts]; ref.Refs() > 1 {
 		c = b.contractsReferences()
 		ref.MinusRef()
-		b.sharedFieldReferences[nativetypes.Contracts] = stateutil.NewRef(1)
+		b.sharedFieldReferences[types.Contracts] = stateutil.NewRef(1)
 	}
 
 	c[idx] = cc
 	b.contracts = c
-	b.markFieldAsDirty(nativetypes.Contracts)
-	b.addDirtyIndices(nativetypes.Contracts, []uint64{uint64(idx)})
+	b.markFieldAsDirty(types.Contracts)
+	b.addDirtyIndices(types.Contracts, []uint64{uint64(idx)})
 
 	for _, contract := range cc.Contracts {
 		b.contractsMapHandler.Set(bytesutil.ToBytes20(contract), idx)
@@ -291,22 +291,22 @@ func (b *BeaconState) AppendContracts(cc *ethpb.ContractsContainer) error {
 	defer b.lock.Unlock()
 
 	contracts := b.contracts
-	if b.sharedFieldReferences[nativetypes.Contracts].Refs() > 1 {
+	if b.sharedFieldReferences[types.Contracts].Refs() > 1 {
 		contracts = b.contractsReferences()
-		b.sharedFieldReferences[nativetypes.Contracts].MinusRef()
-		b.sharedFieldReferences[nativetypes.Contracts] = stateutil.NewRef(1)
+		b.sharedFieldReferences[types.Contracts].MinusRef()
+		b.sharedFieldReferences[types.Contracts] = stateutil.NewRef(1)
 	}
 
 	// append contracts container to slice
 	b.contracts = append(contracts, cc)
-	valIdx := types.ValidatorIndex(len(b.contracts) - 1)
+	valIdx := primitives.ValidatorIndex(len(b.contracts) - 1)
 
 	for _, contract := range cc.Contracts {
 		b.contractsMapHandler.Set(bytesutil.ToBytes20(contract), valIdx)
 	}
 
-	b.markFieldAsDirty(nativetypes.Contracts)
-	b.addDirtyIndices(nativetypes.Contracts, []uint64{uint64(valIdx)})
+	b.markFieldAsDirty(types.Contracts)
+	b.addDirtyIndices(types.Contracts, []uint64{uint64(valIdx)})
 	return nil
 }
 
@@ -316,18 +316,18 @@ func (b *BeaconState) SetActivities(activities []uint64) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	b.sharedFieldReferences[nativetypes.Activities].MinusRef()
-	b.sharedFieldReferences[nativetypes.Activities] = stateutil.NewRef(1)
+	b.sharedFieldReferences[types.Activities].MinusRef()
+	b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
 
 	b.activities = activities
-	b.markFieldAsDirty(nativetypes.Activities)
-	b.rebuildTrie[nativetypes.Activities] = true
+	b.markFieldAsDirty(types.Activities)
+	b.rebuildTrie[types.Activities] = true
 	return nil
 }
 
 // UpdateActivitiesAtIndex for the beacon state. This method updates the activity
 // at a specific index to a new value.
-func (b *BeaconState) UpdateActivitiesAtIndex(idx types.ValidatorIndex, activity uint64) error {
+func (b *BeaconState) UpdateActivitiesAtIndex(idx primitives.ValidatorIndex, activity uint64) error {
 	if uint64(len(b.activities)) <= uint64(idx) {
 		return errors.Errorf("invalid index provided %d", idx)
 	}
@@ -335,16 +335,16 @@ func (b *BeaconState) UpdateActivitiesAtIndex(idx types.ValidatorIndex, activity
 	defer b.lock.Unlock()
 
 	activities := b.activities
-	if b.sharedFieldReferences[nativetypes.Activities].Refs() > 1 {
+	if b.sharedFieldReferences[types.Activities].Refs() > 1 {
 		activities = b.activitiesVal()
-		b.sharedFieldReferences[nativetypes.Activities].MinusRef()
-		b.sharedFieldReferences[nativetypes.Activities] = stateutil.NewRef(1)
+		b.sharedFieldReferences[types.Activities].MinusRef()
+		b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
 	}
 
 	activities[idx] = activity
 	b.activities = activities
-	b.markFieldAsDirty(nativetypes.Activities)
-	b.addDirtyIndices(nativetypes.Activities, []uint64{uint64(idx)})
+	b.markFieldAsDirty(types.Activities)
+	b.addDirtyIndices(types.Activities, []uint64{uint64(idx)})
 	return nil
 }
 
@@ -355,15 +355,15 @@ func (b *BeaconState) AppendActivity(activity uint64) error {
 	defer b.lock.Unlock()
 
 	activities := b.activities
-	if b.sharedFieldReferences[nativetypes.Activities].Refs() > 1 {
+	if b.sharedFieldReferences[types.Activities].Refs() > 1 {
 		activities = b.activitiesVal()
-		b.sharedFieldReferences[nativetypes.Activities].MinusRef()
-		b.sharedFieldReferences[nativetypes.Activities] = stateutil.NewRef(1)
+		b.sharedFieldReferences[types.Activities].MinusRef()
+		b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
 	}
 
 	b.activities = append(activities, activity)
 	activityIdx := len(b.activities) - 1
-	b.markFieldAsDirty(nativetypes.Activities)
-	b.addDirtyIndices(nativetypes.Activities, []uint64{uint64(activityIdx)})
+	b.markFieldAsDirty(types.Activities)
+	b.addDirtyIndices(types.Activities, []uint64{uint64(activityIdx)})
 	return nil
 }

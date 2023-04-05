@@ -5,6 +5,7 @@ package flags
 import (
 	"strings"
 
+	"github.com/prysmaticlabs/prysm/v3/cmd"
 	"github.com/prysmaticlabs/prysm/v3/config/params"
 	"github.com/urfave/cli/v2"
 )
@@ -192,6 +193,13 @@ var (
 		Name:  "network-id",
 		Usage: "Sets the network id of the beacon chain.",
 	}
+	// EngineEndpointTimeoutSeconds defines the seconds to wait before timing out engine endpoints with execution payload execution semantics (newPayload, forkchoiceUpdated).
+	// If this flag is not used then default will be used as defined here:
+	// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md#core
+	EngineEndpointTimeoutSeconds = &cli.Uint64Flag{
+		Name:  "engine-endpoint-timeout-seconds",
+		Usage: "Sets the execution engine timeout (seconds) for execution payload semantics (forkchoiceUpdated, newPayload)",
+	}
 	// Eth1HeaderReqLimit defines a flag to set the maximum number of headers that a deposit log query can fetch. If none is set, 1000 will be the limit.
 	Eth1HeaderReqLimit = &cli.Uint64Flag{
 		Name:  "eth1-header-req-limit",
@@ -238,5 +246,11 @@ var (
 		Usage: "Sets the block hash epoch to manual overrides the default TERMINAL_BLOCK_HASH_ACTIVATION_EPOCH value. " +
 			"WARNING: This flag should be used only if you have a clear understanding that community has decided to override the terminal block hash activation epoch. " +
 			"Incorrect usage will result in your node experience consensus failure.",
+	}
+	// SlasherDirFlag defines a path on disk where the slasher database is stored.
+	SlasherDirFlag = &cli.StringFlag{
+		Name:  "slasher-datadir",
+		Usage: "Directory for the slasher database",
+		Value: cmd.DefaultDataDir(),
 	}
 )
