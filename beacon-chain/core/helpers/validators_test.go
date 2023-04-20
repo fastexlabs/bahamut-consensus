@@ -264,6 +264,59 @@ func TestBeaconProposerIndex_BadState(t *testing.T) {
 	assert.Equal(t, 0, proposerIndicesCache.Len())
 }
 
+func TestSumPowers_Compatibility(t *testing.T) {
+	validators := make([]*ethpb.Validator, params.BeaconConfig().MinGenesisActiveValidatorCount)
+	for i := 0; i < len(validators); i++ {
+		validators[i] = &ethpb.Validator{
+			ExitEpoch: params.BeaconConfig().FarFutureEpoch,
+		}
+	}
+
+	state, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
+		Validators:  validators,
+		RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+	})
+	require.NoError(t, err)
+
+	indices, err := ActiveValidatorIndices(context.Background(), state, 0)
+	require.NoError(t, err)
+
+	totalBalance, err := TotalActiveBalance(state)
+	require.NoError(t, err)
+
+	sumPower, err := SumPowers(state, indices, totalBalance, 0)
+	require.NoError(t, err)
+
+	s, _ := sumPower.Float64()
+	assert.Equal(t, float64(0), s)
+
+	validators = make([]*ethpb.Validator, params.BeaconConfig().MinGenesisActiveValidatorCount)
+	for i := 0; i < len(validators); i++ {
+		validators[i] = &ethpb.Validator{
+			EffectiveBalance:  32 * 1e9,
+			ExitEpoch:         params.BeaconConfig().FarFutureEpoch,
+			EffectiveActivity: 150,
+		}
+	}
+
+	state, err = state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
+		Validators:  validators,
+		RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+	})
+	require.NoError(t, err)
+
+	indices, err = ActiveValidatorIndices(context.Background(), state, 0)
+	require.NoError(t, err)
+
+	totalBalance = TotalBalance(state, indices)
+
+	sumPower, err = SumPowers(state, indices, totalBalance, 3_000_000)
+	require.NoError(t, err)
+
+	s, _ = sumPower.Float64()
+	assert.Equal(t, float64(3_000_000+150*len(validators)), s)
+}
+
 func TestComputeProposerIndex_Compatibility(t *testing.T) {
 	validators := make([]*ethpb.Validator, params.BeaconConfig().MinGenesisActiveValidatorCount)
 	for i := 0; i < len(validators); i++ {
@@ -303,6 +356,61 @@ func TestComputeProposerIndex_Compatibility(t *testing.T) {
 		wantedProposerIndices = append(wantedProposerIndices, index)
 	}
 	assert.DeepEqual(t, wantedProposerIndices, proposerIndices, "Wanted proposer indices from ComputeProposerIndexWithValidators does not match")
+}
+
+func TestComputeProposerIndexFastexPhase1_Compatibility(t *testing.T) {
+	// validators := make([]*ethpb.Validator, params.BeaconConfig().MinGenesisActiveValidatorCount)
+	validators := make([]*ethpb.Validator, 4096)
+	for i := 0; i < len(validators); i++ {
+		validators[i] = &ethpb.Validator{
+			EffectiveBalance:  32 * 1e9,
+			ExitEpoch:         params.BeaconConfig().FarFutureEpoch,
+		}
+	}
+
+	// validators[0].EffectiveActivity = 15005465
+
+	state, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
+		Validators:               validators,
+		RandaoMixes:              make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+		//TransactionsGasPerPeriod: 3_000_000,
+	})
+	require.NoError(t, err)
+
+	indices, err := ActiveValidatorIndices(context.Background(), state, 0)
+	require.NoError(t, err)
+
+	totalBalance := TotalBalance(state, indices)
+
+	sumPower, err := SumPowers(state, indices, totalBalance, 0)
+	require.NoError(t, err)
+	t.Log(sumPower)
+
+	var proposerIndices []primitives.ValidatorIndex
+	seed, err := Seed(state, 0, params.BeaconConfig().DomainBeaconProposer)
+	require.NoError(t, err)
+	for i := uint64(0); i < uint64(params.BeaconConfig().SlotsPerEpoch); i++ {
+		err := state.SetSlot(primitives.Slot(i))
+		require.NoError(t, err)
+		seedWithSlot := append(seed[:], bytesutil.Bytes8(i)...)
+		seedWithSlotHash := hash.Hash(seedWithSlot)
+		index, err := ComputeProposerIndexFastexPhase1(state, indices, seedWithSlotHash)
+		require.NoError(t, err)
+		proposerIndices = append(proposerIndices, index)
+	}
+
+	var wantedProposerIndices []primitives.ValidatorIndex
+	seed, err = Seed(state, 0, params.BeaconConfig().DomainBeaconProposer)
+	require.NoError(t, err)
+	for i := uint64(0); i < uint64(params.BeaconConfig().SlotsPerEpoch); i++ {
+		seedWithSlot := append(seed[:], bytesutil.Bytes8(i)...)
+		seed := hash.Hash(seedWithSlot)
+		index, err := ComputeShuffledIndex(primitives.ValidatorIndex(0), uint64(len(indices)), seed, true /* shuffle */)
+		require.NoError(t, err)
+		wantedProposerIndices = append(wantedProposerIndices, index)
+	}
+
+	assert.DeepNotEqual(t, wantedProposerIndices, proposerIndices, "Wanted proposer indices from ComputeProposerIndexWithValidators does match to first shuffled indicies")
 }
 
 func TestDelayedActivationExitEpoch_OK(t *testing.T) {
@@ -647,15 +755,21 @@ func TestIsEligibleForActivationQueue(t *testing.T) {
 		validator *ethpb.Validator
 		want      bool
 	}{
-		{"Eligible",
+		{
+			"Eligible",
 			&ethpb.Validator{ActivationEligibilityEpoch: params.BeaconConfig().FarFutureEpoch, EffectiveBalance: params.BeaconConfig().MaxEffectiveBalance},
-			true},
-		{"Incorrect activation eligibility epoch",
+			true,
+		},
+		{
+			"Incorrect activation eligibility epoch",
 			&ethpb.Validator{ActivationEligibilityEpoch: 1, EffectiveBalance: params.BeaconConfig().MaxEffectiveBalance},
-			false},
-		{"Not enough balance",
+			false,
+		},
+		{
+			"Not enough balance",
 			&ethpb.Validator{ActivationEligibilityEpoch: params.BeaconConfig().FarFutureEpoch, EffectiveBalance: 1},
-			false},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -671,18 +785,24 @@ func TestIsIsEligibleForActivation(t *testing.T) {
 		state     *ethpb.BeaconState
 		want      bool
 	}{
-		{"Eligible",
+		{
+			"Eligible",
 			&ethpb.Validator{ActivationEligibilityEpoch: 1, ActivationEpoch: params.BeaconConfig().FarFutureEpoch},
 			&ethpb.BeaconState{FinalizedCheckpoint: &ethpb.Checkpoint{Epoch: 2}},
-			true},
-		{"Not yet finalized",
+			true,
+		},
+		{
+			"Not yet finalized",
 			&ethpb.Validator{ActivationEligibilityEpoch: 1, ActivationEpoch: params.BeaconConfig().FarFutureEpoch},
 			&ethpb.BeaconState{FinalizedCheckpoint: &ethpb.Checkpoint{Root: make([]byte, 32)}},
-			false},
-		{"Incorrect activation epoch",
+			false,
+		},
+		{
+			"Incorrect activation epoch",
 			&ethpb.Validator{ActivationEligibilityEpoch: 1},
 			&ethpb.BeaconState{FinalizedCheckpoint: &ethpb.Checkpoint{Epoch: 2}},
-			false},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

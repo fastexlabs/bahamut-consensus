@@ -59,7 +59,13 @@ func ValidateNilSyncContribution(s *ethpb.SignedContributionAndProof) error {
 //	aggregate_pubkey = bls.AggregatePKs(pubkeys)
 //	return SyncCommittee(pubkeys=pubkeys, aggregate_pubkey=aggregate_pubkey)
 func NextSyncCommittee(ctx context.Context, s state.BeaconState) (*ethpb.SyncCommittee, error) {
-	indices, err := NextSyncCommitteeIndices(ctx, s)
+	var indices []primitives.ValidatorIndex
+	var err error
+	if s.Version() < version.FastexPhase1 {
+		indices, err = NextSyncCommitteeIndices(ctx, s)
+	} else {
+		indices, err = NextSyncCommitteeIndicesFastexPhase1(ctx, s)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +162,51 @@ func NextSyncCommitteeIndices(ctx context.Context, s state.BeaconState) ([]primi
 		right := new(big.Float).SetFloat64((2*powerSigmoid - 1) * float64(v.EffectiveBalance()) / float64(params.BeaconConfig().MaxEffectiveBalance))
 
 		if right.Cmp(left) >= 0 {
+			cIndices = append(cIndices, cIndex)
+		}
+	}
+
+	return cIndices, nil
+}
+
+// NextSyncCommitteeIndicesFastexPhase1 returns the next sync committee indices for a given state
+// based on validators' effective balances.
+func NextSyncCommitteeIndicesFastexPhase1(ctx context.Context, s state.BeaconState) ([]primitives.ValidatorIndex, error) {
+	epoch := coreTime.NextEpoch(s)
+	indices, err := helpers.ActiveValidatorIndices(ctx, s, epoch)
+	if err != nil {
+		return nil, err
+	}
+	seed, err := helpers.Seed(s, epoch, params.BeaconConfig().DomainSyncCommittee)
+	if err != nil {
+		return nil, err
+	}
+	count := uint64(len(indices))
+	cfg := params.BeaconConfig()
+	syncCommitteeSize := cfg.SyncCommitteeSize
+	cIndices := make([]primitives.ValidatorIndex, 0, syncCommitteeSize)
+	hashFunc := hash.CustomSHA256Hasher()
+
+	for i := primitives.ValidatorIndex(0); uint64(len(cIndices)) < params.BeaconConfig().SyncCommitteeSize; i++ {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
+		sIndex, err := helpers.ComputeShuffledIndex(i.Mod(count), count, seed, true)
+		if err != nil {
+			return nil, err
+		}
+
+		b := append(seed[:], bytesutil.Bytes8(uint64(i.Div(32)))...)
+		randomByte := hashFunc(b)[i%32]
+		cIndex := indices[sIndex]
+		v, err := s.ValidatorAtIndexReadOnly(cIndex)
+		if err != nil {
+			return nil, err
+		}
+
+		effectiveBal := v.EffectiveBalance()
+		if effectiveBal*maxRandomByte >= cfg.MaxEffectiveBalance*uint64(randomByte) {
 			cIndices = append(cIndices, cIndex)
 		}
 	}

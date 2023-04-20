@@ -298,7 +298,10 @@ func BeaconProposerIndex(ctx context.Context, state state.ReadOnlyBeaconState) (
 		return 0, errors.Wrap(err, "could not get active indices")
 	}
 
-	return ComputeProposerIndex(state, indices, seedWithSlotHash)
+	if state.Version() < version.FastexPhase1 {
+		return ComputeProposerIndex(state, indices, seedWithSlotHash)
+	}
+	return ComputeProposerIndexFastexPhase1(state, indices, seedWithSlotHash)
 }
 
 // MaxPower find the validator with the highest power.
@@ -339,6 +342,45 @@ func MaxPower(
 	return maxPower, nil
 }
 
+// SumPowers returns sum of validators' powers.
+func SumPowers(
+	bState state.ReadOnlyValidators,
+	activeIndices []primitives.ValidatorIndex,
+	totalBalance uint64,
+	txGasPerPeriod uint64,
+) (*big.Float, error) {
+	maxEffectiveBalanceBig := new(big.Float).SetUint64(params.BeaconConfig().MaxEffectiveBalance / params.BeaconConfig().EffectiveBalanceIncrement)
+	totalBalanceBig := new(big.Float).SetUint64(totalBalance / params.BeaconConfig().EffectiveBalanceIncrement)
+	txGasBig := new(big.Float).SetUint64(txGasPerPeriod)
+
+	sumPowers := big.NewFloat(0)
+	for i := 0; i < len(activeIndices); i++ {
+		v, err := bState.ValidatorAtIndexReadOnly(activeIndices[i])
+		if err != nil {
+			return nil, err
+		}
+
+		effectiveBalanceBig := new(big.Float).SetUint64(v.EffectiveBalance() / params.BeaconConfig().EffectiveBalanceIncrement)
+		effectiveActivityBig := new(big.Float).SetUint64(v.EffectiveActivity())
+
+		// In post-FastexPhase1 fork power of i'th validator is
+		// power_i = (tx_gas * effective_balance_i) / total_balance + effective_activity
+		// effective_power_i = power_i * effective_balance_i / max_effective_balance
+		power := new(big.Float).Set(txGasBig)
+		power = power.Mul(power, effectiveBalanceBig)
+		power = power.Quo(power, totalBalanceBig)
+		power = power.Add(power, effectiveActivityBig)
+
+		effectivePower := new(big.Float).Set(power)
+		effectivePower = effectivePower.Mul(effectivePower, effectiveBalanceBig)
+		effectivePower = effectivePower.Quo(effectivePower, maxEffectiveBalanceBig)
+
+		sumPowers = sumPowers.Add(sumPowers, effectivePower)
+	}
+
+	return sumPowers, nil
+}
+
 // ComputeProposerIndex returns the index sampled by effective balance, which is used to calculate proposer.
 func ComputeProposerIndex(bState state.ReadOnlyBeaconState, activeIndices []primitives.ValidatorIndex, seed [32]byte) (primitives.ValidatorIndex, error) {
 	length := uint64(len(activeIndices))
@@ -361,6 +403,10 @@ func ComputeProposerIndex(bState state.ReadOnlyBeaconState, activeIndices []prim
 		return 0, err
 	}
 
+	totalBalanceBig := new(big.Int).SetUint64(totalBalance / params.BeaconConfig().EffectiveBalanceIncrement)
+	txGasBig := new(big.Int).SetUint64(txGasPerPeriod)
+	nonStakersGasBig := new(big.Int).SetUint64(nonStakersGasPerPeriod)
+
 	for i := uint64(0); ; i++ {
 		candidateIndex, err := ComputeShuffledIndex(primitives.ValidatorIndex(i%length), length, seed, true /* shuffle */)
 		if err != nil {
@@ -379,11 +425,8 @@ func ComputeProposerIndex(bState state.ReadOnlyBeaconState, activeIndices []prim
 			return 0, err
 		}
 
-		totalBalanceBig := new(big.Int).SetUint64(totalBalance / params.BeaconConfig().EffectiveBalanceIncrement)
 		effectiveBalanceBig := new(big.Int).SetUint64(v.EffectiveBalance() / params.BeaconConfig().EffectiveBalanceIncrement)
 		effectiveActivityBig := new(big.Int).SetUint64(v.EffectiveActivity())
-		txGasBig := new(big.Int).SetUint64(txGasPerPeriod)
-		nonStakersGasBig := new(big.Int).SetUint64(nonStakersGasPerPeriod)
 
 		var power *big.Int
 		power = new(big.Int).Add(txGasBig, nonStakersGasBig)
@@ -405,6 +448,72 @@ func ComputeProposerIndex(bState state.ReadOnlyBeaconState, activeIndices []prim
 		left = new(big.Float).Mul(left, new(big.Float).SetFloat64(params.BeaconConfig().SigmoidLimit))
 
 		right := new(big.Float).SetFloat64((2*powerSigmoid - 1) * float64(v.EffectiveBalance()) / float64(params.BeaconConfig().MaxEffectiveBalance))
+
+		if right.Cmp(left) >= 0 {
+			return candidateIndex, nil
+		}
+	}
+}
+
+// ComputeProposerIndexFastexPhase1 returns the index sampled by validators' power in post-FastexPhase1 forks.
+func ComputeProposerIndexFastexPhase1(bState state.ReadOnlyBeaconState, activeIndices []primitives.ValidatorIndex, seed [32]byte) (primitives.ValidatorIndex, error) {
+	length := uint64(len(activeIndices))
+	if length == 0 {
+		return 0, errors.New("empty active indices list")
+	}
+	maxRandomBytes := new(big.Float).SetUint64(1<<16 - 1)
+	hashFunc := hash.CustomSHA256Hasher()
+
+	txGasPerPeriod := bState.TransactionsGasPerPeriod()
+	totalBalance := TotalBalance(bState, activeIndices)
+	sumPower, err := SumPowers(bState, activeIndices, totalBalance, txGasPerPeriod)
+	if err != nil {
+		return 0, err
+	}
+
+	maxEffectiveBalanceBig := new(big.Float).SetUint64(params.BeaconConfig().MaxEffectiveBalance / params.BeaconConfig().EffectiveBalanceIncrement)
+	totalBalanceBig := new(big.Float).SetUint64(totalBalance / params.BeaconConfig().EffectiveBalanceIncrement)
+	txGasBig := new(big.Float).SetUint64(txGasPerPeriod)
+
+	b := append(seed[:], bytesutil.Bytes8(0)...)
+	hash := hashFunc(b)
+	bytes2 := append([]byte{}, hash[0], hash[16])
+	randomBytes := new(big.Float).SetUint64(uint64(bytesutil.FromBytes2(bytes2)))
+
+	accumPower := big.NewFloat(0)
+	for i := uint64(0); ; i++ {
+		candidateIndex, err := ComputeShuffledIndex(primitives.ValidatorIndex(i%length), length, seed, true /* shuffle */)
+		if err != nil {
+			return 0, err
+		}
+		candidateIndex = activeIndices[candidateIndex]
+		if uint64(candidateIndex) >= uint64(bState.NumValidators()) {
+			return 0, errors.New("active index out of range")
+		}
+		v, err := bState.ValidatorAtIndexReadOnly(candidateIndex)
+		if err != nil {
+			return 0, err
+		}
+
+		effectiveBalanceBig := new(big.Float).SetUint64(v.EffectiveBalance() / params.BeaconConfig().EffectiveBalanceIncrement)
+		effectiveActivityBig := new(big.Float).SetUint64(v.EffectiveActivity())
+
+		// In post-FastexPhase1 fork power of i'th validator is
+		// power_i = (tx_gas * effective_balance_i) / total_balance + effective_activity
+		// effective_power_i = power_i * effective_balance_i / max_effective_balance
+		power := new(big.Float).Set(txGasBig)
+		power = power.Mul(power, effectiveBalanceBig)
+		power = power.Quo(power, totalBalanceBig)
+		power = power.Add(power, effectiveActivityBig)
+
+		effectivePower := new(big.Float).Set(power)
+		effectivePower = effectivePower.Mul(effectivePower, effectiveBalanceBig)
+		effectivePower = effectivePower.Quo(effectivePower, maxEffectiveBalanceBig)
+
+		accumPower = accumPower.Add(accumPower, effectivePower)
+
+		left := new(big.Float).Mul(randomBytes, sumPower)
+		right := new(big.Float).Mul(accumPower, maxRandomBytes)
 
 		if right.Cmp(left) >= 0 {
 			return candidateIndex, nil
