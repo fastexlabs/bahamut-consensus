@@ -10,18 +10,18 @@ import (
 	"sort"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/validators"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/math"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1/attestation"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/validators"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/math"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1/attestation"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
 
 // sortableIndices implements the Sort interface to sort newly activated validator indices
@@ -289,6 +289,77 @@ func ProcessEffectiveBalanceUpdates(state state.BeaconState) (state.BeaconState,
 	return state, nil
 }
 
+// ProcessEffectiveActivityUpdates processes effective activity updates during epoch processing.
+func ProcessEffectiveActivityUpdates(state state.BeaconState) (state.BeaconState, error) {
+	activities := state.Activities()
+	period := uint64(params.BeaconConfig().EpochsPerActivityPeriod)
+
+	validatorFunc := func(idx int, val *ethpb.Validator) (bool, *ethpb.Validator, error) {
+		if val == nil {
+			return false, nil, fmt.Errorf("validator %d is nil in state", idx)
+		}
+		if idx >= len(activities) {
+			return false, nil, fmt.Errorf("validator index exceeds activities length in state %d >= %d", idx, len(activities))
+		}
+		activity := activities[idx]
+
+		// EA - validator's effective activity
+		// dA - validator's delta (epoch) activity
+		// P - activity period.
+		// newEA = EA - EA / P + dA = ((EA + dA) * P - EA) / P
+		effectiveActivity := ((val.EffectiveActivity+activity)*period - val.EffectiveActivity) / period
+
+		newVal := ethpb.CopyValidator(val)
+		newVal.EffectiveActivity = effectiveActivity
+
+		return true, newVal, nil
+	}
+
+	if err := state.ApplyToEveryValidator(validatorFunc); err != nil {
+		return nil, err
+	}
+
+	return state, nil
+}
+
+// ProcessActivitiesReset reallocate epoch activities slice.
+func ProcessActivitiesReset(state state.BeaconState) (state.BeaconState, error) {
+	activities := make([]uint64, state.ActivitiesLength())
+	err := state.SetActivities(activities)
+	if err != nil {
+		return nil, err
+	}
+
+	return state, nil
+}
+
+// ProcessSharedActivityUpdates processes transactions gas per period
+// and base fee per period updates.
+func ProcessSharedActivityUpdates(state state.BeaconState) (state.BeaconState, error) {
+	period := uint64(params.BeaconConfig().EpochsPerActivityPeriod)
+	sharedActivity := state.SharedActivity()
+	if sharedActivity == nil {
+		return nil, fmt.Errorf("shared activity is nil in state")
+	}
+
+	gasPerPeriod := sharedActivity.TransactionsGasPerPeriod
+	gasPerEpoch := sharedActivity.TransactionsGasPerEpoch
+
+	baseFeePerPeriod := sharedActivity.BaseFeePerPeriod
+	baseFeePerEpoch := math.Max(1, sharedActivity.BaseFeePerEpoch / params.BeaconConfig().WeiPerGwei)
+
+	sharedActivity.TransactionsGasPerPeriod = ((gasPerPeriod+gasPerEpoch)*period - gasPerPeriod) / period
+	sharedActivity.TransactionsGasPerEpoch = 0
+	sharedActivity.BaseFeePerPeriod = ((baseFeePerPeriod+baseFeePerEpoch)*period - baseFeePerPeriod) / period
+	sharedActivity.BaseFeePerEpoch = 0
+
+	if err := state.SetSharedActivity(sharedActivity); err != nil {
+		return nil, err
+	}
+
+	return state, nil
+}
+
 // ProcessSlashingsReset processes the total slashing balances updates during epoch processing.
 //
 // Spec pseudocode definition:
@@ -391,98 +462,6 @@ func ProcessHistoricalDataUpdate(state state.BeaconState) (state.BeaconState, er
 	return state, nil
 }
 
-// ProcessEffectiveActivityUpdates processes the updates to validators' effective activities.
-func ProcessEffectiveActivityUpdates(state state.BeaconState) (state.BeaconState, error) {
-	activities := state.Activities()
-	period := uint64(params.BeaconConfig().EpochsPerActivityPeriod)
-
-	validatorFunc := func(idx int, val *ethpb.Validator) (bool, *ethpb.Validator, error) {
-		if val == nil {
-			return false, nil, fmt.Errorf("validator %d is nil in state", idx)
-		}
-		if idx >= len(activities) {
-			return false, nil, fmt.Errorf("validator index exceeds validator length in state %d >= %d", idx, len(state.Activities()))
-		}
-		// EA - validator's effective activity
-		// dA - validator's delta (epoch) activity
-		// P - activity period.
-		// newEA = EA - EA / P + dA = ((EA + dA) * P - EA) / P
-		activity := ((val.EffectiveActivity+activities[idx])*period - val.EffectiveActivity) / period
-
-		newVal := ethpb.CopyValidator(val)
-		newVal.EffectiveActivity = activity
-
-		return true, newVal, nil
-	}
-
-	if err := state.ApplyToEveryValidator(validatorFunc); err != nil {
-		return nil, err
-	}
-
-	return state, nil
-}
-
-// ProcessActivityReset resets epoch activity slice.
-func ProcessActivityReset(state state.BeaconState) (state.BeaconState, error) {
-	err := state.SetActivities(make([]uint64, state.ActivitiesLength()))
-	if err != nil {
-		return nil, err
-	}
-
-	return state, nil
-}
-
-// ProcessTransactionsGasPerPeriodUpdate processes the updates to transactions gas per period.
-func ProcessTransactionsGasPerPeriodUpdate(state state.BeaconState) (state.BeaconState, error) {
-	period := uint64(params.BeaconConfig().EpochsPerActivityPeriod)
-	txsPerPeriod := ((state.TransactionsGasPerPeriod()+state.TransactionsPerLatestEpoch()*21000)*period - state.TransactionsGasPerPeriod()) / period
-	if err := state.SetTransactionsGasPerPeriod(txsPerPeriod); err != nil {
-		return nil, err
-	}
-	if err := state.SetTransactionsPerLatestEpoch(0); err != nil {
-		return nil, err
-	}
-
-	return state, nil
-}
-
-// ProcessTransactionsGasPerPeriodUpdate processes the updates to non stakers gas per period.
-func ProcessNonStakersGasPerPeriodUpdate(state state.BeaconState) (state.BeaconState, error) {
-	period := uint64(params.BeaconConfig().EpochsPerActivityPeriod)
-	nonStakersGasPerPeriod := ((state.NonStakersGasPerPeriod()+state.NonStakersGasPerEpoch())*period - state.NonStakersGasPerPeriod()) / period
-	if err := state.SetNonStakersGasPerPeriod(nonStakersGasPerPeriod); err != nil {
-		return nil, err
-	}
-	if err := state.SetNonStakersGasPerEpoch(0); err != nil {
-		return nil, err
-	}
-
-	return state, nil
-}
-
-// ProcessBaseFeePerPeriodUpdate processes the updates to base fee per period.
-func ProcessBaseFeePerPeriodUpdate(state state.BeaconState) (state.BeaconState, error) {
-	period := uint64(params.BeaconConfig().EpochsPerActivityPeriod)
-	slots := uint64(params.BeaconConfig().SlotsPerEpoch)
-	periodBaseFee, err := state.BaseFeePerPeriod()
-	if err != nil {
-		return nil, err
-	}
-	epochBaseFee, err := state.BaseFeePerEpoch()
-	if err != nil {
-		return nil, err
-	}
-	baseFeePerPeriod := (periodBaseFee*slots*period + epochBaseFee - periodBaseFee*slots) / period / slots
-	if err := state.SetBaseFeePerPeriod(baseFeePerPeriod); err != nil {
-		return nil, err
-	}
-	if err := state.SetBaseFeePerEpoch(0); err != nil {
-		return nil, err
-	}
-
-	return state, nil
-}
-
 // ProcessParticipationRecordUpdates rotates current/previous epoch attestations during epoch processing.
 //
 // Spec pseudocode definition:
@@ -514,26 +493,20 @@ func ProcessFinalUpdates(state state.BeaconState) (state.BeaconState, error) {
 		return nil, err
 	}
 
-	// Update validators' effective activity.
+	// Update effective activities with current epoch activities.
 	state, err = ProcessEffectiveActivityUpdates(state)
 	if err != nil {
 		return nil, err
 	}
-
-	// Update transactions gas per period.
-	state, err = ProcessTransactionsGasPerPeriodUpdate(state)
+	
+	// Update transactions gas per epoch and base fee per epoch.
+	state, err = ProcessSharedActivityUpdates(state)
 	if err != nil {
 		return nil, err
 	}
 
-	// Update non stakers gas per period.
-	state, err = ProcessNonStakersGasPerPeriodUpdate(state)
-	if err != nil {
-		return nil, err
-	}
-
-	// Set initial epoch activity to zero
-	state, err = ProcessActivityReset(state)
+	// Reset epoch activities for new epoch.
+	state, err = ProcessActivitiesReset(state)
 	if err != nil {
 		return nil, err
 	}

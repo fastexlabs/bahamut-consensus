@@ -1,10 +1,10 @@
 package historycmd
 
 import (
-	"github.com/prysmaticlabs/prysm/v3/cmd"
-	"github.com/prysmaticlabs/prysm/v3/cmd/validator/flags"
-	"github.com/prysmaticlabs/prysm/v3/config/features"
-	"github.com/prysmaticlabs/prysm/v3/runtime/tos"
+	"github.com/prysmaticlabs/prysm/v4/cmd"
+	"github.com/prysmaticlabs/prysm/v4/cmd/validator/flags"
+	"github.com/prysmaticlabs/prysm/v4/config/features"
+	"github.com/prysmaticlabs/prysm/v4/runtime/tos"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
@@ -21,10 +21,9 @@ var Commands = &cli.Command{
 			Flags: cmd.WrapFlags([]cli.Flag{
 				cmd.DataDirFlag,
 				flags.SlashingProtectionExportDirFlag,
-				features.FastexChainTestnet,
-				// features.Mainnet,
-				// features.PraterTestnet,
-				// features.SepoliaTestnet,
+				features.Mainnet,
+				features.PraterTestnet,
+				features.SepoliaTestnet,
 				cmd.AcceptTosFlag,
 			}),
 			Before: func(cliCtx *cli.Context) error {
@@ -49,10 +48,9 @@ var Commands = &cli.Command{
 			Flags: cmd.WrapFlags([]cli.Flag{
 				cmd.DataDirFlag,
 				flags.SlashingProtectionJSONFileFlag,
-				features.FastexChainTestnet,
-				// features.Mainnet,
-				// features.PraterTestnet,
-				// features.SepoliaTestnet,
+				features.Mainnet,
+				features.PraterTestnet,
+				features.SepoliaTestnet,
 				cmd.AcceptTosFlag,
 			}),
 			Before: func(cliCtx *cli.Context) error {

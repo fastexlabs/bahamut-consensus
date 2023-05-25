@@ -2,43 +2,46 @@ package validator
 
 import (
 	"context"
-	"math/big"
 
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"go.opencensus.io/trace"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/blocks"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
 )
 
-// getActivityChanges returns a list of activityChanges that are ready for inclusion in the next beacon block.
-func (vs *Server) getActivityChanges(ctx context.Context, beaconState state.BeaconState) ([]*ethpb.ActivityChange, uint64, uint64, error) {
-	ctx, span := trace.StartSpan(ctx, "ProposerServer.getActivityChanges")
-	defer span.End()
-
-	if !vs.Eth1InfoFetcher.ExecutionClientConnected() {
-		log.Warn("not connected to eth1 node, skip activity changes insertion")
-		return []*ethpb.ActivityChange{}, 0, 0, nil
-	}
-
-	var activityChanges []*ethpb.ActivityChange
-	var transactionsCount uint64
-
-	followedBlockHeight, err := vs.FollowedHeightFetcher.FollowedBlockHeight(ctx)
+// Sets the activity changes, transactions count, base fee and execution height for the block.
+// Activity changes come from EL client.
+func (vs *Server) setActivities(
+	ctx context.Context,
+	blk interfaces.SignedBeaconBlock,
+	beaconState state.BeaconState,
+) error {
+	mergeComplete, err := blocks.IsMergeTransitionComplete(beaconState)
 	if err != nil {
-		return []*ethpb.ActivityChange{}, 0, 0, err
+		return err
 	}
 
-	latestProcessedBlock := beaconState.LatestProcessedBlockActivities()
-
-	for i := latestProcessedBlock + 1; i <= followedBlockHeight; i++ {
-		ac := vs.ActivityChangeFetcher.GetActivityChanges(ctx, big.NewInt(0).SetUint64(i))
-		activityChanges = append(activityChanges, ac...)
-		transactionsCount += vs.ActivityChangeFetcher.GetTxCount(ctx, big.NewInt(0).SetUint64(i))
+	if !mergeComplete {
+		return nil
 	}
 
-	if len(activityChanges) == 0  && transactionsCount == 0 {
-		log.Debug("no activity changes for inclusion in block")
-		return []*ethpb.ActivityChange{}, 0, followedBlockHeight, nil
+	latestExecutionHeader, err := beaconState.LatestExecutionPayloadHeader()
+	if err != nil {
+		return err
 	}
 
-	return activityChanges, transactionsCount, followedBlockHeight, nil
+	blockHash := common.BytesToHash(latestExecutionHeader.BlockHash())
+
+	blockActivities, err := vs.ExecutionEngineCaller.GetBlockActivitiesByHash(ctx, blockHash)
+	if err != nil {
+		return errors.Wrap(err, "could not get block activities from execution layer")
+	}
+
+	blk.SetActivityChanges(blockActivities.Activities)
+	blk.SetTransactionsCount(blockActivities.TxCount)
+	blk.SetBaseFee(blockActivities.BaseFee)
+	blk.SetExecutionHeight(latestExecutionHeader.BlockNumber())
+
+	return nil
 }

@@ -1,8 +1,7 @@
 package state_native
 
 import (
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 // Eth1Data corresponding to the proof-of-work chain information stored in the beacon state.
@@ -64,73 +63,34 @@ func (b *BeaconState) Eth1DepositIndex() uint64 {
 	return b.eth1DepositIndex
 }
 
-// LatestProcessedBlockActivities corresponds to the number of the block
-// from which latest activity changes was retrieved
-func (b *BeaconState) LatestProcessedBlockActivities() uint64 {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	return b.latestProcessedBlockActivities
-}
-
-// TransactionsGasPerPeriod corresponds to the amount of gas used by
-// transactions during activity period.
-func (b *BeaconState) TransactionsGasPerPeriod() uint64 {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	return b.transactionsGasPerPeriod
-}
-
-// TransactionsPerLatestEpoch corresponds to the number of transactions
-// executed during latest epoch.
-func (b *BeaconState) TransactionsPerLatestEpoch() uint64 {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	return b.transactionsPerLatestEpoch
-}
-
-// NonStakersGasPerEpoch corresponds to the amount of gas used by
-// contracts that are not in validators' contracts list during latest epoch.
-func (b *BeaconState) NonStakersGasPerEpoch() uint64 {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	return b.nonStakersGasPerEpoch
-}
-
-// NonStakersGasPerEpoch corresponds to the amount of gas used by
-// contracts that are not in validators' contracts list during acitivity period.
-func (b *BeaconState) NonStakersGasPerPeriod() uint64 {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	return b.nonStakersGasPerPeriod
-}
-
-// BaseFeePerEpoch corresponds to the sum of base fee per gas from blocks
-// processed in during latest epoch.
-func (b *BeaconState) BaseFeePerEpoch() (uint64, error) {
-	if b.version < version.FastexPhase1 {
-		return 0, errNotSupported("BaseFeePerEpoch", b.version)
+// SharedActivity corresponds to the consensus activity params
+// shared amond all validators.
+func (b *BeaconState) SharedActivity() *ethpb.SharedActivity {
+	if b.sharedActivity == nil {
+		return nil
 	}
 
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
-	return b.baseFeePerEpoch, nil
+	return b.sharedActivityVal()
 }
 
-// BaseFeePerPeriod corresponds to the average base fee per gas
-// during activity period.
-func (b *BeaconState) BaseFeePerPeriod() (uint64, error) {
-	if b.version < version.FastexPhase1 {
-		return 0, errNotSupported("BaseFeePerPeriod", b.version)
+// sharedActivityVal corresponds to the consensus activity params
+// shared amond all validators.
+// This assumes that a lock is already held on BeaconState.
+func (b *BeaconState) sharedActivityVal() *ethpb.SharedActivity {
+	if b.sharedActivity == nil {
+		return nil
 	}
 
+	return ethpb.CopySharedActivity(b.sharedActivity)
+}
+
+// ExecutionHeight corresponds to the current EL chain height.
+func (b *BeaconState) ExecutionHeight() uint64 {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
-	return b.baseFeePerPeriod, nil
+	return b.executionHeight
 }

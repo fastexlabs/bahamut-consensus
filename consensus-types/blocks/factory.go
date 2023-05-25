@@ -5,10 +5,10 @@ import (
 	"math/big"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	eth "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	eth "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
 
 var (
@@ -49,14 +49,6 @@ func NewSignedBeaconBlock(i interface{}) (interfaces.SignedBeaconBlock, error) {
 		return initBlindedSignedBlockFromProtoBellatrix(b.BlindedBellatrix)
 	case *eth.SignedBlindedBeaconBlockBellatrix:
 		return initBlindedSignedBlockFromProtoBellatrix(b)
-	case *eth.GenericSignedBeaconBlock_FastexPhase1:
-		return initSignedBlockFromProtoFastexPhase1(b.FastexPhase1)
-	case *eth.SignedBeaconBlockFastexPhase1:
-		return initSignedBlockFromProtoFastexPhase1(b)
-	case *eth.GenericSignedBeaconBlock_BlindedFastexPhase1:
-		return initBlindedSignedBlockFromProtoFastexPhase1(b.BlindedFastexPhase1)
-	case *eth.SignedBlindedBeaconBlockFastexPhase1:
-		return initBlindedSignedBlockFromProtoFastexPhase1(b)
 	case *eth.GenericSignedBeaconBlock_Capella:
 		return initSignedBlockFromProtoCapella(b.Capella)
 	case *eth.SignedBeaconBlockCapella:
@@ -91,14 +83,6 @@ func NewBeaconBlock(i interface{}) (interfaces.ReadOnlyBeaconBlock, error) {
 		return initBlindedBlockFromProtoBellatrix(b.BlindedBellatrix)
 	case *eth.BlindedBeaconBlockBellatrix:
 		return initBlindedBlockFromProtoBellatrix(b)
-	case *eth.GenericBeaconBlock_FastexPhase1:
-		return initBlockFromProtoFastexPhase1(b.FastexPhase1)
-	case *eth.BeaconBlockFastexPhase1:
-		return initBlockFromProtoFastexPhase1(b)
-	case *eth.GenericBeaconBlock_BlindedFastexPhase1:
-		return initBlindedBlockFromProtoFastexPhase1(b.BlindedFastexPhase1)
-	case *eth.BlindedBeaconBlockFastexPhase1:
-		return initBlindedBlockFromProtoFastexPhase1(b)
 	case *eth.GenericBeaconBlock_Capella:
 		return initBlockFromProtoCapella(b.Capella)
 	case *eth.BeaconBlockCapella:
@@ -125,10 +109,6 @@ func NewBeaconBlockBody(i interface{}) (interfaces.ReadOnlyBeaconBlockBody, erro
 		return initBlockBodyFromProtoBellatrix(b)
 	case *eth.BlindedBeaconBlockBodyBellatrix:
 		return initBlindedBlockBodyFromProtoBellatrix(b)
-	case *eth.BeaconBlockBodyFastexPhase1:
-		return initBlockBodyFromProtoFastexPhase1(b)
-	case *eth.BlindedBeaconBlockBodyFastexPhase1:
-		return initBlindedBlockBodyFromProtoFastexPhase1(b)
 	case *eth.BeaconBlockBodyCapella:
 		return initBlockBodyFromProtoCapella(b)
 	case *eth.BlindedBeaconBlockBodyCapella:
@@ -173,19 +153,6 @@ func BuildSignedBeaconBlock(blk interfaces.ReadOnlyBeaconBlock, signature []byte
 			return nil, errIncorrectBlockVersion
 		}
 		return NewSignedBeaconBlock(&eth.SignedBeaconBlockBellatrix{Block: pb, Signature: signature})
-	case version.FastexPhase1:
-		if blk.IsBlinded() {
-			pb, ok := pb.(*eth.BlindedBeaconBlockFastexPhase1)
-			if !ok {
-				return nil, errIncorrectBlockVersion
-			}
-			return NewSignedBeaconBlock(&eth.SignedBlindedBeaconBlockFastexPhase1{Block: pb, Signature: signature})
-		}
-		pb, ok := pb.(*eth.BeaconBlockFastexPhase1)
-		if !ok {
-			return nil, errIncorrectBlockVersion
-		}
-		return NewSignedBeaconBlock(&eth.SignedBeaconBlockFastexPhase1{Block: pb, Signature: signature})
 	case version.Capella:
 		if blk.IsBlinded() {
 			pb, ok := pb.(*eth.BlindedBeaconBlockCapella)
@@ -268,58 +235,27 @@ func BuildSignedBeaconBlockFromExecutionPayload(
 	var fullBlock interface{}
 	switch p := payload.(type) {
 	case *enginev1.ExecutionPayload:
-		if b.Version() == version.Bellatrix {
-			fullBlock = &eth.SignedBeaconBlockBellatrix{
-				Block: &eth.BeaconBlockBellatrix{
-					Slot:          b.Slot(),
-					ProposerIndex: b.ProposerIndex(),
-					ParentRoot:    parentRoot[:],
-					StateRoot:     stateRoot[:],
-					Body: &eth.BeaconBlockBodyBellatrix{
-						RandaoReveal:         randaoReveal[:],
-						Eth1Data:             b.Body().Eth1Data(),
-						Graffiti:             graffiti[:],
-						ProposerSlashings:    b.Body().ProposerSlashings(),
-						AttesterSlashings:    b.Body().AttesterSlashings(),
-						Attestations:         b.Body().Attestations(),
-						Deposits:             b.Body().Deposits(),
-						VoluntaryExits:       b.Body().VoluntaryExits(),
-						ActivityChanges:      b.Body().ActivityChanges(),
-						LatestProcessedBlock: b.Body().LatestProcessedBlock(),
-						TransactionsCount:    b.Body().TransactionsCount(),
-						SyncAggregate:        syncAgg,
-						ExecutionPayload:     p,
-					},
-				},
-				Signature: sig[:],
-			}
-			break
-		}
-		baseFee, err := b.Body().BaseFee()
-		if err != nil {
-			return nil, errors.Wrap(err, "could not get base fee from block body")
-		}
-		fullBlock = &eth.SignedBeaconBlockFastexPhase1{
-			Block: &eth.BeaconBlockFastexPhase1{
+		fullBlock = &eth.SignedBeaconBlockBellatrix{
+			Block: &eth.BeaconBlockBellatrix{
 				Slot:          b.Slot(),
 				ProposerIndex: b.ProposerIndex(),
 				ParentRoot:    parentRoot[:],
 				StateRoot:     stateRoot[:],
-				Body: &eth.BeaconBlockBodyFastexPhase1{
-					RandaoReveal:         randaoReveal[:],
-					Eth1Data:             b.Body().Eth1Data(),
-					Graffiti:             graffiti[:],
-					ProposerSlashings:    b.Body().ProposerSlashings(),
-					AttesterSlashings:    b.Body().AttesterSlashings(),
-					Attestations:         b.Body().Attestations(),
-					Deposits:             b.Body().Deposits(),
-					VoluntaryExits:       b.Body().VoluntaryExits(),
-					ActivityChanges:      b.Body().ActivityChanges(),
-					LatestProcessedBlock: b.Body().LatestProcessedBlock(),
-					TransactionsCount:    b.Body().TransactionsCount(),
-					SyncAggregate:        syncAgg,
-					ExecutionPayload:     p,
-					BaseFee:              baseFee,
+				Body: &eth.BeaconBlockBodyBellatrix{
+					RandaoReveal:      randaoReveal[:],
+					Eth1Data:          b.Body().Eth1Data(),
+					Graffiti:          graffiti[:],
+					ProposerSlashings: b.Body().ProposerSlashings(),
+					AttesterSlashings: b.Body().AttesterSlashings(),
+					Attestations:      b.Body().Attestations(),
+					Deposits:          b.Body().Deposits(),
+					VoluntaryExits:    b.Body().VoluntaryExits(),
+					ActivityChanges:   b.Body().ActivityChanges(),
+					TransactionsCount: b.Body().TransactionsCount(),
+					BaseFee:           b.Body().BaseFee(),
+					ExecutionHeight:   b.Body().ExecutionHeight(),
+					SyncAggregate:     syncAgg,
+					ExecutionPayload:  p,
 				},
 			},
 			Signature: sig[:],
@@ -328,10 +264,6 @@ func BuildSignedBeaconBlockFromExecutionPayload(
 		blsToExecutionChanges, err := b.Body().BLSToExecutionChanges()
 		if err != nil {
 			return nil, err
-		}
-		baseFee, err := b.Body().BaseFee()
-		if err != nil {
-			return nil, errors.Wrap(err, "could not get base fee from block body")
 		}
 		fullBlock = &eth.SignedBeaconBlockCapella{
 			Block: &eth.BeaconBlockCapella{
@@ -349,11 +281,11 @@ func BuildSignedBeaconBlockFromExecutionPayload(
 					Deposits:              b.Body().Deposits(),
 					VoluntaryExits:        b.Body().VoluntaryExits(),
 					ActivityChanges:       b.Body().ActivityChanges(),
-					LatestProcessedBlock:  b.Body().LatestProcessedBlock(),
 					TransactionsCount:     b.Body().TransactionsCount(),
+					BaseFee:               b.Body().BaseFee(),
+					ExecutionHeight:       b.Body().ExecutionHeight(),
 					SyncAggregate:         syncAgg,
 					ExecutionPayload:      p,
-					BaseFee:               baseFee,
 					BlsToExecutionChanges: blsToExecutionChanges,
 				},
 			},

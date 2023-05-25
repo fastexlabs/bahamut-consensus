@@ -2,13 +2,13 @@ package validator
 
 import (
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/async/event"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/blocks"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/feed"
-	blockfeed "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/feed/block"
-	statefeed "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/feed/state"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/async/event"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/blocks"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed"
+	blockfeed "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/block"
+	statefeed "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/state"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -89,17 +89,6 @@ func sendVerifiedBlocks(stream ethpb.BeaconNodeValidator_StreamBlocksAltairServe
 			return nil
 		}
 		b.Block = &ethpb.StreamBlocksResponse_BellatrixBlock{BellatrixBlock: phBlk}
-	case version.FastexPhase1:
-		pb, err := data.SignedBlock.Proto()
-		if err != nil {
-			return errors.Wrap(err, "could not get protobuf block")
-		}
-		phBlk, ok := pb.(*ethpb.SignedBeaconBlockFastexPhase1)
-		if !ok {
-			log.Warn("Mismatch between version and block type, was expecting SignedBeaconBlockBellatrix")
-			return nil
-		}
-		b.Block = &ethpb.StreamBlocksResponse_FastexPhase1Block{FastexPhase1Block: phBlk}
 	case version.Capella:
 		pb, err := data.SignedBlock.Proto()
 		if err != nil {
@@ -158,8 +147,6 @@ func (vs *Server) sendBlocks(stream ethpb.BeaconNodeValidator_StreamBlocksAltair
 		b.Block = &ethpb.StreamBlocksResponse_AltairBlock{AltairBlock: p}
 	case *ethpb.SignedBeaconBlockBellatrix:
 		b.Block = &ethpb.StreamBlocksResponse_BellatrixBlock{BellatrixBlock: p}
-	case *ethpb.SignedBeaconBlockFastexPhase1:
-		b.Block = &ethpb.StreamBlocksResponse_FastexPhase1Block{FastexPhase1Block: p}
 	case *ethpb.SignedBeaconBlockCapella:
 		b.Block = &ethpb.StreamBlocksResponse_CapellaBlock{CapellaBlock: p}
 	default:

@@ -1,9 +1,9 @@
 package payloadattribute
 
 import (
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
 
 // Version returns the version of the payload attribute.
@@ -43,7 +43,7 @@ func (a *data) PbV1() (*enginev1.PayloadAttributes, error) {
 	if a == nil {
 		return nil, errNilPayloadAttribute
 	}
-	if a.version != version.Bellatrix && a.version != version.FastexPhase1 {
+	if a.version != version.Bellatrix {
 		return nil, blocks.ErrNotSupported("PayloadAttributePbV1", a.version)
 	}
 	if a.timeStamp == 0 && len(a.prevRandao) == 0 {

@@ -15,14 +15,14 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/monitoring/tracing"
-	"github.com/prysmaticlabs/prysm/v3/network"
-	"github.com/prysmaticlabs/prysm/v3/network/authorization"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/monitoring/tracing"
+	"github.com/prysmaticlabs/prysm/v4/network"
+	"github.com/prysmaticlabs/prysm/v4/network/authorization"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 	log "github.com/sirupsen/logrus"
 	"go.opencensus.io/trace"
 )
@@ -34,12 +34,10 @@ const (
 	postRegisterValidatorPath  = "/eth/v1/builder/validators"
 )
 
-var (
-	errMalformedHostname      = errors.New("hostname must include port, separated by one colon, like example.com:3500")
-	errMalformedRequest       = errors.New("required request data are missing")
-	errNotBlinded             = errors.New("submitted block is not blinded")
-	submitBlindedBlockTimeout = 3 * time.Second
-)
+var errMalformedHostname = errors.New("hostname must include port, separated by one colon, like example.com:3500")
+var errMalformedRequest = errors.New("required request data are missing")
+var errNotBlinded = errors.New("submitted block is not blinded")
+var submitBlindedBlockTimeout = 3 * time.Second
 
 // ClientOpt is a functional option for the Client type (http.Client wrapper)
 type ClientOpt func(*Client)
@@ -159,6 +157,7 @@ func (c *Client) do(ctx context.Context, method string, path string, body io.Rea
 	if err != nil {
 		return
 	}
+	req.Header.Add("User-Agent", version.BuildData())
 	for _, o := range opts {
 		o(req)
 	}
@@ -234,7 +233,7 @@ func (c *Client) GetHeader(ctx context.Context, slot primitives.Slot, parentHash
 			return nil, errors.Wrapf(err, "could not extract proto message from header")
 		}
 		return WrappedSignedBuilderBidCapella(p)
-	case strings.ToLower(version.String(version.Bellatrix)), strings.ToLower(version.String(version.FastexPhase1)):
+	case strings.ToLower(version.String(version.Bellatrix)):
 		hr := &ExecHeaderResponse{}
 		if err := json.Unmarshal(hb, hr); err != nil {
 			return nil, errors.Wrapf(err, "error unmarshaling the builder GetHeader response, using slot=%d, parentHash=%#x, pubkey=%#x", slot, parentHash, pubkey)
@@ -247,6 +246,7 @@ func (c *Client) GetHeader(ctx context.Context, slot primitives.Slot, parentHash
 	default:
 		return nil, fmt.Errorf("unsupported header version %s", strings.ToLower(v.Version))
 	}
+
 }
 
 // RegisterValidator encodes the SignedValidatorRegistrationV1 message to json (including hex-encoding the byte
@@ -300,37 +300,9 @@ func (c *Client) SubmitBlindedBlock(ctx context.Context, sb interfaces.ReadOnlyS
 			r.Header.Add("Eth-Consensus-Version", version.String(version.Bellatrix))
 		}
 		rb, err := c.do(ctx, http.MethodPost, postBlindedBeaconBlockPath, bytes.NewBuffer(body), versionOpt)
+
 		if err != nil {
 			return nil, errors.Wrap(err, "error posting the SignedBlindedBeaconBlockBellatrix to the builder api")
-		}
-		ep := &ExecPayloadResponse{}
-		if err := json.Unmarshal(rb, ep); err != nil {
-			return nil, errors.Wrap(err, "error unmarshaling the builder SubmitBlindedBlock response")
-		}
-		p, err := ep.ToProto()
-		if err != nil {
-			return nil, errors.Wrapf(err, "could not extract proto message from payload")
-		}
-		return blocks.WrappedExecutionPayload(p)
-	case version.FastexPhase1:
-		psb, err := sb.PbBlindedFastexPhase1Block()
-		if err != nil {
-			return nil, errors.Wrapf(err, "could not get protobuf block")
-		}
-		b := &SignedBlindedBeaconBlockFastexPhase1{SignedBlindedBeaconBlockFastexPhase1: psb}
-		body, err := json.Marshal(b)
-		if err != nil {
-			return nil, errors.Wrap(err, "error encoding the SignedBlindedBeaconBlockFastexPhase1 value body in SubmitBlindedBlock")
-		}
-
-		ctx, cancel := context.WithTimeout(ctx, submitBlindedBlockTimeout)
-		defer cancel()
-		versionOpt := func(r *http.Request) {
-			r.Header.Add("Eth-Consensus-Version", version.String(version.FastexPhase1))
-		}
-		rb, err := c.do(ctx, http.MethodPost, postBlindedBeaconBlockPath, bytes.NewBuffer(body), versionOpt)
-		if err != nil {
-			return nil, errors.Wrap(err, "error posting the SignedBlindedBeaconBlockFastexPhase1 to the builder api")
 		}
 		ep := &ExecPayloadResponse{}
 		if err := json.Unmarshal(rb, ep); err != nil {
@@ -358,6 +330,7 @@ func (c *Client) SubmitBlindedBlock(ctx context.Context, sb interfaces.ReadOnlyS
 			r.Header.Add("Eth-Consensus-Version", version.String(version.Capella))
 		}
 		rb, err := c.do(ctx, http.MethodPost, postBlindedBeaconBlockPath, bytes.NewBuffer(body), versionOpt)
+
 		if err != nil {
 			return nil, errors.Wrap(err, "error posting the SignedBlindedBeaconBlockCapella to the builder api")
 		}
@@ -427,6 +400,5 @@ func covertEndPoint(ep string) network.Endpoint {
 		Auth: network.AuthorizationData{ // Auth is not used for builder.
 			Method: authorization.None,
 			Value:  "",
-		},
-	}
+		}}
 }

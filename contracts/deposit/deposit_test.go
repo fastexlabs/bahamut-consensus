@@ -3,14 +3,14 @@ package deposit_test
 import (
 	"testing"
 
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/signing"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/contracts/deposit"
-	"github.com/prysmaticlabs/prysm/v3/crypto/bls"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
-	"github.com/prysmaticlabs/prysm/v3/testing/util"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/signing"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/contracts/deposit"
+	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/testing/util"
 )
 
 func TestDepositInput_GeneratesPb(t *testing.T) {
@@ -23,16 +23,12 @@ func TestDepositInput_GeneratesPb(t *testing.T) {
 	require.NoError(t, err)
 	assert.DeepEqual(t, k1.PublicKey().Marshal(), result.PublicKey)
 
-	contract := []byte{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}
-	nonce := uint64(0)
 	sig, err := bls.SignatureFromBytes(result.Signature)
 	require.NoError(t, err)
 	testData := &ethpb.DepositMessage{
 		PublicKey:             result.PublicKey,
 		WithdrawalCredentials: result.WithdrawalCredentials,
 		Amount:                result.Amount,
-		DeployedContract:      []byte{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11},
-		DeploymentNonce:       0,
 	}
 	sr, err := testData.HashTreeRoot()
 	require.NoError(t, err)

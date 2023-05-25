@@ -3,9 +3,9 @@ package state_native
 import (
 	"testing"
 
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	testtmpl "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/testing"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	testtmpl "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/testing"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 func TestBeaconState_SlotDataRace_Phase0(t *testing.T) {
@@ -124,6 +124,30 @@ func TestBeaconState_ValidatorByPubkey_Bellatrix(t *testing.T) {
 
 func TestBeaconState_ValidatorByPubkey_Capella(t *testing.T) {
 	testtmpl.VerifyBeaconStateValidatorByPubkey(t, func() (state.BeaconState, error) {
+		return InitializeFromProtoCapella(&ethpb.BeaconStateCapella{})
+	})
+}
+
+func TestBeaconState_ValidatorByContract_Phase0(t *testing.T) {
+	testtmpl.VerifyBeaconStateValidatorByContract(t, func() (state.BeaconState, error) {
+		return InitializeFromProtoPhase0(&ethpb.BeaconState{})
+	})
+}
+
+func TestBeaconState_ValidatorByContract_Altair(t *testing.T) {
+	testtmpl.VerifyBeaconStateValidatorByContract(t, func() (state.BeaconState, error) {
+		return InitializeFromProtoAltair(&ethpb.BeaconStateAltair{})
+	})
+}
+
+func TestBeaconState_ValidatorByContract_Bellatrix(t *testing.T) {
+	testtmpl.VerifyBeaconStateValidatorByContract(t, func() (state.BeaconState, error) {
+		return InitializeFromProtoBellatrix(&ethpb.BeaconStateBellatrix{})
+	})
+}
+
+func TestBeaconState_ValidatorByContract_Capella(t *testing.T) {
+	testtmpl.VerifyBeaconStateValidatorByContract(t, func() (state.BeaconState, error) {
 		return InitializeFromProtoCapella(&ethpb.BeaconStateCapella{})
 	})
 }

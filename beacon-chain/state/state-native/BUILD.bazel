@@ -19,7 +19,6 @@ go_library(
         "getters_withdrawal.go",
         "hasher.go",
         "proofs.go",
-        "readonly_contracts.go",
         "readonly_validator.go",
         "setters_attestation.go",
         "setters_block.go",
@@ -41,7 +40,7 @@ go_library(
         "//config:mainnet": ["beacon_state_mainnet.go"],
         "//config:minimal": ["beacon_state_minimal.go"],
     }),
-    importpath = "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native",
+    importpath = "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native",
     visibility = ["//visibility:public"],
     deps = [
         "//beacon-chain/core/time:go_default_library",
@@ -75,7 +74,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "beacon_state_minimal_test.go",
         "getters_attestation_test.go",
         "getters_block_test.go",
         "getters_checkpoint_test.go",
@@ -85,7 +83,6 @@ go_test(
         "getters_withdrawal_test.go",
         "hasher_test.go",
         "proofs_test.go",
-        "readonly_contracts_test.go",
         "readonly_validator_test.go",
         "references_test.go",
         "setters_attestation_test.go",

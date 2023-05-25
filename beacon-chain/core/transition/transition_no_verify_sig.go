@@ -6,17 +6,16 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/altair"
-	b "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/blocks"
-	fastexphase1 "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/fastex-phase1"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition/interop"
-	v "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/validators"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/crypto/bls"
-	"github.com/prysmaticlabs/prysm/v3/monitoring/tracing"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/altair"
+	b "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/blocks"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition/interop"
+	v "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/validators"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
+	"github.com/prysmaticlabs/prysm/v4/monitoring/tracing"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 	"go.opencensus.io/trace"
 )
 
@@ -252,19 +251,31 @@ func ProcessOperationsNoVerifyAttsSigs(
 	}
 
 	var err error
+	mergeComplete, err := b.IsMergeTransitionComplete(state)
+	if err != nil {
+		return nil, err
+	}
+
+	if !mergeComplete {
+		if len(signedBeaconBlock.Block().Body().ActivityChanges()) > 0 {
+			return nil, errors.New("activity changes in pre-merge block")
+		}
+		if signedBeaconBlock.Block().Body().TransactionsCount() > 0 {
+			return nil, errors.New("transactions count in pre-merge block")
+		}
+		if signedBeaconBlock.Block().Body().BaseFee() > 0 {
+			return nil, errors.New("transactions count in pre-merge block")
+		}
+	}
+
 	switch signedBeaconBlock.Version() {
 	case version.Phase0:
 		state, err = phase0Operations(ctx, state, signedBeaconBlock)
 		if err != nil {
 			return nil, err
 		}
-	case version.Altair, version.Bellatrix:
+	case version.Altair, version.Bellatrix, version.Capella:
 		state, err = altairOperations(ctx, state, signedBeaconBlock)
-		if err != nil {
-			return nil, err
-		}
-	case version.FastexPhase1, version.Capella:
-		state, err = fastexPhase1Operations(ctx, state, signedBeaconBlock)
 		if err != nil {
 			return nil, err
 		}
@@ -358,66 +369,12 @@ func ProcessBlockForStateRoot(
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get sync aggregate from block")
 	}
-
-	if signed.Block().Version() <= version.Bellatrix {
-		state, _, err = altair.ProcessSyncAggregate(ctx, state, sa)
-		if err != nil {
-			return nil, errors.Wrap(err, "process_sync_aggregate failed")
-		}
-
-		return state, nil
-	}
-
-	state, _, err = fastexphase1.ProcessSyncAggregate(ctx, state, sa)
+	state, _, err = altair.ProcessSyncAggregate(ctx, state, sa)
 	if err != nil {
-		return nil, errors.Wrap(err, "process_sync_aggregate (fastex-phase1) failed")
+		return nil, errors.Wrap(err, "process_sync_aggregate failed")
 	}
 
 	return state, nil
-}
-
-// This calls altair block operations.
-func fastexPhase1Operations(
-	ctx context.Context,
-	st state.BeaconState,
-	signedBeaconBlock interfaces.ReadOnlySignedBeaconBlock,
-) (state.BeaconState, error) {
-	st, err := b.ProcessProposerSlashings(ctx, st, signedBeaconBlock.Block().Body().ProposerSlashings(), v.SlashValidator)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not process altair proposer slashing")
-	}
-	st, err = b.ProcessAttesterSlashings(ctx, st, signedBeaconBlock.Block().Body().AttesterSlashings(), v.SlashValidator)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not process altair attester slashing")
-	}
-	st, err = fastexphase1.ProcessAttestationsNoVerifySignature(ctx, st, signedBeaconBlock)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not process fastex-phase1 attestation")
-	}
-	if _, err := altair.ProcessDeposits(ctx, st, signedBeaconBlock.Block().Body().Deposits()); err != nil {
-		return nil, errors.Wrap(err, "could not process altair deposit")
-	}
-	st, err = b.ProcessBlockActivities(ctx, st, signedBeaconBlock.Block().Body().ActivityChanges())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not process activity changes")
-	}
-	st, err = b.ProcessLatestProcessedBlock(ctx, st, signedBeaconBlock.Block().Body().LatestProcessedBlock())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not process latest processed block attribute")
-	}
-	st, err = b.ProcessTransactionsCount(ctx, st, signedBeaconBlock.Block().Body().TransactionsCount())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not process transactions count")
-	}
-	st, err = b.ProcessVoluntaryExits(ctx, st, signedBeaconBlock.Block().Body().VoluntaryExits())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not process voluntary exits")
-	}
-	st, err = fastexphase1.ProcessBaseFeePerEpoch(ctx, st, signedBeaconBlock)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not process base fee")
-	}
-	return b.ProcessBLSToExecutionChanges(st, signedBeaconBlock)
 }
 
 // This calls altair block operations.
@@ -441,21 +398,25 @@ func altairOperations(
 	if _, err := altair.ProcessDeposits(ctx, st, signedBeaconBlock.Block().Body().Deposits()); err != nil {
 		return nil, errors.Wrap(err, "could not process altair deposit")
 	}
-	st, err = b.ProcessBlockActivities(ctx, st, signedBeaconBlock.Block().Body().ActivityChanges())
+	st, err = b.ProcessVoluntaryExits(ctx, st, signedBeaconBlock.Block().Body().VoluntaryExits())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process voluntary exits")
+	}
+	st, err = b.ProcessActivityChanges(ctx, st, signedBeaconBlock.Block().Body().ActivityChanges())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process activity changes")
-	}
-	st, err = b.ProcessLatestProcessedBlock(ctx, st, signedBeaconBlock.Block().Body().LatestProcessedBlock())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not process latest processed block attribute")
 	}
 	st, err = b.ProcessTransactionsCount(ctx, st, signedBeaconBlock.Block().Body().TransactionsCount())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process transactions count")
 	}
-	st, err = b.ProcessVoluntaryExits(ctx, st, signedBeaconBlock.Block().Body().VoluntaryExits())
+	st, err = b.ProcessBaseFee(ctx, st, signedBeaconBlock.Block().Body().BaseFee())
 	if err != nil {
-		return nil, errors.Wrap(err, "could not process voluntary exits")
+		return nil, errors.Wrap(err, "could not process base fee")
+	}
+	st, err = b.ProcessExecutionHeight(ctx, st, signedBeaconBlock.Block().Body().ExecutionHeight())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process execution height")
 	}
 	return b.ProcessBLSToExecutionChanges(st, signedBeaconBlock)
 }
@@ -481,17 +442,25 @@ func phase0Operations(
 	if _, err := b.ProcessDeposits(ctx, st, signedBeaconBlock.Block().Body().Deposits()); err != nil {
 		return nil, errors.Wrap(err, "could not process deposits")
 	}
-	st, err = b.ProcessBlockActivities(ctx, st, signedBeaconBlock.Block().Body().ActivityChanges())
+	st, err = b.ProcessVoluntaryExits(ctx, st, signedBeaconBlock.Block().Body().VoluntaryExits())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process voluntary exits")
+	}
+	st, err = b.ProcessActivityChanges(ctx, st, signedBeaconBlock.Block().Body().ActivityChanges())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process activity changes")
-	}
-	st, err = b.ProcessLatestProcessedBlock(ctx, st, signedBeaconBlock.Block().Body().LatestProcessedBlock())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not process latest processed block attribute")
 	}
 	st, err = b.ProcessTransactionsCount(ctx, st, signedBeaconBlock.Block().Body().TransactionsCount())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process transactions count")
 	}
-	return b.ProcessVoluntaryExits(ctx, st, signedBeaconBlock.Block().Body().VoluntaryExits())
+	st, err = b.ProcessBaseFee(ctx, st, signedBeaconBlock.Block().Body().BaseFee())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process base fee")
+	}
+	st, err = b.ProcessExecutionHeight(ctx, st, signedBeaconBlock.Block().Body().ExecutionHeight())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not process execution height")
+	}
+	return st, nil
 }

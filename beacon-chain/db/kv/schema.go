@@ -52,8 +52,6 @@ var (
 	altairKey                  = []byte("altair")
 	bellatrixKey               = []byte("merge")
 	bellatrixBlindKey          = []byte("blind-bellatrix")
-	fastexPhase1Key            = []byte("fastex-phase1")
-	fastexPhase1BlindKey       = []byte("blind-fastex-phase1")
 	capellaKey                 = []byte("capella")
 	capellaBlindKey            = []byte("blind-capella")
 	saveBlindedBeaconBlocksKey = []byte("save-blinded-beacon-blocks")

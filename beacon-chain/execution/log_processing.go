@@ -13,31 +13,31 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/feed"
-	statefeed "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/feed/state"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
-	coreState "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/execution/types"
-	statenative "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	contracts "github.com/prysmaticlabs/prysm/v3/contracts/deposit"
-	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed"
+	statefeed "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/state"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
+	coreState "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/execution/types"
+	statenative "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	contracts "github.com/prysmaticlabs/prysm/v4/contracts/deposit"
+	"github.com/prysmaticlabs/prysm/v4/crypto/hash"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	"github.com/sirupsen/logrus"
 )
 
-var depositEventSignature = hash.HashKeccak256([]byte("DepositEvent(bytes,bytes,bytes,bytes,bytes,bytes,bytes)"))
-
-const (
-	eth1DataSavingInterval        = 1000
-	maxTolerableDifference        = 50
-	defaultEth1HeaderReqLimit     = uint64(1000)
-	depositLogRequestLimit        = 10000
-	additiveFactorMultiplier      = 0.10
-	multiplicativeDecreaseDivisor = 2
+var (
+	depositEventSignature = hash.HashKeccak256([]byte("DepositEvent(bytes,bytes,bytes,bytes,bytes)"))
 )
+
+const eth1DataSavingInterval = 1000
+const maxTolerableDifference = 50
+const defaultEth1HeaderReqLimit = uint64(1000)
+const depositLogRequestLimit = 10000
+const additiveFactorMultiplier = 0.10
+const multiplicativeDecreaseDivisor = 2
 
 var errTimedOut = errors.New("net/http: request canceled")
 
@@ -109,7 +109,7 @@ func (s *Service) ProcessLog(ctx context.Context, depositLog gethtypes.Log) erro
 // the eth1 chain by trying to ascertain which participant deposited
 // in the contract.
 func (s *Service) ProcessDepositLog(ctx context.Context, depositLog gethtypes.Log) error {
-	pubkey, withdrawalCredentials, amount, signature, merkleTreeIndex, deployedContract, deploymentNonce, err := contracts.UnpackDepositLogData(depositLog.Data)
+	pubkey, withdrawalCredentials, amount, signature, merkleTreeIndex, err := contracts.UnpackDepositLogData(depositLog.Data)
 	if err != nil {
 		return errors.Wrap(err, "Could not unpack log")
 	}
@@ -131,12 +131,10 @@ func (s *Service) ProcessDepositLog(ctx context.Context, depositLog gethtypes.Lo
 	// We then decode the deposit input in order to create a deposit object
 	// we can store in our persistent DB.
 	depositData := &ethpb.Deposit_Data{
-		PublicKey:             pubkey,
-		WithdrawalCredentials: withdrawalCredentials,
 		Amount:                bytesutil.FromBytes8(amount),
+		PublicKey:             pubkey,
 		Signature:             signature,
-		DeployedContract:      deployedContract,
-		DeploymentNonce:       bytesutil.FromBytes8(deploymentNonce),
+		WithdrawalCredentials: withdrawalCredentials,
 	}
 
 	depositHash, err := depositData.HashTreeRoot()
@@ -251,6 +249,10 @@ func (s *Service) ProcessChainStart(genesisTime uint64, eth1BlockHash [32]byte, 
 		DepositCount: uint64(len(s.chainStartData.ChainstartDeposits)),
 		DepositRoot:  root[:],
 		BlockHash:    eth1BlockHash[:],
+	}
+	if err := s.preGenesisState.SetExecutionHeight(blockNumber.Uint64()); err != nil {
+		log.Error(err)
+		return
 	}
 
 	log.WithFields(logrus.Fields{
@@ -470,12 +472,6 @@ func (s *Service) requestBatchedHeadersAndLogs(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if s.chainStartData.Chainstarted {
-			err = s.ProcessBlockActivities(ctx, big.NewInt(0).SetUint64(i))
-			if err != nil {
-				return err
-			}
-		}
 		s.latestEth1DataLock.Lock()
 		s.latestEth1Data.LastRequestedBlock = i
 		s.latestEth1DataLock.Unlock()
@@ -512,12 +508,8 @@ func (s *Service) processChainStartFromHeader(ctx context.Context, header *types
 	s.processChainStartIfReady(ctx, header.Hash, header.Number, header.Time)
 }
 
-func (s *Service) checkHeaderRange(
-	ctx context.Context,
-	start, end uint64,
-	headersMap map[uint64]*types.HeaderInfo,
-	requestHeaders func(uint64, uint64) error,
-) error {
+func (s *Service) checkHeaderRange(ctx context.Context, start, end uint64, headersMap map[uint64]*types.HeaderInfo,
+	requestHeaders func(uint64, uint64) error) error {
 	for i := start; i <= end; i++ {
 		if !s.chainStartData.Chainstarted {
 			h, ok := headersMap[i]

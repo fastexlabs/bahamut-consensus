@@ -4,15 +4,15 @@ import (
 	"testing"
 
 	"github.com/prysmaticlabs/go-bitfield"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpbv1 "github.com/prysmaticlabs/prysm/v3/proto/eth/v1"
-	ethpbalpha "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
-	"github.com/prysmaticlabs/prysm/v3/testing/util"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpbv1 "github.com/prysmaticlabs/prysm/v4/proto/eth/v1"
+	ethpbalpha "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/testing/util"
 )
 
 var (
@@ -26,6 +26,7 @@ var (
 	gasLimit         = uint64(10)
 	gasUsed          = uint64(10)
 	timestamp        = uint64(10)
+	executionHeight  = uint64(10)
 	parentRoot       = bytesutil.PadTo([]byte("parentroot"), fieldparams.RootLength)
 	stateRoot        = bytesutil.PadTo([]byte("stateroot"), fieldparams.RootLength)
 	signature        = bytesutil.PadTo([]byte("signature"), 96)
@@ -101,6 +102,7 @@ func Test_V1Alpha1ToV1SignedBlock(t *testing.T) {
 		BlockHash:    blockHash,
 	}
 	alphaBlock.Signature = signature
+	alphaBlock.Block.Body.ExecutionHeight = executionHeight
 
 	v1Block, err := V1Alpha1ToV1SignedBlock(alphaBlock)
 	require.NoError(t, err)
@@ -124,6 +126,7 @@ func Test_V1ToV1Alpha1SignedBlock(t *testing.T) {
 		BlockHash:    blockHash,
 	}
 	v1Block.Signature = signature
+	v1Block.Block.Body.ExecutionHeight = executionHeight
 
 	alphaBlock, err := V1ToV1Alpha1SignedBlock(v1Block)
 	require.NoError(t, err)
@@ -146,6 +149,7 @@ func Test_V1ToV1Alpha1Block(t *testing.T) {
 		DepositCount: depositCount,
 		BlockHash:    blockHash,
 	}
+	alphaBlock.Body.ExecutionHeight = executionHeight
 
 	v1Block, err := V1Alpha1ToV1Block(alphaBlock)
 	require.NoError(t, err)
@@ -364,6 +368,7 @@ func Test_BlockInterfaceToV1Block(t *testing.T) {
 		BlockHash:    blockHash,
 	}
 	v1Alpha1Block.Signature = signature
+	v1Alpha1Block.Block.Body.ExecutionHeight = executionHeight
 
 	wsb, err := blocks.NewSignedBeaconBlock(v1Alpha1Block)
 	require.NoError(t, err)
@@ -380,7 +385,9 @@ func Test_V1Alpha1ValidatorToV1(t *testing.T) {
 	v1Alpha1Validator := &ethpbalpha.Validator{
 		PublicKey:                  []byte("pubkey"),
 		WithdrawalCredentials:      []byte("withdraw"),
+		Contract:                   []byte("contract"),
 		EffectiveBalance:           99,
+		EffectiveActivity:          42,
 		Slashed:                    true,
 		ActivationEligibilityEpoch: 1,
 		ActivationEpoch:            11,
@@ -392,7 +399,9 @@ func Test_V1Alpha1ValidatorToV1(t *testing.T) {
 	require.NotNil(t, v1Validator)
 	assert.DeepEqual(t, []byte("pubkey"), v1Validator.Pubkey)
 	assert.DeepEqual(t, []byte("withdraw"), v1Validator.WithdrawalCredentials)
+	assert.DeepEqual(t, []byte("contract"), v1Validator.Contract)
 	assert.Equal(t, uint64(99), v1Validator.EffectiveBalance)
+	assert.Equal(t, uint64(42), v1Validator.EffectiveActivity)
 	assert.Equal(t, true, v1Validator.Slashed)
 	assert.Equal(t, primitives.Epoch(1), v1Validator.ActivationEligibilityEpoch)
 	assert.Equal(t, primitives.Epoch(11), v1Validator.ActivationEpoch)
@@ -404,7 +413,9 @@ func Test_V1ValidatorToV1Alpha1(t *testing.T) {
 	v1Validator := &ethpbv1.Validator{
 		Pubkey:                     []byte("pubkey"),
 		WithdrawalCredentials:      []byte("withdraw"),
+		Contract:                   []byte("contract"),
 		EffectiveBalance:           99,
+		EffectiveActivity:          42,
 		Slashed:                    true,
 		ActivationEligibilityEpoch: 1,
 		ActivationEpoch:            11,
@@ -416,7 +427,9 @@ func Test_V1ValidatorToV1Alpha1(t *testing.T) {
 	require.NotNil(t, v1Alpha1Validator)
 	assert.DeepEqual(t, []byte("pubkey"), v1Alpha1Validator.PublicKey)
 	assert.DeepEqual(t, []byte("withdraw"), v1Alpha1Validator.WithdrawalCredentials)
+	assert.DeepEqual(t, []byte("contract"), v1Validator.Contract)
 	assert.Equal(t, uint64(99), v1Alpha1Validator.EffectiveBalance)
+	assert.Equal(t, uint64(42), v1Validator.EffectiveActivity)
 	assert.Equal(t, true, v1Alpha1Validator.Slashed)
 	assert.Equal(t, primitives.Epoch(1), v1Alpha1Validator.ActivationEligibilityEpoch)
 	assert.Equal(t, primitives.Epoch(11), v1Alpha1Validator.ActivationEpoch)
@@ -452,6 +465,8 @@ func Test_V1AttestationToV1Alpha1(t *testing.T) {
 	require.NoError(t, err)
 	assert.DeepEqual(t, v1Root, v1Alpha1Root)
 }
+
+// TODO(fastex-chain): test BeaconStateToProto function.
 func TestBeaconStateToProto(t *testing.T) {
 	source, err := util.NewBeaconState(util.FillRootsNaturalOpt, func(state *ethpbalpha.BeaconState) error {
 		state.GenesisTime = 1

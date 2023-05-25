@@ -7,17 +7,17 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/async"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/signing"
-	coreState "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition"
-	statenative "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/container/trie"
-	"github.com/prysmaticlabs/prysm/v3/crypto/bls"
-	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/time"
+	"github.com/prysmaticlabs/prysm/v4/async"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/signing"
+	coreState "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
+	statenative "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/container/trie"
+	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
+	"github.com/prysmaticlabs/prysm/v4/crypto/hash"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/time"
 )
 
 // This is the recommended mock eth1 block hash according to the Ethereum consensus interop guidelines.
@@ -163,10 +163,9 @@ func depositDataFromKeys(privKeys []bls.SecretKey, pubKeys []bls.PublicKey, numO
 func createDepositData(privKey bls.SecretKey, pubKey bls.PublicKey, withExecCreds bool) (*ethpb.Deposit_Data, error) {
 	depositMessage := &ethpb.DepositMessage{
 		PublicKey:             pubKey.Marshal(),
+		Contract:              make([]byte, 20),
 		WithdrawalCredentials: withdrawalCredentialsHash(pubKey.Marshal()),
 		Amount:                params.BeaconConfig().MaxEffectiveBalance,
-		DeployedContract:      []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
-		DeploymentNonce:       0,
 	}
 	if withExecCreds {
 		newCredentials := make([]byte, 12)
@@ -188,11 +187,10 @@ func createDepositData(privKey bls.SecretKey, pubKey bls.PublicKey, withExecCred
 	}
 	di := &ethpb.Deposit_Data{
 		PublicKey:             depositMessage.PublicKey,
+		Contract:              depositMessage.Contract,
 		WithdrawalCredentials: depositMessage.WithdrawalCredentials,
 		Amount:                depositMessage.Amount,
 		Signature:             privKey.Sign(root[:]).Marshal(),
-		DeployedContract:      depositMessage.DeployedContract,
-		DeploymentNonce:       depositMessage.DeploymentNonce,
 	}
 	return di, nil
 }

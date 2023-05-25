@@ -7,16 +7,16 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/prysmaticlabs/go-bitfield"
-	b "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/blocks"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/db/iface"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	state_native "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/crypto/bls"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
+	b "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/blocks"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db/iface"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	state_native "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
 )
 
 // FillRootsNaturalOpt is meant to be used as an option when calling NewBeaconState.
@@ -90,6 +90,7 @@ func NewBeaconState(options ...NewBeaconStateOption) (state.BeaconState, error) 
 			PreviousVersion: make([]byte, 4),
 			CurrentVersion:  make([]byte, 4),
 		},
+		SharedActivity:              &ethpb.SharedActivity{},
 		Eth1DataVotes:               make([]*ethpb.Eth1Data, 0),
 		HistoricalRoots:             make([][]byte, 0),
 		JustificationBits:           bitfield.Bitvector4{0x0},
@@ -107,7 +108,7 @@ func NewBeaconState(options ...NewBeaconStateOption) (state.BeaconState, error) 
 		}
 	}
 
-	var st, err = state_native.InitializeFromProtoUnsafePhase0(seed)
+	st, err := state_native.InitializeFromProtoUnsafePhase0(seed)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +134,7 @@ func NewBeaconStateAltair(options ...func(state *ethpb.BeaconStateAltair) error)
 			DepositRoot: make([]byte, fieldparams.RootLength),
 			BlockHash:   make([]byte, 32),
 		},
+		SharedActivity: &ethpb.SharedActivity{},
 		Fork: &ethpb.Fork{
 			PreviousVersion: make([]byte, 4),
 			CurrentVersion:  make([]byte, 4),
@@ -162,7 +164,7 @@ func NewBeaconStateAltair(options ...func(state *ethpb.BeaconStateAltair) error)
 		}
 	}
 
-	var st, err = state_native.InitializeFromProtoUnsafeAltair(seed)
+	st, err := state_native.InitializeFromProtoUnsafeAltair(seed)
 	if err != nil {
 		return nil, err
 	}
@@ -188,6 +190,7 @@ func NewBeaconStateBellatrix(options ...func(state *ethpb.BeaconStateBellatrix) 
 			DepositRoot: make([]byte, fieldparams.RootLength),
 			BlockHash:   make([]byte, 32),
 		},
+		SharedActivity: &ethpb.SharedActivity{},
 		Fork: &ethpb.Fork{
 			PreviousVersion: make([]byte, 4),
 			CurrentVersion:  make([]byte, 4),
@@ -229,7 +232,7 @@ func NewBeaconStateBellatrix(options ...func(state *ethpb.BeaconStateBellatrix) 
 		}
 	}
 
-	var st, err = state_native.InitializeFromProtoUnsafeBellatrix(seed)
+	st, err := state_native.InitializeFromProtoUnsafeBellatrix(seed)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +300,7 @@ func NewBeaconStateCapella(options ...func(state *ethpb.BeaconStateCapella) erro
 		}
 	}
 
-	var st, err = state_native.InitializeFromProtoUnsafeCapella(seed)
+	st, err := state_native.InitializeFromProtoUnsafeCapella(seed)
 	if err != nil {
 		return nil, err
 	}

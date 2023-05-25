@@ -20,11 +20,11 @@ const (
 	MaxTxsPerPayloadLength                = 1048576       // MaxTxsPerPayloadLength defines the maximum number of transactions that can be included in a payload.
 	MaxBytesPerTxLength                   = 1073741824    // MaxBytesPerTxLength defines the maximum number of bytes that can be included in a transaction.
 	FeeRecipientLength                    = 20            // FeeRecipientLength defines the byte length of a fee recipient.
+	ContractAddressLength                 = 20            // ContractAddressLength defines the bytes length of a smart contract address length.
 	LogsBloomLength                       = 256           // LogsBloomLength defines the byte length of a logs bloom.
 	VersionLength                         = 4             // VersionLength defines the byte length of a fork version number.
 	SlotsPerEpoch                         = 32            // SlotsPerEpoch defines the number of slots per epoch.
 	SyncCommitteeAggregationBytesLength   = 16            // SyncCommitteeAggregationBytesLength defines the length of sync committee aggregate bytes.
 	SyncAggregateSyncCommitteeBytesLength = 64            // SyncAggregateSyncCommitteeBytesLength defines the length of sync committee bytes in a sync aggregate.
 	MaxWithdrawalsPerPayload              = 16            // MaxWithdrawalsPerPayloadLength defines the maximum number of withdrawals that can be included in a payload.
-	ExecutionLayerAddressLength           = 20            // ExecutionLayerAddressLength defines the byte length of execution address.
 )

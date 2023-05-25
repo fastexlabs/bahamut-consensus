@@ -7,11 +7,11 @@ import (
 	"context"
 
 	"github.com/prysmaticlabs/go-bitfield"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 // BeaconState has read and write access to beacon state methods.
@@ -46,7 +46,6 @@ type ReadOnlyBeaconState interface {
 	ReadOnlyEth1Data
 	ReadOnlyValidators
 	ReadOnlyBalances
-	ReadOnlyContractsContainers
 	ReadOnlyActivities
 	ReadOnlyCheckpoint
 	ReadOnlyAttestations
@@ -79,7 +78,6 @@ type WriteOnlyBeaconState interface {
 	WriteOnlyEth1Data
 	WriteOnlyValidators
 	WriteOnlyBalances
-	WriteOnlyContractsContainers
 	WriteOnlyActivities
 	WriteOnlyCheckpoint
 	WriteOnlyAttestations
@@ -111,9 +109,6 @@ type ReadOnlyValidator interface {
 	ExitEpoch() primitives.Epoch
 	PublicKey() [fieldparams.BLSPubkeyLength]byte
 	WithdrawalCredentials() []byte
-	HasETH1WithdrawalCredential() bool
-	IsFullyWithdrawable(primitives.Epoch) bool
-	IsPartiallyWithdrawable(uint64) bool
 	Slashed() bool
 	IsNil() bool
 }
@@ -124,12 +119,11 @@ type ReadOnlyValidators interface {
 	ValidatorAtIndex(idx primitives.ValidatorIndex) (*ethpb.Validator, error)
 	ValidatorAtIndexReadOnly(idx primitives.ValidatorIndex) (ReadOnlyValidator, error)
 	ValidatorIndexByPubkey(key [fieldparams.BLSPubkeyLength]byte) (primitives.ValidatorIndex, bool)
+	ValidatorIndexByContract(key [fieldparams.ContractAddressLength]byte) (primitives.ValidatorIndex, bool)
 	PubkeyAtIndex(idx primitives.ValidatorIndex) [fieldparams.BLSPubkeyLength]byte
+	ContractAtIndex(idx primitives.ValidatorIndex) ([fieldparams.ContractAddressLength]byte, bool)
 	NumValidators() int
 	ReadFromEveryValidator(f func(idx int, val ReadOnlyValidator) error) error
-	TransactionsGasPerPeriod() uint64
-	NonStakersGasPerEpoch() uint64
-	NonStakersGasPerPeriod() uint64
 }
 
 // ReadOnlyBalances defines a struct which only has read access to balances methods.
@@ -137,22 +131,6 @@ type ReadOnlyBalances interface {
 	Balances() []uint64
 	BalanceAtIndex(idx primitives.ValidatorIndex) (uint64, error)
 	BalancesLength() int
-}
-
-// ReadOnlyContractsContainers defines a struct which only has read access to contract containers methods.
-type ReadOnlyContractsContainers interface {
-	Contracts() []*ethpb.ContractsContainer
-	ContractsAtIndex(idx primitives.ValidatorIndex) (*ethpb.ContractsContainer, error)
-	ContractsAtIndexReadOnly(idx primitives.ValidatorIndex) (ReadOnlyContractsContainer, error)
-	ValidatorIndexByContractAddress(key [fieldparams.ExecutionLayerAddressLength]byte) (primitives.ValidatorIndex, bool)
-	ContractsLength() int
-}
-
-// ReadOnlyContractsContainer defines a struct which only has read access to contract container methods.
-type ReadOnlyContractsContainer interface {
-	Contracts() [][fieldparams.ExecutionLayerAddressLength]byte
-	ContractAtIndex(idx int) ([fieldparams.ExecutionLayerAddressLength]byte, error)
-	IsNil() bool
 }
 
 // ReadOnlyActivities defines a struct which only has read access to activities methods.
@@ -198,13 +176,8 @@ type ReadOnlyEth1Data interface {
 	Eth1Data() *ethpb.Eth1Data
 	Eth1DataVotes() []*ethpb.Eth1Data
 	Eth1DepositIndex() uint64
-	LatestProcessedBlockActivities() uint64
-	TransactionsGasPerPeriod() uint64
-	TransactionsPerLatestEpoch() uint64
-	NonStakersGasPerEpoch() uint64
-	NonStakersGasPerPeriod() uint64
-	BaseFeePerEpoch() (uint64, error)
-	BaseFeePerPeriod() (uint64, error)
+	SharedActivity() *ethpb.SharedActivity
+	ExecutionHeight() uint64
 }
 
 // ReadOnlyAttestations defines a struct which only has read access to attestations methods.
@@ -255,13 +228,8 @@ type WriteOnlyEth1Data interface {
 	SetEth1DataVotes(val []*ethpb.Eth1Data) error
 	AppendEth1DataVotes(val *ethpb.Eth1Data) error
 	SetEth1DepositIndex(val uint64) error
-	SetLatestProcessedBlockActivities(val uint64) error
-	SetTransactionsGasPerPeriod(val uint64) error
-	SetTransactionsPerLatestEpoch(val uint64) error
-	SetNonStakersGasPerEpoch(val uint64) error
-	SetNonStakersGasPerPeriod(val uint64) error
-	SetBaseFeePerEpoch(val uint64) error
-	SetBaseFeePerPeriod(val uint64) error
+	SetSharedActivity(val *ethpb.SharedActivity) error
+	SetExecutionHeight(val uint64) error
 }
 
 // WriteOnlyValidators defines a struct which only has write access to validators methods.
@@ -279,18 +247,11 @@ type WriteOnlyBalances interface {
 	AppendBalance(bal uint64) error
 }
 
-// WriteOnlyContractsContainers defines a struct which only has write access to contracts containers methods.
-type WriteOnlyContractsContainers interface {
-	SetContracts(cc []*ethpb.ContractsContainer) error
-	UpdateContractsAtIndex(idx primitives.ValidatorIndex, cc *ethpb.ContractsContainer) error
-	AppendContracts(cc *ethpb.ContractsContainer) error
-}
-
 // WriteOnlyActivities defines a struct which only has write access to activities methods.
 type WriteOnlyActivities interface {
-	SetActivities(activities []uint64) error
-	UpdateActivitiesAtIndex(idx primitives.ValidatorIndex, activity uint64) error
-	AppendActivity(activity uint64) error
+	SetActivities(val []uint64) error
+	UpdateActivityAtIndex(idx primitives.ValidatorIndex, val uint64) error
+	AppendActivity(bal uint64) error
 }
 
 // WriteOnlyRandaoMixes defines a struct which only has write access to randao mixes methods.

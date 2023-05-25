@@ -5,14 +5,13 @@ import (
 	"encoding/binary"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	"github.com/prysmaticlabs/prysm/v3/encoding/ssz"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/encoding/ssz"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 	"go.opencensus.io/trace"
 )
 
@@ -24,7 +23,6 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 	if state == nil {
 		return nil, errors.New("nil state")
 	}
-	hasher := hash.CustomSHA256Hasher()
 	var fieldRoots [][]byte
 	switch state.version {
 	case version.Phase0:
@@ -33,8 +31,6 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 		fieldRoots = make([][]byte, params.BeaconConfig().BeaconStateAltairFieldCount)
 	case version.Bellatrix:
 		fieldRoots = make([][]byte, params.BeaconConfig().BeaconStateBellatrixFieldCount)
-	case version.FastexPhase1:
-		fieldRoots = make([][]byte, params.BeaconConfig().BeaconStateFastexPhase1FieldCount)
 	case version.Capella:
 		fieldRoots = make([][]byte, params.BeaconConfig().BeaconStateCapellaFieldCount)
 	}
@@ -100,7 +96,7 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 	fieldRoots[types.HistoricalRoots.RealPosition()] = historicalRootsRt[:]
 
 	// Eth1Data data structure root.
-	eth1HashTreeRoot, err := stateutil.Eth1Root(hasher, state.eth1Data)
+	eth1HashTreeRoot, err := stateutil.Eth1Root(state.eth1Data)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute eth1data merkleization")
 	}
@@ -119,30 +115,18 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 	eth1DepositBuf := bytesutil.ToBytes32(eth1DepositIndexBuf)
 	fieldRoots[types.Eth1DepositIndex.RealPosition()] = eth1DepositBuf[:]
 
-	latestProcessedBlockActivitiesBuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(latestProcessedBlockActivitiesBuf, state.latestProcessedBlockActivities)
-	latestProcessedBlockActivities := bytesutil.ToBytes32(latestProcessedBlockActivitiesBuf)
-	fieldRoots[types.LatestProcessedBlockActivities.RealPosition()] = latestProcessedBlockActivities[:]
+	// SharedActivity data structure root.
+	sharedActivityHashTreeRoot, err := stateutil.SharedActivityRoot(state.sharedActivity)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not compute shared activity merkleization")
+	}
+	fieldRoots[types.SharedActivity.RealPosition()] = sharedActivityHashTreeRoot[:]
 
-	transactionsGasPerPeriodBuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(transactionsGasPerPeriodBuf, state.transactionsGasPerPeriod)
-	transactionsGasPerPeriod := bytesutil.ToBytes32(transactionsGasPerPeriodBuf)
-	fieldRoots[types.TransactionsGasPerPeriod.RealPosition()] = transactionsGasPerPeriod[:]
-
-	transactionsPerLatestEpochBuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(transactionsPerLatestEpochBuf, state.transactionsPerLatestEpoch)
-	transactionsPerLatestEpoch := bytesutil.ToBytes32(transactionsPerLatestEpochBuf)
-	fieldRoots[types.TransactionsPerLatestEpoch.RealPosition()] = transactionsPerLatestEpoch[:]
-
-	nonStakersGasPerEpochBuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(nonStakersGasPerEpochBuf, state.nonStakersGasPerEpoch)
-	nonStakersGasPerEpoch := bytesutil.ToBytes32(nonStakersGasPerEpochBuf)
-	fieldRoots[types.NonStakersGasPerEpoch.RealPosition()] = nonStakersGasPerEpoch[:]
-
-	nonStakersGasPerPeriodBuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(nonStakersGasPerPeriodBuf, state.nonStakersGasPerPeriod)
-	nonStakersGasPerPeriod := bytesutil.ToBytes32(nonStakersGasPerPeriodBuf)
-	fieldRoots[types.NonStakersGasPerPeriod.RealPosition()] = nonStakersGasPerPeriod[:]
+	// ExecutionHeight root.
+	executionHeightBuf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(executionHeightBuf, state.executionHeight)
+	executionHeightRoot := bytesutil.ToBytes32(executionHeightBuf)
+	fieldRoots[types.ExecutionHeight.RealPosition()] = executionHeightRoot[:]
 
 	// Validators slice root.
 	validatorsRoot, err := stateutil.ValidatorRegistryRoot(state.validators)
@@ -158,12 +142,7 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 	}
 	fieldRoots[types.Balances.RealPosition()] = balancesRoot[:]
 
-	contractsRoot, err := stateutil.ContractsRoot(state.contracts)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not compute validator contracts merkleization")
-	}
-	fieldRoots[types.Contracts.RealPosition()] = contractsRoot[:]
-
+	// Activities slice root.
 	activitiesRoot, err := stateutil.Uint64ListRootWithRegistryLimit(state.activities)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute validator activities merkleization")
@@ -225,21 +204,21 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 	fieldRoots[types.JustificationBits.RealPosition()] = justifiedBitsRoot[:]
 
 	// PreviousJustifiedCheckpoint data structure root.
-	prevCheckRoot, err := ssz.CheckpointRoot(hasher, state.previousJustifiedCheckpoint)
+	prevCheckRoot, err := ssz.CheckpointRoot(state.previousJustifiedCheckpoint)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute previous justified checkpoint merkleization")
 	}
 	fieldRoots[types.PreviousJustifiedCheckpoint.RealPosition()] = prevCheckRoot[:]
 
 	// CurrentJustifiedCheckpoint data structure root.
-	currJustRoot, err := ssz.CheckpointRoot(hasher, state.currentJustifiedCheckpoint)
+	currJustRoot, err := ssz.CheckpointRoot(state.currentJustifiedCheckpoint)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute current justified checkpoint merkleization")
 	}
 	fieldRoots[types.CurrentJustifiedCheckpoint.RealPosition()] = currJustRoot[:]
 
 	// FinalizedCheckpoint data structure root.
-	finalRoot, err := ssz.CheckpointRoot(hasher, state.finalizedCheckpoint)
+	finalRoot, err := ssz.CheckpointRoot(state.finalizedCheckpoint)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not compute finalized checkpoint merkleization")
 	}
@@ -268,25 +247,13 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 		fieldRoots[types.NextSyncCommittee.RealPosition()] = nextSyncCommitteeRoot[:]
 	}
 
-	if state.version == version.Bellatrix || state.version == version.FastexPhase1 {
+	if state.version == version.Bellatrix {
 		// Execution payload root.
 		executionPayloadRoot, err := state.latestExecutionPayloadHeader.HashTreeRoot()
 		if err != nil {
 			return nil, err
 		}
 		fieldRoots[types.LatestExecutionPayloadHeader.RealPosition()] = executionPayloadRoot[:]
-	}
-
-	if state.version >= version.FastexPhase1 {
-		baseFeePerEpochBuf := make([]byte, 8)
-		binary.LittleEndian.PutUint64(baseFeePerEpochBuf, state.baseFeePerEpoch)
-		baseFeePerEpoch := bytesutil.ToBytes32(baseFeePerEpochBuf)
-		fieldRoots[types.BaseFeePerEpoch.RealPosition()] = baseFeePerEpoch[:]
-
-		baseFeePerPeriodBuf := make([]byte, 8)
-		binary.LittleEndian.PutUint64(baseFeePerPeriodBuf, state.baseFeePerPeriod)
-		baseFeePerPeriod := bytesutil.ToBytes32(baseFeePerPeriodBuf)
-		fieldRoots[types.BaseFeePerPeriod.RealPosition()] = baseFeePerPeriod[:]
 	}
 
 	if state.version == version.Capella {

@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	v1alpha1 "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	v1alpha1 "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
 )
 
 func TestCopyETH1Data(t *testing.T) {
@@ -39,6 +39,7 @@ func TestCopyAttestation(t *testing.T) {
 	}
 	assert.NotEmpty(t, got, "Copied attestation has empty fields")
 }
+
 func TestCopyAttestationData(t *testing.T) {
 	att := genAttData()
 
@@ -239,6 +240,26 @@ func TestCopySignedVoluntaryExit(t *testing.T) {
 	assert.NotEmpty(t, got, "Copied signed voluntary exit has empty fields")
 }
 
+func TestCopyActivityChange(t *testing.T) {
+	ac := genActivityChange()
+
+	got := v1alpha1.CopyActivityChange(ac)
+	if !reflect.DeepEqual(got, ac) {
+		t.Errorf("CopyActivityChange() = %v, want %v", got, ac)
+	}
+	assert.NotEmpty(t, got, "Copied activity change has empty fields")
+}
+
+func TestCopyActivityChanges(t *testing.T) {
+	ac := genActivityChanges(10)
+
+	got := v1alpha1.CopyActivityChanges(ac)
+	if !reflect.DeepEqual(got, ac) {
+		t.Errorf("CopyActivityChanges() = %v, want %v", got, ac)
+	}
+	assert.NotEmpty(t, got, "Copied activity changes has empty fields")
+}
+
 func TestCopyValidator(t *testing.T) {
 	v := genValidator()
 
@@ -247,16 +268,6 @@ func TestCopyValidator(t *testing.T) {
 		t.Errorf("CopyValidator() = %v, want %v", got, v)
 	}
 	assert.NotEmpty(t, got, "Copied validator has empty fields")
-}
-
-func TestCopyContractsContainer(t *testing.T) {
-	cc := genContractsContainer(10)
-
-	got := v1alpha1.CopyContractsContainer(cc)
-	if !reflect.DeepEqual(got, cc) {
-		t.Errorf("CopyContractsContainer() = %v, want %v", got, cc)
-	}
-	assert.NotEmpty(t, got, "Copied contracts container has empty fields")
 }
 
 func TestCopySyncCommitteeMessage(t *testing.T) {
@@ -591,6 +602,10 @@ func genBeaconBlockBody() *v1alpha1.BeaconBlockBody {
 		Attestations:      genAttestations(5),
 		Deposits:          genDeposits(5),
 		VoluntaryExits:    genSignedVoluntaryExits(5),
+		ActivityChanges:   genActivityChanges(5),
+		TransactionsCount: 4,
+		BaseFee:           5,
+		ExecutionHeight:   6,
 	}
 }
 
@@ -652,11 +667,10 @@ func genSignedBeaconBlockHeader() *v1alpha1.SignedBeaconBlockHeader {
 func genDepositData() *v1alpha1.Deposit_Data {
 	return &v1alpha1.Deposit_Data{
 		PublicKey:             bytes(32),
+		Contract:              bytes(20),
 		WithdrawalCredentials: bytes(32),
 		Amount:                20000,
 		Signature:             bytes(32),
-		DeployedContract:      bytes(32),
-		DeploymentNonce:       1,
 	}
 }
 
@@ -701,22 +715,14 @@ func genValidator() *v1alpha1.Validator {
 	return &v1alpha1.Validator{
 		PublicKey:                  bytes(32),
 		WithdrawalCredentials:      bytes(32),
+		Contract:                   bytes(20),
 		EffectiveBalance:           12345,
+		EffectiveActivity:          42424242,
 		Slashed:                    true,
 		ActivationEligibilityEpoch: 14322,
 		ActivationEpoch:            14325,
 		ExitEpoch:                  23425,
 		WithdrawableEpoch:          30000,
-	}
-}
-
-func genContractsContainer(num int) *v1alpha1.ContractsContainer {
-	contracts := make([][]byte, num)
-	for i := 0; i < num; i++ {
-		contracts[i] = bytes(32)
-	}
-	return &v1alpha1.ContractsContainer{
-		Contracts: contracts,
 	}
 }
 
@@ -747,6 +753,10 @@ func genBeaconBlockBodyAltair() *v1alpha1.BeaconBlockBodyAltair {
 		Attestations:      genAttestations(10),
 		Deposits:          genDeposits(5),
 		VoluntaryExits:    genSignedVoluntaryExits(12),
+		ActivityChanges:   genActivityChanges(5),
+		TransactionsCount: 4,
+		BaseFee:           5,
+		ExecutionHeight:   6,
 		SyncAggregate:     genSyncAggregate(),
 	}
 }
@@ -778,6 +788,10 @@ func genBeaconBlockBodyBellatrix() *v1alpha1.BeaconBlockBodyBellatrix {
 		Attestations:      genAttestations(10),
 		Deposits:          genDeposits(5),
 		VoluntaryExits:    genSignedVoluntaryExits(12),
+		ActivityChanges:   genActivityChanges(5),
+		TransactionsCount: 4,
+		BaseFee:           5,
+		ExecutionHeight:   6,
 		SyncAggregate:     genSyncAggregate(),
 		ExecutionPayload:  genPayload(),
 	}
@@ -810,6 +824,10 @@ func genBeaconBlockBodyCapella() *v1alpha1.BeaconBlockBodyCapella {
 		Attestations:          genAttestations(10),
 		Deposits:              genDeposits(5),
 		VoluntaryExits:        genSignedVoluntaryExits(12),
+		ActivityChanges:       genActivityChanges(5),
+		TransactionsCount:     4,
+		BaseFee:               5,
+		ExecutionHeight:       6,
 		SyncAggregate:         genSyncAggregate(),
 		ExecutionPayload:      genPayloadCapella(),
 		BlsToExecutionChanges: genBLSToExecutionChanges(10),
@@ -843,6 +861,10 @@ func genBlindedBeaconBlockBodyCapella() *v1alpha1.BlindedBeaconBlockBodyCapella 
 		Attestations:           genAttestations(10),
 		Deposits:               genDeposits(5),
 		VoluntaryExits:         genSignedVoluntaryExits(12),
+		ActivityChanges:        genActivityChanges(5),
+		TransactionsCount:      4,
+		BaseFee:                5,
+		ExecutionHeight:        6,
 		SyncAggregate:          genSyncAggregate(),
 		ExecutionPayloadHeader: genPayloadHeaderCapella(),
 		BlsToExecutionChanges:  genBLSToExecutionChanges(10),
@@ -863,6 +885,21 @@ func genSignedBlindedBeaconBlockCapella() *v1alpha1.SignedBlindedBeaconBlockCape
 	return &v1alpha1.SignedBlindedBeaconBlockCapella{
 		Block:     genBlindedBeaconBlockCapella(),
 		Signature: bytes(32),
+	}
+}
+
+func genActivityChanges(num int) []*v1alpha1.ActivityChange {
+	acs := make([]*v1alpha1.ActivityChange, num)
+	for i := 0; i < num; i++ {
+		acs[i] = genActivityChange()
+	}
+	return acs
+}
+
+func genActivityChange() *v1alpha1.ActivityChange {
+	return &v1alpha1.ActivityChange{
+		ContractAddress: bytes(20),
+		DeltaActivity:   424242,
 	}
 }
 

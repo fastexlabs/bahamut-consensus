@@ -20,26 +20,19 @@ import "proto/eth/ext/options.proto";
 import "proto/eth/v1/attestation.proto";
 
 option csharp_namespace = "Ethereum.Eth.V1";
-option go_package = "github.com/prysmaticlabs/prysm/v3/proto/eth/v1";
+option go_package = "github.com/prysmaticlabs/prysm/v4/proto/eth/v1";
 option java_multiple_files = true;
 option java_outer_classname = "BeaconBlockProto";
 option java_package = "org.ethereum.eth.v1";
 option php_namespace = "Ethereum\\Eth\\v1";
 
-// ActivityChange contains a activity increase of particular contract address.
-message ActivityChange {
-    bytes contract_address = 1 [(ethereum.eth.ext.ssz_size) = "20"];                                                                                  
-    
-    uint64 delta_activity = 2;
-}
-
 // The Ethereum consensus beacon block. The message does not contain a validator signature.
 message BeaconBlock {
     // Beacon chain slot that this block represents.
-    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
+    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Slot"];
 
     // Validator index of the validator that proposed the block header.
-    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.ValidatorIndex"];
 
     // 32 byte root of the parent block.
     bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];
@@ -90,14 +83,17 @@ message BeaconBlockBody {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
-    // At max MAX_ACTIVITY_CHANGES.
-    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
+    // Activity changes from EL.
+    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_size) = "?", (ethereum.eth.ext.ssz_max) = "1073741824"];
 
-    // The block number from which activity changes were processed.
-    uint64 latest_processed_block = 10;
+    // The number of transactions in EL block.
+    uint64 transactions_count = 10;
 
-    // The number of transactions in latest processed block.
-    uint64 transactions_count = 11;
+    // The base fee in EL block.
+    uint64 base_fee = 11;
+
+    // The latest processed EL block number.
+    uint64 execution_height = 12;
 }
 
 // Proposer slashings are proofs that a slashable offense has been committed by
@@ -122,6 +118,7 @@ message AttesterSlashing {
 
 // Deposit into the Ethereum consensus from the Ethereum 1.x deposit contract.
 message Deposit {
+	// TODO(fastex-chain): add nonce to v1.DepositData.
     message Data {
         // 48 byte BLS public key of the validator.
         bytes pubkey = 1 [(ethereum.eth.ext.ssz_size) = "48", (ethereum.eth.ext.spec_name) = "pubkey"];
@@ -129,16 +126,14 @@ message Deposit {
         // A 32 byte hash of the withdrawal address public key.
         bytes withdrawal_credentials = 2 [(ethereum.eth.ext.ssz_size) = "32"];
 
+        // A 20 byte address of the validator deployed contract.
+        bytes contract = 3  [(ethereum.eth.ext.ssz_size) = "20"];
+
         // Deposit amount in gwei.
-        uint64 amount = 3;
+        uint64 amount = 4;
 
         // 96 byte signature from the validators public key.
-        bytes signature = 4 [(ethereum.eth.ext.ssz_size) = "96"];
-
-		// 20 byte address.
-        bytes deployed_contract = 5 [(ethereum.eth.ext.ssz_size) = "20"];
-
-        uint64 deployment_nonce = 6;
+        bytes signature = 5 [(ethereum.eth.ext.ssz_size) = "96"];
     }
 
     // 32 byte roots in the deposit tree branch.
@@ -153,10 +148,10 @@ message Deposit {
 // validator signature.
 message VoluntaryExit {
     // The epoch on when exit request becomes valid.
-    uint64 epoch = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Epoch"];
+    uint64 epoch = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Epoch"];
 
     // Index of the exiting validator.
-    uint64 validator_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+    uint64 validator_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.ValidatorIndex"];
 }
 
 // The signed version of voluntary exit.
@@ -183,16 +178,25 @@ message Eth1Data {
     bytes block_hash = 3 [(ethereum.eth.ext.ssz_size) = "32"];
 }
 
+// ActivityChange represents activity change of a single contract from EL
+message ActivityChange {
+    // Address of the smart contract
+    bytes contract_address = 1 [(ethereum.eth.ext.ssz_size) = "20"];
+
+    // The amount of gas used by the smart contract during its execution
+	uint64 delta_activity = 2;
+}
+
 // A beacon block header is essentially a beacon block with only a reference to
 // the beacon body as a 32 byte merkle tree root. This type of message is more
 // lightweight than a full beacon block. The message does not contain
 // a validator signature.
 message BeaconBlockHeader {
     // Beacon chain slot that this block represents.
-    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
+    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Slot"];
 
     // Validator index of the validator that proposed the block header.
-    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.ValidatorIndex"];
 
     // 32 byte merkle tree root of the parent ssz encoded block.
     bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];

@@ -3,7 +3,7 @@ load("@prysm//tools/go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "activities.go",
+        "activity_changes.go",
         "attestation.go",
         "attester_slashing.go",
         "deposit.go",
@@ -19,7 +19,7 @@ go_library(
         "signature.go",
         "withdrawals.go",
     ],
-    importpath = "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/blocks",
+    importpath = "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/blocks",
     visibility = ["//visibility:public"],
     deps = [
         "//beacon-chain/core/helpers:go_default_library",
@@ -59,6 +59,7 @@ go_test(
     name = "go_default_test",
     size = "medium",
     srcs = [
+        "activity_changes_test.go",
         "attestation_regression_test.go",
         "attestation_test.go",
         "attester_slashing_test.go",

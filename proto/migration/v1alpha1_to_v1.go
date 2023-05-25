@@ -2,11 +2,11 @@ package migration
 
 import (
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpbv1 "github.com/prysmaticlabs/prysm/v3/proto/eth/v1"
-	ethpbalpha "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpbv1 "github.com/prysmaticlabs/prysm/v4/proto/eth/v1"
+	ethpbalpha "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -311,6 +311,7 @@ func V1Alpha1ValidatorToV1(v1Alpha1Validator *ethpbalpha.Validator) *ethpbv1.Val
 	return &ethpbv1.Validator{
 		Pubkey:                     v1Alpha1Validator.PublicKey,
 		WithdrawalCredentials:      v1Alpha1Validator.WithdrawalCredentials,
+		Contract:                   v1Alpha1Validator.Contract,
 		EffectiveBalance:           v1Alpha1Validator.EffectiveBalance,
 		EffectiveActivity:          v1Alpha1Validator.EffectiveActivity,
 		Slashed:                    v1Alpha1Validator.Slashed,
@@ -329,6 +330,7 @@ func V1ValidatorToV1Alpha1(v1Validator *ethpbv1.Validator) *ethpbalpha.Validator
 	return &ethpbalpha.Validator{
 		PublicKey:                  v1Validator.Pubkey,
 		WithdrawalCredentials:      v1Validator.WithdrawalCredentials,
+		Contract:                   v1Validator.Contract,
 		EffectiveBalance:           v1Validator.EffectiveBalance,
 		EffectiveActivity:          v1Validator.EffectiveActivity,
 		Slashed:                    v1Validator.Slashed,
@@ -363,8 +365,8 @@ func BeaconStateToProto(state state.BeaconState) (*ethpbv1.BeaconState, error) {
 	sourceLatestBlockHeader := state.LatestBlockHeader()
 	sourceEth1Data := state.Eth1Data()
 	sourceEth1DataVotes := state.Eth1DataVotes()
+	sourceSharedActivity := state.SharedActivity()
 	sourceValidators := state.Validators()
-	sourceContractsContainers := state.Contracts()
 	sourcePrevEpochAtts, err := state.PreviousEpochAttestations()
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not get previous epoch attestations from state")
@@ -391,6 +393,7 @@ func BeaconStateToProto(state state.BeaconState) (*ethpbv1.BeaconState, error) {
 		resultValidators[i] = &ethpbv1.Validator{
 			Pubkey:                     bytesutil.SafeCopyBytes(validator.PublicKey),
 			WithdrawalCredentials:      bytesutil.SafeCopyBytes(validator.WithdrawalCredentials),
+			Contract:                   bytesutil.SafeCopyBytes(validator.Contract),
 			EffectiveBalance:           validator.EffectiveBalance,
 			EffectiveActivity:          validator.EffectiveActivity,
 			Slashed:                    validator.Slashed,
@@ -398,16 +401,6 @@ func BeaconStateToProto(state state.BeaconState) (*ethpbv1.BeaconState, error) {
 			ActivationEpoch:            validator.ActivationEpoch,
 			ExitEpoch:                  validator.ExitEpoch,
 			WithdrawableEpoch:          validator.WithdrawableEpoch,
-		}
-	}
-	resultContractsContainers := make([]*ethpbv1.ContractsContainer, len(sourceContractsContainers))
-	for i, cc := range sourceContractsContainers {
-		contracts := make([][]byte, len(cc.Contracts))
-		for j, c := range cc.Contracts {
-			contracts[j] = bytesutil.SafeCopyBytes(c)
-		}
-		resultContractsContainers[i] = &ethpbv1.ContractsContainer{
-			Contracts: contracts,
 		}
 	}
 	resultPrevEpochAtts := make([]*ethpbv1.PendingAttestation, len(sourcePrevEpochAtts))
@@ -483,22 +476,22 @@ func BeaconStateToProto(state state.BeaconState) (*ethpbv1.BeaconState, error) {
 			DepositCount: sourceEth1Data.DepositCount,
 			BlockHash:    bytesutil.SafeCopyBytes(sourceEth1Data.BlockHash),
 		},
-		Eth1DataVotes:                  resultEth1DataVotes,
-		Eth1DepositIndex:               state.Eth1DepositIndex(),
-		LatestProcessedBlockActivities: state.LatestProcessedBlockActivities(),
-		TransactionsPerLatestEpoch:     state.TransactionsPerLatestEpoch(),
-		TransactionsGasPerPeriod:       state.TransactionsGasPerPeriod(),
-		NonStakersGasPerEpoch:          state.NonStakersGasPerEpoch(),
-		NonStakersGasPerPeriod:         state.NonStakersGasPerPeriod(),
-		Validators:                     resultValidators,
-		Balances:                       state.Balances(),
-		Contracts:                      resultContractsContainers,
-		Activities:                     state.Activities(),
-		RandaoMixes:                    bytesutil.SafeCopy2dBytes(state.RandaoMixes()),
-		Slashings:                      state.Slashings(),
-		PreviousEpochAttestations:      resultPrevEpochAtts,
-		CurrentEpochAttestations:       resultCurrEpochAtts,
-		JustificationBits:              bytesutil.SafeCopyBytes(sourceJustificationBits),
+		Eth1DataVotes:    resultEth1DataVotes,
+		Eth1DepositIndex: state.Eth1DepositIndex(),
+		SharedActivity: &ethpbv1.SharedActivity{
+			TransactionsGasPerPeriod: sourceSharedActivity.TransactionsGasPerPeriod,
+			TransactionsGasPerEpoch:  sourceSharedActivity.TransactionsGasPerEpoch,
+			BaseFeePerPeriod:         sourceSharedActivity.BaseFeePerPeriod,
+			BaseFeePerEpoch:          sourceSharedActivity.BaseFeePerEpoch,
+		},
+		Validators:                resultValidators,
+		Balances:                  state.Balances(),
+		Activities:                state.Activities(),
+		RandaoMixes:               bytesutil.SafeCopy2dBytes(state.RandaoMixes()),
+		Slashings:                 state.Slashings(),
+		PreviousEpochAttestations: resultPrevEpochAtts,
+		CurrentEpochAttestations:  resultCurrEpochAtts,
+		JustificationBits:         bytesutil.SafeCopyBytes(sourceJustificationBits),
 		PreviousJustifiedCheckpoint: &ethpbv1.Checkpoint{
 			Epoch: sourcePrevJustifiedCheckpoint.Epoch,
 			Root:  bytesutil.SafeCopyBytes(sourcePrevJustifiedCheckpoint.Root),

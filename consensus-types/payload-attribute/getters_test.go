@@ -3,9 +3,9 @@ package payloadattribute
 import (
 	"testing"
 
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
 )
 
 func TestPayloadAttributeGetters(t *testing.T) {
@@ -24,7 +24,7 @@ func TestPayloadAttributeGetters(t *testing.T) {
 			name: "Get prev randao",
 			tc: func(t *testing.T) {
 				r := []byte{1, 2, 3}
-				a, err := New(&enginev1.PayloadAttributes{PrevRandao: r}, version.Bellatrix)
+				a, err := New(&enginev1.PayloadAttributes{PrevRandao: r})
 				require.NoError(t, err)
 				require.DeepEqual(t, r, a.PrevRandao())
 			},
@@ -33,7 +33,7 @@ func TestPayloadAttributeGetters(t *testing.T) {
 			name: "Get suggested fee recipient",
 			tc: func(t *testing.T) {
 				r := []byte{4, 5, 6}
-				a, err := New(&enginev1.PayloadAttributes{SuggestedFeeRecipient: r}, version.Bellatrix)
+				a, err := New(&enginev1.PayloadAttributes{SuggestedFeeRecipient: r})
 				require.NoError(t, err)
 				require.DeepEqual(t, r, a.SuggestedFeeRecipient())
 			},
@@ -42,7 +42,7 @@ func TestPayloadAttributeGetters(t *testing.T) {
 			name: "Get timestamp",
 			tc: func(t *testing.T) {
 				r := uint64(123)
-				a, err := New(&enginev1.PayloadAttributes{Timestamp: r}, version.Bellatrix)
+				a, err := New(&enginev1.PayloadAttributes{Timestamp: r})
 				require.NoError(t, err)
 				require.Equal(t, r, a.Timestamps())
 			},
@@ -59,7 +59,7 @@ func TestPayloadAttributeGetters(t *testing.T) {
 			name: "Get withdrawals (capella)",
 			tc: func(t *testing.T) {
 				wd := []*enginev1.Withdrawal{{Index: 1}, {Index: 2}, {Index: 3}}
-				a, err := New(&enginev1.PayloadAttributesV2{Withdrawals: wd}, version.Capella)
+				a, err := New(&enginev1.PayloadAttributesV2{Withdrawals: wd})
 				require.NoError(t, err)
 				got, err := a.Withdrawals()
 				require.NoError(t, err)
@@ -69,7 +69,7 @@ func TestPayloadAttributeGetters(t *testing.T) {
 		{
 			name: "Get PbBellatrix (bad version)",
 			tc: func(t *testing.T) {
-				a, err := New(&enginev1.PayloadAttributes{}, version.Bellatrix)
+				a, err := New(&enginev1.PayloadAttributes{})
 				require.NoError(t, err)
 				_, err = a.PbV2()
 				require.ErrorContains(t, "PayloadAttributePbV2 is not supported for bellatrix: unsupported getter", err)
@@ -78,7 +78,7 @@ func TestPayloadAttributeGetters(t *testing.T) {
 		{
 			name: "Get PbCapella (bad version)",
 			tc: func(t *testing.T) {
-				a, err := New(&enginev1.PayloadAttributesV2{}, version.Capella)
+				a, err := New(&enginev1.PayloadAttributesV2{})
 				require.NoError(t, err)
 				_, err = a.PbV1()
 				require.ErrorContains(t, "PayloadAttributePbV1 is not supported for capella: unsupported getter", err)
@@ -87,7 +87,7 @@ func TestPayloadAttributeGetters(t *testing.T) {
 		{
 			name: "Get PbBellatrix (nil)",
 			tc: func(t *testing.T) {
-				a, err := New(&enginev1.PayloadAttributes{}, version.Bellatrix)
+				a, err := New(&enginev1.PayloadAttributes{})
 				require.NoError(t, err)
 				got, err := a.PbV1()
 				require.NoError(t, err)
@@ -97,7 +97,7 @@ func TestPayloadAttributeGetters(t *testing.T) {
 		{
 			name: "Get PbCapella (nil)",
 			tc: func(t *testing.T) {
-				a, err := New(&enginev1.PayloadAttributesV2{}, version.Capella)
+				a, err := New(&enginev1.PayloadAttributesV2{})
 				require.NoError(t, err)
 				got, err := a.PbV2()
 				require.NoError(t, err)
@@ -112,7 +112,7 @@ func TestPayloadAttributeGetters(t *testing.T) {
 					PrevRandao:            []byte{1, 2, 3},
 					SuggestedFeeRecipient: []byte{4, 5, 6},
 				}
-				a, err := New(p, version.Bellatrix)
+				a, err := New(p)
 				require.NoError(t, err)
 				got, err := a.PbV1()
 				require.NoError(t, err)
@@ -128,7 +128,7 @@ func TestPayloadAttributeGetters(t *testing.T) {
 					SuggestedFeeRecipient: []byte{4, 5, 6},
 					Withdrawals:           []*enginev1.Withdrawal{{Index: 1}, {Index: 2}, {Index: 3}},
 				}
-				a, err := New(p, version.Capella)
+				a, err := New(p)
 				require.NoError(t, err)
 				got, err := a.PbV2()
 				require.NoError(t, err)

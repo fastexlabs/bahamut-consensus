@@ -8,15 +8,15 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/holiman/uint256"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	payloadattribute "github.com/prysmaticlabs/prysm/v3/consensus-types/payload-attribute"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	pb "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	payloadattribute "github.com/prysmaticlabs/prysm/v4/consensus-types/payload-attribute"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	pb "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
 
 // EngineClient --
@@ -27,7 +27,6 @@ type EngineClient struct {
 	ExecutionPayload            *pb.ExecutionPayload
 	ExecutionPayloadCapella     *pb.ExecutionPayloadCapella
 	ExecutionBlock              *pb.ExecutionBlock
-	BlockActivities             []*ethpb.ActivityChange
 	Err                         error
 	ErrLatestExecBlock          error
 	ErrExecBlockByHash          error
@@ -41,10 +40,6 @@ type EngineClient struct {
 	TerminalBlockHashExists     bool
 	OverrideValidHash           [32]byte
 	BlockValue                  *big.Int
-}
-
-func (e *EngineClient) GetBlockActivities(_ context.Context, _ *big.Int) ([]*ethpb.ActivityChange, error) {
-	return e.BlockActivities, e.Err
 }
 
 // NewPayload --
@@ -177,4 +172,22 @@ func (e *EngineClient) GetTerminalBlockHash(ctx context.Context, transitionTime 
 		}
 		blk = parentBlk
 	}
+}
+
+// GetBlockActivitiesByHash --
+func (e *EngineClient) GetBlockActivitiesByHash(ctx context.Context, blockHash common.Hash) (*ethpb.BlockActivities, error) {
+	return &ethpb.BlockActivities{
+		BaseFee: 123,
+		TxCount: 123,
+		Activities: []*ethpb.ActivityChange{
+			{
+				ContractAddress: bytesutil.PadTo([]byte("contract-1"), 20),
+				DeltaActivity:   123,
+			},
+			{
+				ContractAddress: bytesutil.PadTo([]byte("contract-2"), 20),
+				DeltaActivity:   123,
+			},
+		},
+	}, nil
 }

@@ -2,12 +2,12 @@ package state_native
 
 import (
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
 
 // SetValidators for the beacon state. Updates the entire
@@ -22,6 +22,7 @@ func (b *BeaconState) SetValidators(val []*ethpb.Validator) error {
 	b.markFieldAsDirty(types.Validators)
 	b.rebuildTrie[types.Validators] = true
 	b.valMapHandler = stateutil.NewValMapHandler(b.validators)
+	b.contractMapHandler = stateutil.NewContractMapHandler(b.validators)
 	return nil
 }
 
@@ -120,6 +121,44 @@ func (b *BeaconState) UpdateBalancesAtIndex(idx primitives.ValidatorIndex, val u
 	return nil
 }
 
+// SetActivities for the beacon state. Updates the entire
+// list to a new value by overwriting the previous one.
+func (b *BeaconState) SetActivities(val []uint64) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	b.sharedFieldReferences[types.Activities].MinusRef()
+	b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
+
+	b.activities = val
+	b.markFieldAsDirty(types.Activities)
+	b.rebuildTrie[types.Activities] = true
+	return nil
+}
+
+// UpdateActivityAtIndex for the beacon state. This method updates the activity
+// at a specific index to a new value.
+func (b *BeaconState) UpdateActivityAtIndex(idx primitives.ValidatorIndex, val uint64) error {
+	if uint64(len(b.activities)) <= uint64(idx) {
+		return errors.Errorf("invalid index provided %d", idx)
+	}
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	acts := b.activities
+	if b.sharedFieldReferences[types.Activities].Refs() > 1 {
+		acts = b.activitiesVal()
+		b.sharedFieldReferences[types.Activities].MinusRef()
+		b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
+	}
+
+	acts[idx] = val
+	b.activities = acts
+	b.markFieldAsDirty(types.Activities)
+	b.addDirtyIndices(types.Activities, []uint64{uint64(idx)})
+	return nil
+}
+
 // SetSlashings for the beacon state. Updates the entire
 // list to a new value by overwriting the previous one.
 func (b *BeaconState) SetSlashings(val []uint64) error {
@@ -177,6 +216,12 @@ func (b *BeaconState) AppendValidator(val *ethpb.Validator) error {
 
 	b.valMapHandler.Set(bytesutil.ToBytes48(val.PublicKey), valIdx)
 
+	// If validator has non-zero contract address,
+	// then add its contract address to contract map.
+	if bytesutil.ToBytes20(val.Contract) != ([20]byte{}) {
+		b.contractMapHandler.Set(bytesutil.ToBytes20(val.Contract), valIdx)
+	}
+
 	b.markFieldAsDirty(types.Validators)
 	b.addDirtyIndices(types.Validators, []uint64{uint64(valIdx)})
 	return nil
@@ -199,6 +244,26 @@ func (b *BeaconState) AppendBalance(bal uint64) error {
 	balIdx := len(b.balances) - 1
 	b.markFieldAsDirty(types.Balances)
 	b.addDirtyIndices(types.Balances, []uint64{uint64(balIdx)})
+	return nil
+}
+
+// AppendActivity for the beacon state. Appends the new value
+// to the the end of list.
+func (b *BeaconState) AppendActivity(act uint64) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	acts := b.activities
+	if b.sharedFieldReferences[types.Activities].Refs() > 1 {
+		acts = b.activitiesVal()
+		b.sharedFieldReferences[types.Activities].MinusRef()
+		b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
+	}
+
+	b.activities = append(acts, act)
+	actIdx := len(b.activities) - 1
+	b.markFieldAsDirty(types.Activities)
+	b.addDirtyIndices(types.Activities, []uint64{uint64(actIdx)})
 	return nil
 }
 
@@ -238,132 +303,5 @@ func (b *BeaconState) SetInactivityScores(val []uint64) error {
 
 	b.inactivityScores = val
 	b.markFieldAsDirty(types.InactivityScores)
-	return nil
-}
-
-// SetContracts for the beacon state. Updates the entire
-// to a new value by overwriting the previous one.
-func (b *BeaconState) SetContracts(cc []*ethpb.ContractsContainer) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	b.contracts = cc
-	b.sharedFieldReferences[types.Contracts].MinusRef()
-	b.sharedFieldReferences[types.Contracts] = stateutil.NewRef(1)
-	b.markFieldAsDirty(types.Contracts)
-	b.rebuildTrie[types.Contracts] = true
-	b.contractsMapHandler = stateutil.NewContractsMapHandler(b.contracts)
-	return nil
-}
-
-// UpdateContractsAtIndex for the beacon state. Updates the contracts container
-// at a specific index to a new value.
-func (b *BeaconState) UpdateContractsAtIndex(idx primitives.ValidatorIndex, cc *ethpb.ContractsContainer) error {
-	if uint64(len(b.contracts)) <= uint64(idx) {
-		return errors.Errorf("invalid index provided %d", idx)
-	}
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	c := b.contracts
-	if ref := b.sharedFieldReferences[types.Contracts]; ref.Refs() > 1 {
-		c = b.contractsReferences()
-		ref.MinusRef()
-		b.sharedFieldReferences[types.Contracts] = stateutil.NewRef(1)
-	}
-
-	c[idx] = cc
-	b.contracts = c
-	b.markFieldAsDirty(types.Contracts)
-	b.addDirtyIndices(types.Contracts, []uint64{uint64(idx)})
-
-	for _, contract := range cc.Contracts {
-		b.contractsMapHandler.Set(bytesutil.ToBytes20(contract), idx)
-	}
-
-	return nil
-}
-
-// AppendContracts for the beacon state. Appends the new value
-// to the the end of list.
-func (b *BeaconState) AppendContracts(cc *ethpb.ContractsContainer) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	contracts := b.contracts
-	if b.sharedFieldReferences[types.Contracts].Refs() > 1 {
-		contracts = b.contractsReferences()
-		b.sharedFieldReferences[types.Contracts].MinusRef()
-		b.sharedFieldReferences[types.Contracts] = stateutil.NewRef(1)
-	}
-
-	// append contracts container to slice
-	b.contracts = append(contracts, cc)
-	valIdx := primitives.ValidatorIndex(len(b.contracts) - 1)
-
-	for _, contract := range cc.Contracts {
-		b.contractsMapHandler.Set(bytesutil.ToBytes20(contract), valIdx)
-	}
-
-	b.markFieldAsDirty(types.Contracts)
-	b.addDirtyIndices(types.Contracts, []uint64{uint64(valIdx)})
-	return nil
-}
-
-// SetActivities for the beacon state. Updates the entire
-// to a new value by overwriting the previous one.
-func (b *BeaconState) SetActivities(activities []uint64) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	b.sharedFieldReferences[types.Activities].MinusRef()
-	b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
-
-	b.activities = activities
-	b.markFieldAsDirty(types.Activities)
-	b.rebuildTrie[types.Activities] = true
-	return nil
-}
-
-// UpdateActivitiesAtIndex for the beacon state. This method updates the activity
-// at a specific index to a new value.
-func (b *BeaconState) UpdateActivitiesAtIndex(idx primitives.ValidatorIndex, activity uint64) error {
-	if uint64(len(b.activities)) <= uint64(idx) {
-		return errors.Errorf("invalid index provided %d", idx)
-	}
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	activities := b.activities
-	if b.sharedFieldReferences[types.Activities].Refs() > 1 {
-		activities = b.activitiesVal()
-		b.sharedFieldReferences[types.Activities].MinusRef()
-		b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
-	}
-
-	activities[idx] = activity
-	b.activities = activities
-	b.markFieldAsDirty(types.Activities)
-	b.addDirtyIndices(types.Activities, []uint64{uint64(idx)})
-	return nil
-}
-
-// AppendActivtity for the beacon state. Appends the new value
-// to the the end of list.
-func (b *BeaconState) AppendActivity(activity uint64) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	activities := b.activities
-	if b.sharedFieldReferences[types.Activities].Refs() > 1 {
-		activities = b.activitiesVal()
-		b.sharedFieldReferences[types.Activities].MinusRef()
-		b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
-	}
-
-	b.activities = append(activities, activity)
-	activityIdx := len(b.activities) - 1
-	b.markFieldAsDirty(types.Activities)
-	b.addDirtyIndices(types.Activities, []uint64{uint64(activityIdx)})
 	return nil
 }

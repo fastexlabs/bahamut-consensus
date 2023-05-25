@@ -2,8 +2,9 @@ package payloadattribute
 
 import (
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
 
 var (
@@ -24,14 +25,14 @@ var (
 )
 
 // New returns a new payload attribute with the given input object.
-func New(i interface{}, v int) (Attributer, error) {
+func New(i interface{}) (Attributer, error) {
 	switch a := i.(type) {
 	case nil:
 		return nil, blocks.ErrNilObject
 	case *enginev1.PayloadAttributes:
-		return initPayloadAttributeFromV1(a, v)
+		return initPayloadAttributeFromV1(a)
 	case *enginev1.PayloadAttributesV2:
-		return initPayloadAttributeFromV2(a, v)
+		return initPayloadAttributeFromV2(a)
 	default:
 		return nil, errors.Wrapf(errUnsupportedPayloadAttribute, "unable to create payload attribute from type %T", i)
 	}
@@ -44,26 +45,26 @@ func EmptyWithVersion(version int) Attributer {
 	}
 }
 
-func initPayloadAttributeFromV1(a *enginev1.PayloadAttributes, v int) (Attributer, error) {
+func initPayloadAttributeFromV1(a *enginev1.PayloadAttributes) (Attributer, error) {
 	if a == nil {
 		return nil, errNilPayloadAttribute
 	}
 
 	return &data{
-		version:               v,
+		version:               version.Bellatrix,
 		prevRandao:            a.PrevRandao,
 		timeStamp:             a.Timestamp,
 		suggestedFeeRecipient: a.SuggestedFeeRecipient,
 	}, nil
 }
 
-func initPayloadAttributeFromV2(a *enginev1.PayloadAttributesV2, v int) (Attributer, error) {
+func initPayloadAttributeFromV2(a *enginev1.PayloadAttributesV2) (Attributer, error) {
 	if a == nil {
 		return nil, errNilPayloadAttribute
 	}
 
 	return &data{
-		version:               v,
+		version:               version.Capella,
 		prevRandao:            a.PrevRandao,
 		timeStamp:             a.Timestamp,
 		suggestedFeeRecipient: a.SuggestedFeeRecipient,

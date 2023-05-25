@@ -4,15 +4,15 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/encoding/ssz/detect"
-	"github.com/prysmaticlabs/prysm/v3/network/forks"
-	ethpbv1 "github.com/prysmaticlabs/prysm/v3/proto/eth/v1"
-	ethpbv2 "github.com/prysmaticlabs/prysm/v3/proto/eth/v2"
-	"github.com/prysmaticlabs/prysm/v3/proto/migration"
-	eth "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/encoding/ssz/detect"
+	"github.com/prysmaticlabs/prysm/v4/network/forks"
+	ethpbv1 "github.com/prysmaticlabs/prysm/v4/proto/eth/v1"
+	ethpbv2 "github.com/prysmaticlabs/prysm/v4/proto/eth/v2"
+	"github.com/prysmaticlabs/prysm/v4/proto/migration"
+	eth "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -25,7 +25,7 @@ func (bs *Server) GetBlindedBlock(ctx context.Context, req *ethpbv1.BlockRequest
 	ctx, span := trace.StartSpan(ctx, "beacon.GetBlindedBlock")
 	defer span.End()
 
-	blk, err := bs.blockFromBlockID(ctx, req.BlockId)
+	blk, err := bs.Blocker.Block(ctx, req.BlockId)
 	err = handleGetBlockError(blk, err)
 	if err != nil {
 		return nil, err
@@ -62,15 +62,6 @@ func (bs *Server) GetBlindedBlock(ctx context.Context, req *ethpbv1.BlockRequest
 	if !errors.Is(err, blocks.ErrUnsupportedGetter) {
 		return nil, status.Errorf(codes.Internal, "Could not get blinded block: %v", err)
 	}
-	result, err = bs.getBlindedBlockFastexPhase1(ctx, blk)
-	if result != nil {
-		result.Finalized = bs.FinalizationFetcher.IsFinalized(ctx, blkRoot)
-		return result, nil
-	}
-	// ErrUnsupportedGetter means that we have another block type
-	if !errors.Is(err, blocks.ErrUnsupportedGetter) {
-		return nil, status.Errorf(codes.Internal, "Could not get blinded block: %v", err)
-	}
 	result, err = bs.getBlindedBlockCapella(ctx, blk)
 	if result != nil {
 		result.Finalized = bs.FinalizationFetcher.IsFinalized(ctx, blkRoot)
@@ -89,7 +80,7 @@ func (bs *Server) GetBlindedBlockSSZ(ctx context.Context, req *ethpbv1.BlockRequ
 	ctx, span := trace.StartSpan(ctx, "beacon.GetBlindedBlockSSZ")
 	defer span.End()
 
-	blk, err := bs.blockFromBlockID(ctx, req.BlockId)
+	blk, err := bs.Blocker.Block(ctx, req.BlockId)
 	err = handleGetBlockError(blk, err)
 	if err != nil {
 		return nil, err
@@ -126,15 +117,6 @@ func (bs *Server) GetBlindedBlockSSZ(ctx context.Context, req *ethpbv1.BlockRequ
 	if !errors.Is(err, blocks.ErrUnsupportedGetter) {
 		return nil, status.Errorf(codes.Internal, "Could not get signed beacon block: %v", err)
 	}
-	result, err = bs.getBlindedSSZBlockFastexPhase1(ctx, blk)
-	if result != nil {
-		result.Finalized = bs.FinalizationFetcher.IsFinalized(ctx, blkRoot)
-		return result, nil
-	}
-	// ErrUnsupportedGetter means that we have another block type
-	if !errors.Is(err, blocks.ErrUnsupportedGetter) {
-		return nil, status.Errorf(codes.Internal, "Could not get signed beacon block: %v", err)
-	}
 	result, err = bs.getBlindedSSZBlockCapella(ctx, blk)
 	if result != nil {
 		result.Finalized = bs.FinalizationFetcher.IsFinalized(ctx, blkRoot)
@@ -163,10 +145,6 @@ func (bs *Server) SubmitBlindedBlock(ctx context.Context, req *ethpbv2.SignedBli
 	switch blkContainer := req.Message.(type) {
 	case *ethpbv2.SignedBlindedBeaconBlockContainer_CapellaBlock:
 		if err := bs.submitBlindedCapellaBlock(ctx, blkContainer.CapellaBlock, req.Signature); err != nil {
-			return nil, err
-		}
-	case *ethpbv2.SignedBlindedBeaconBlockContainer_FastexPhase1Block:
-		if err := bs.submitBlindedFastexPhase1Block(ctx, blkContainer.FastexPhase1Block, req.Signature); err != nil {
 			return nil, err
 		}
 	case *ethpbv2.SignedBlindedBeaconBlockContainer_BellatrixBlock:
@@ -227,23 +205,15 @@ func (bs *Server) SubmitBlindedBlockSSZ(ctx context.Context, req *ethpbv2.SSZCon
 	if block.IsBlinded() {
 		b, err := block.PbBlindedBellatrixBlock()
 		if err != nil {
-			b, err := block.PbBlindedFastexPhase1Block()
+			b, err := block.PbBlindedCapellaBlock()
 			if err != nil {
-				b, err := block.PbBlindedCapellaBlock()
-				if err != nil {
-					return &emptypb.Empty{}, status.Errorf(codes.Internal, "Could not get blinded block: %v", err)
-				}
-				bb, err := migration.V1Alpha1BeaconBlockBlindedCapellaToV2Blinded(b.Block)
-				if err != nil {
-					return &emptypb.Empty{}, status.Errorf(codes.Internal, "Could not migrate block: %v", err)
-				}
-				return &emptypb.Empty{}, bs.submitBlindedCapellaBlock(ctx, bb, b.Signature)
+				return &emptypb.Empty{}, status.Errorf(codes.Internal, "Could not get blinded block: %v", err)
 			}
-			bb, err := migration.V1Alpha1BeaconBlockBlindedFastexPhase1ToV2Blinded(b.Block)
+			bb, err := migration.V1Alpha1BeaconBlockBlindedCapellaToV2Blinded(b.Block)
 			if err != nil {
 				return &emptypb.Empty{}, status.Errorf(codes.Internal, "Could not migrate block: %v", err)
 			}
-			return &emptypb.Empty{}, bs.submitBlindedFastexPhase1Block(ctx, bb, b.Signature)
+			return &emptypb.Empty{}, bs.submitBlindedCapellaBlock(ctx, bb, b.Signature)
 		}
 		bb, err := migration.V1Alpha1BeaconBlockBlindedBellatrixToV2Blinded(b.Block)
 		if err != nil {
@@ -368,76 +338,6 @@ func (bs *Server) getBlindedBlockBellatrix(ctx context.Context, blk interfaces.R
 		Version: ethpbv2.Version_BELLATRIX,
 		Data: &ethpbv2.SignedBlindedBeaconBlockContainer{
 			Message:   &ethpbv2.SignedBlindedBeaconBlockContainer_BellatrixBlock{BellatrixBlock: v2Blk},
-			Signature: sig[:],
-		},
-		ExecutionOptimistic: isOptimistic,
-	}, nil
-}
-
-func (bs *Server) getBlindedBlockFastexPhase1(ctx context.Context, blk interfaces.ReadOnlySignedBeaconBlock) (*ethpbv2.BlindedBlockResponse, error) {
-	fastexPhase1Blk, err := blk.PbFastexPhase1Block()
-	if err != nil {
-		// ErrUnsupportedGetter means that we have another block type
-		if errors.Is(err, blocks.ErrUnsupportedGetter) {
-			if blindedFastexPhase1Blk, err := blk.PbBlindedFastexPhase1Block(); err == nil {
-				if blindedFastexPhase1Blk == nil {
-					return nil, errNilBlock
-				}
-				v2Blk, err := migration.V1Alpha1BeaconBlockBlindedFastexPhase1ToV2Blinded(blindedFastexPhase1Blk.Block)
-				if err != nil {
-					return nil, errors.Wrapf(err, "could not convert beacon block")
-				}
-				root, err := blk.Block().HashTreeRoot()
-				if err != nil {
-					return nil, errors.Wrapf(err, "could not get block root")
-				}
-				isOptimistic, err := bs.OptimisticModeFetcher.IsOptimisticForRoot(ctx, root)
-				if err != nil {
-					return nil, errors.Wrapf(err, "could not check if block is optimistic")
-				}
-				sig := blk.Signature()
-				return &ethpbv2.BlindedBlockResponse{
-					Version: ethpbv2.Version_FASTEX_PHASE1,
-					Data: &ethpbv2.SignedBlindedBeaconBlockContainer{
-						Message:   &ethpbv2.SignedBlindedBeaconBlockContainer_FastexPhase1Block{FastexPhase1Block: v2Blk},
-						Signature: sig[:],
-					},
-					ExecutionOptimistic: isOptimistic,
-				}, nil
-			}
-			return nil, err
-		}
-		return nil, err
-	}
-
-	if fastexPhase1Blk == nil {
-		return nil, errNilBlock
-	}
-	blindedBlkInterface, err := blk.ToBlinded()
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not convert block to blinded block")
-	}
-	blindedFastexPhase1Block, err := blindedBlkInterface.PbBlindedFastexPhase1Block()
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not get signed beacon block")
-	}
-	v2Blk, err := migration.V1Alpha1BeaconBlockBlindedFastexPhase1ToV2Blinded(blindedFastexPhase1Block.Block)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not convert beacon block")
-	}
-	root, err := blk.Block().HashTreeRoot()
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not get block root")
-	}
-	isOptimistic, err := bs.OptimisticModeFetcher.IsOptimisticForRoot(ctx, root)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not check if block is optimistic")
-	}
-	sig := blk.Signature()
-	return &ethpbv2.BlindedBlockResponse{
-		Version: ethpbv2.Version_FASTEX_PHASE1,
-		Data: &ethpbv2.SignedBlindedBeaconBlockContainer{
-			Message:   &ethpbv2.SignedBlindedBeaconBlockContainer_FastexPhase1Block{FastexPhase1Block: v2Blk},
 			Signature: sig[:],
 		},
 		ExecutionOptimistic: isOptimistic,
@@ -589,81 +489,6 @@ func (bs *Server) getBlindedSSZBlockBellatrix(ctx context.Context, blk interface
 	return &ethpbv2.SSZContainer{Version: ethpbv2.Version_BELLATRIX, ExecutionOptimistic: isOptimistic, Data: sszData}, nil
 }
 
-func (bs *Server) getBlindedSSZBlockFastexPhase1(ctx context.Context, blk interfaces.ReadOnlySignedBeaconBlock) (*ethpbv2.SSZContainer, error) {
-	fastexPhase1Blk, err := blk.PbFastexPhase1Block()
-	if err != nil {
-		// ErrUnsupportedGetter means that we have another block type
-		if errors.Is(err, blocks.ErrUnsupportedGetter) {
-			if blindedFastexPhase1Blk, err := blk.PbBlindedFastexPhase1Block(); err == nil {
-				if blindedFastexPhase1Blk == nil {
-					return nil, errNilBlock
-				}
-				v2Blk, err := migration.V1Alpha1BeaconBlockBlindedFastexPhase1ToV2Blinded(blindedFastexPhase1Blk.Block)
-				if err != nil {
-					return nil, errors.Wrapf(err, "could not get signed beacon block")
-				}
-				root, err := blk.Block().HashTreeRoot()
-				if err != nil {
-					return nil, errors.Wrapf(err, "could not get block root")
-				}
-				isOptimistic, err := bs.OptimisticModeFetcher.IsOptimisticForRoot(ctx, root)
-				if err != nil {
-					return nil, errors.Wrapf(err, "could not check if block is optimistic")
-				}
-				sig := blk.Signature()
-				data := &ethpbv2.SignedBlindedBeaconBlockFastexPhase1{
-					Message:   v2Blk,
-					Signature: sig[:],
-				}
-				sszData, err := data.MarshalSSZ()
-				if err != nil {
-					return nil, errors.Wrapf(err, "could not marshal block into SSZ")
-				}
-				return &ethpbv2.SSZContainer{
-					Version:             ethpbv2.Version_FASTEX_PHASE1,
-					ExecutionOptimistic: isOptimistic,
-					Data:                sszData,
-				}, nil
-			}
-			return nil, err
-		}
-	}
-
-	if fastexPhase1Blk == nil {
-		return nil, errNilBlock
-	}
-	blindedBlkInterface, err := blk.ToBlinded()
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not convert block to blinded block")
-	}
-	blindedFastexPhase1Block, err := blindedBlkInterface.PbBlindedFastexPhase1Block()
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not get signed beacon block")
-	}
-	v2Blk, err := migration.V1Alpha1BeaconBlockBlindedFastexPhase1ToV2Blinded(blindedFastexPhase1Block.Block)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not get signed beacon block")
-	}
-	root, err := blk.Block().HashTreeRoot()
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not get block root")
-	}
-	isOptimistic, err := bs.OptimisticModeFetcher.IsOptimisticForRoot(ctx, root)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not check if block is optimistic")
-	}
-	sig := blk.Signature()
-	data := &ethpbv2.SignedBlindedBeaconBlockFastexPhase1{
-		Message:   v2Blk,
-		Signature: sig[:],
-	}
-	sszData, err := data.MarshalSSZ()
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not marshal block into SSZ")
-	}
-	return &ethpbv2.SSZContainer{Version: ethpbv2.Version_FASTEX_PHASE1, ExecutionOptimistic: isOptimistic, Data: sszData}, nil
-}
-
 func (bs *Server) getBlindedSSZBlockCapella(ctx context.Context, blk interfaces.ReadOnlySignedBeaconBlock) (*ethpbv2.SSZContainer, error) {
 	capellaBlk, err := blk.PbCapellaBlock()
 	if err != nil {
@@ -750,25 +575,6 @@ func (bs *Server) submitBlindedBellatrixBlock(ctx context.Context, blindedBellat
 	_, err = bs.V1Alpha1ValidatorServer.ProposeBeaconBlock(ctx, &eth.GenericSignedBeaconBlock{
 		Block: &eth.GenericSignedBeaconBlock_BlindedBellatrix{
 			BlindedBellatrix: b,
-		},
-	})
-	if err != nil {
-		return status.Errorf(codes.Internal, "Could not propose blinded block: %v", err)
-	}
-	return nil
-}
-
-func (bs *Server) submitBlindedFastexPhase1Block(ctx context.Context, blindedFastexPhase1Blk *ethpbv2.BlindedBeaconBlockFastexPhase1, sig []byte) error {
-	b, err := migration.BlindedFastexPhase1ToV1Alpha1SignedBlock(&ethpbv2.SignedBlindedBeaconBlockFastexPhase1{
-		Message:   blindedFastexPhase1Blk,
-		Signature: sig,
-	})
-	if err != nil {
-		return status.Errorf(codes.Internal, "Could not get blinded block: %v", err)
-	}
-	_, err = bs.V1Alpha1ValidatorServer.ProposeBeaconBlock(ctx, &eth.GenericSignedBeaconBlock{
-		Block: &eth.GenericSignedBeaconBlock_BlindedFastexPhase1{
-			BlindedFastexPhase1: b,
 		},
 	})
 	if err != nil {

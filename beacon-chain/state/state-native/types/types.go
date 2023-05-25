@@ -49,22 +49,14 @@ func (f FieldIndex) String(_ int) string {
 		return "eth1DataVotes"
 	case Eth1DepositIndex:
 		return "eth1DepositIndex"
-	case LatestProcessedBlockActivities:
-		return "latestProcessedBlockActivities"
-	case TransactionsGasPerPeriod:
-		return "transactionsGasPerPeriod"
-	case TransactionsPerLatestEpoch:
-		return "transactionsPerLatestEpoch"
-	case NonStakersGasPerEpoch:
-		return "nonStakersGasPerEpoch"
-	case NonStakersGasPerPeriod:
-		return "nonStakersGasPerPeriod"
+	case SharedActivity:
+		return "sharedActivity"
+	case ExecutionHeight:
+		return "executionHeight"
 	case Validators:
 		return "validators"
 	case Balances:
 		return "balances"
-	case Contracts:
-		return "contracts"
 	case Activities:
 		return "activities"
 	case RandaoMixes:
@@ -134,58 +126,46 @@ func (f FieldIndex) RealPosition() int {
 		return 9
 	case Eth1DepositIndex:
 		return 10
-	case LatestProcessedBlockActivities:
+	case SharedActivity:
 		return 11
-	case TransactionsGasPerPeriod:
+	case ExecutionHeight:
 		return 12
-	case TransactionsPerLatestEpoch:
-		return 13
-	case NonStakersGasPerEpoch:
-		return 14
-	case NonStakersGasPerPeriod:
-		return 15
 	case Validators:
-		return 16
+		return 13
 	case Balances:
-		return 17
-	case Contracts:
-		return 18
+		return 14
 	case Activities:
-		return 19
+		return 15
 	case RandaoMixes:
-		return 20
+		return 16
 	case Slashings:
-		return 21
+		return 17
 	case PreviousEpochAttestations, PreviousEpochParticipationBits:
-		return 22
+		return 18
 	case CurrentEpochAttestations, CurrentEpochParticipationBits:
-		return 23
+		return 19
 	case JustificationBits:
-		return 24
+		return 20
 	case PreviousJustifiedCheckpoint:
-		return 25
+		return 21
 	case CurrentJustifiedCheckpoint:
-		return 26
+		return 22
 	case FinalizedCheckpoint:
-		return 27
+		return 23
 	case InactivityScores:
-		return 28
+		return 24
 	case CurrentSyncCommittee:
-		return 29
+		return 25
 	case NextSyncCommittee:
-		return 30
+		return 26
 	case LatestExecutionPayloadHeader, LatestExecutionPayloadHeaderCapella:
-		return 31
-	case BaseFeePerEpoch:
-		return 32
-	case BaseFeePerPeriod:
-		return 33
+		return 27
 	case NextWithdrawalIndex:
-		return 34
+		return 28
 	case NextWithdrawalValidatorIndex:
-		return 35
+		return 29
 	case HistoricalSummaries:
-		return 36
+		return 30
 	default:
 		return -1
 	}
@@ -220,14 +200,10 @@ const (
 	Eth1Data
 	Eth1DataVotes
 	Eth1DepositIndex
-	LatestProcessedBlockActivities
-	TransactionsGasPerPeriod
-	TransactionsPerLatestEpoch
-	NonStakersGasPerEpoch
-	NonStakersGasPerPeriod
+	SharedActivity
+	ExecutionHeight
 	Validators
 	Balances
-	Contracts
 	Activities
 	RandaoMixes
 	Slashings
@@ -244,8 +220,6 @@ const (
 	NextSyncCommittee
 	LatestExecutionPayloadHeader
 	LatestExecutionPayloadHeaderCapella
-	BaseFeePerEpoch
-	BaseFeePerPeriod
 	NextWithdrawalIndex
 	NextWithdrawalValidatorIndex
 	HistoricalSummaries

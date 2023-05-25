@@ -2,11 +2,11 @@ package altair
 
 import (
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/math"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/math"
 )
 
 // BaseReward takes state and validator index and calculate
@@ -58,5 +58,30 @@ func BaseRewardPerIncrement(activeBalance uint64) (uint64, error) {
 		return 0, errors.New("active balance can't be 0")
 	}
 	cfg := params.BeaconConfig()
-	return cfg.EffectiveBalanceIncrement * cfg.BaseRewardFactor / math.IntegerSquareRoot(activeBalance), nil
+	return cfg.EffectiveBalanceIncrement * cfg.BaseRewardFactor / math.CachedSquareRoot(activeBalance), nil
+}
+
+// BaseProposerReward of the beacon state.
+func BaseProposerReward(s state.ReadOnlyBeaconState, totalPower, totalEffectivePower uint64) (uint64, error) {
+	activity, err := helpers.TotalEffectiveActivity(s)
+	if err != nil {
+		return 0, errors.Wrap(err, "could not calculate total effective activity")
+	}
+
+	sharedActivity := s.SharedActivity()
+	if sharedActivity == nil {
+		return 0, errors.New("nil shared activity in state")
+	}
+
+	period := uint64(params.BeaconConfig().EpochsPerActivityPeriod)
+	slotsPerEpoch := uint64(params.BeaconConfig().SlotsPerEpoch)
+	denominator := period * period * slotsPerEpoch * slotsPerEpoch
+	transactionsGas := sharedActivity.TransactionsGasPerPeriod
+	baseFee := sharedActivity.BaseFeePerPeriod
+	reward := baseFee * (activity + transactionsGas) / denominator
+	if totalPower == 0 {
+		return reward, nil
+	}
+
+	return reward * totalEffectivePower / totalPower, nil
 }

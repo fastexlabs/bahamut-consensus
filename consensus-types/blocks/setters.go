@@ -1,10 +1,10 @@
 package blocks
 
 import (
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	eth "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	eth "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
 
 // SetSignature sets the signature of the signed beacon block.
@@ -93,20 +93,26 @@ func (b *SignedBeaconBlock) SetVoluntaryExits(v []*eth.SignedVoluntaryExit) {
 
 // SetActivityChanges sets the activity changes in the block.
 // This function is not thread safe, it is only used during block creation.
-func (b *SignedBeaconBlock) SetActivityChanges(a []*eth.ActivityChange) {
-	b.block.body.activityChanges = a
+func (b *SignedBeaconBlock) SetActivityChanges(v []*eth.ActivityChange) {
+	b.block.body.activityChanges = v
 }
 
-// SetLatestProcessedBlock sets the number of latest processed block of the block body.
+// SetTransactionsCount sets the transactions count in the block.
 // This function is not thread safe, it is only used during block creation.
-func (b *SignedBeaconBlock) SetLatestProcessedBlock(l uint64) {
-	b.block.body.latestProcessedBlock = l
+func (b *SignedBeaconBlock) SetTransactionsCount(v uint64) {
+	b.block.body.transactionsCount = v
 }
 
-// SetTransactionsCount sets the number of transactions of the block body.
+// SetBaseFee sets the base fee in the block.
 // This function is not thread safe, it is only used during block creation.
-func (b *SignedBeaconBlock) SetTransactionsCount(c uint64) {
-	b.block.body.transactionsCount = c
+func (b *SignedBeaconBlock) SetBaseFee(v uint64) {
+	b.block.body.baseFee = v
+}
+
+// SetExecutionHeight sets the base fee in the block.
+// This function is not thread safe, it is only used during block creation.
+func (b *SignedBeaconBlock) SetExecutionHeight(v uint64) {
+	b.block.body.executionHeight = v
 }
 
 // SetSyncAggregate sets the sync aggregate in the block.
@@ -130,16 +136,6 @@ func (b *SignedBeaconBlock) SetExecution(e interfaces.ExecutionData) error {
 		return nil
 	}
 	b.block.body.executionPayload = e
-	return nil
-}
-
-// SetBaseFee sets the base fee of the block body.
-// This function is not thread safe, it is only used during block creation.
-func (b *SignedBeaconBlock) SetBaseFee(bf uint64) error {
-	if b.version < version.FastexPhase1 {
-		return ErrNotSupported("BaseFee", b.version)
-	}
-	b.block.body.baseFee = bf
 	return nil
 }
 

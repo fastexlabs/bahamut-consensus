@@ -57,7 +57,6 @@ ssz_gen_marshal(
         "//proto/engine/v1:go_default_library",
     ],
     objs = [
-        "ActivityChange",
         "BeaconBlockAltair",
         "BeaconBlockBodyAltair",
         "SignedBeaconBlockAltair",
@@ -67,12 +66,6 @@ ssz_gen_marshal(
         "SignedBlindedBeaconBlockBellatrix",
         "BlindedBeaconBlockBellatrix",
         "BlindedBeaconBlockBodyBellatrix",
-        "BeaconBlockFastexPhase1",
-        "BeaconBlockBodyFastexPhase1",
-        "SignedBeaconBlockFastexPhase1",
-        "SignedBlindedBeaconBlockFastexPhase1",
-        "BlindedBeaconBlockFastexPhase1",
-        "BlindedBeaconBlockBodyFastexPhase1",
         "BeaconBlockCapella",
         "BeaconBlockBodyCapella",
         "SignedBeaconBlockCapella",
@@ -104,8 +97,10 @@ ssz_gen_marshal(
         "SignedBeaconBlock",
         "SignedBeaconBlockHeader",
         "SignedVoluntaryExit",
+        "SharedActivity",
         "Validator",
         "VoluntaryExit",
+        "ActivityChange",
         "ContributionAndProof",
         "SignedContributionAndProof",
         "DepositMessage",
@@ -116,7 +111,6 @@ ssz_gen_marshal(
         "BeaconState",
         "BeaconStateAltair",
         "BeaconStateBellatrix",
-        "BeaconStateFastexPhase1",
         "BeaconStateCapella",
         "SigningData",
         "SyncCommittee",
@@ -137,7 +131,7 @@ go_proto_library(
     compilers = [
         "@com_github_prysmaticlabs_protoc_gen_go_cast//:go_cast_grpc",
     ],
-    importpath = "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1",
+    importpath = "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1",
     proto = ":proto",
     visibility = ["//visibility:public"],
     deps = [
@@ -163,7 +157,7 @@ go_proto_library(
         "@com_github_grpc_ecosystem_grpc_gateway_v2//protoc-gen-grpc-gateway:go_gen_grpc_gateway",
     ],
     embed = [":go_proto"],
-    importpath = "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1",
+    importpath = "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1",
     protos = [":proto"],
     visibility = ["//visibility:private"],
     deps = [
@@ -181,8 +175,8 @@ go_proto_library(
 go_library(
     name = "go_default_library",
     srcs = [
-        "json_marshal_unmarshal.go",
         "cloners.go",
+        "json_marshal_unmarshal.go",
         "sync_committee_mainnet.go",
         "sync_committee_minimal.go",  # keep
         ":ssz_generated_files",  # keep
@@ -190,15 +184,15 @@ go_library(
     embed = [
         ":go_grpc_gateway_library",
     ],
-    importpath = "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1",
+    importpath = "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1",
     visibility = ["//visibility:public"],
     deps = SSZ_DEPS + [
         "//proto/eth/ext:go_default_library",
         "//proto/engine/v1:go_default_library",
         "//encoding/bytesutil:go_default_library",
+        "@com_github_ethereum_go_ethereum//common:go_default_library",
         "@com_github_grpc_ecosystem_grpc_gateway_v2//runtime:go_default_library",
         "@com_github_grpc_ecosystem_grpc_gateway_v2//utilities:go_default_library",
-        "@com_github_ethereum_go_ethereum//common:go_default_library",
         "@io_bazel_rules_go//proto/wkt:empty_go_proto",
         "@org_golang_google_grpc//:go_default_library",
         "@org_golang_google_grpc//codes:go_default_library",
@@ -222,7 +216,6 @@ ssz_proto_files(
         "attestation.proto",
         "beacon_block.proto",
         "beacon_state.proto",
-        "blobs.proto",
         "sync_committee.proto",
         "withdrawals.proto",
     ],

@@ -3,7 +3,7 @@ package params
 import (
 	"math"
 
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 )
 
 // MinimalSpecConfig retrieves the minimal config used in spec tests.
@@ -44,7 +44,6 @@ func MinimalSpecConfig() *BeaconChainConfig {
 	minimalConfig.ShardCommitteePeriod = 64
 	minimalConfig.MinEpochsToInactivityPenalty = 4
 	minimalConfig.Eth1FollowDistance = 16
-	minimalConfig.SafeSlotsToUpdateJustified = 2
 	minimalConfig.SecondsPerETH1Block = 14
 
 	// State vector lengths
@@ -87,9 +86,7 @@ func MinimalSpecConfig() *BeaconChainConfig {
 	minimalConfig.AltairForkEpoch = math.MaxUint64
 	minimalConfig.BellatrixForkVersion = []byte{2, 0, 0, 1}
 	minimalConfig.BellatrixForkEpoch = math.MaxUint64
-	minimalConfig.FastexPhase1ForkVersion = []byte{3, 0, 0, 1}
-	minimalConfig.CapellaForkEpoch = math.MaxUint64
-	minimalConfig.CapellaForkVersion = []byte{4, 0, 0, 1}
+	minimalConfig.CapellaForkVersion = []byte{3, 0, 0, 1}
 	minimalConfig.CapellaForkEpoch = math.MaxUint64
 
 	minimalConfig.SyncCommitteeSize = 32

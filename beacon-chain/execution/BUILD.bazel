@@ -3,7 +3,6 @@ load("@prysm//tools/go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "activities_processing.go",
         "block_cache.go",
         "block_reader.go",
         "check_transition_config.go",
@@ -19,7 +18,7 @@ go_library(
         "rpc_connection.go",
         "service.go",
     ],
-    importpath = "github.com/prysmaticlabs/prysm/v3/beacon-chain/execution",
+    importpath = "github.com/prysmaticlabs/prysm/v4/beacon-chain/execution",
     visibility = [
         "//beacon-chain:__subpackages__",
         "//cmd/beacon-chain:__subpackages__",
@@ -27,8 +26,6 @@ go_library(
         "//testing/spectest:__subpackages__",
     ],
     deps = [
-        "//beacon-chain/cache/activitycache:go_default_library",
-        "//beacon-chain/cache/basefeecache:go_default_library",
         "//beacon-chain/cache/depositcache:go_default_library",
         "//beacon-chain/core/blocks:go_default_library",
         "//beacon-chain/core/feed:go_default_library",
@@ -40,6 +37,7 @@ go_library(
         "//beacon-chain/state:go_default_library",
         "//beacon-chain/state/state-native:go_default_library",
         "//beacon-chain/state/stategen:go_default_library",
+        "//config/features:go_default_library",
         "//config/fieldparams:go_default_library",
         "//config/params:go_default_library",
         "//consensus-types/blocks:go_default_library",
@@ -110,6 +108,7 @@ go_test(
         "//beacon-chain/execution/types:go_default_library",
         "//beacon-chain/forkchoice/doubly-linked-tree:go_default_library",
         "//beacon-chain/state/stategen:go_default_library",
+        "//config/features:go_default_library",
         "//config/fieldparams:go_default_library",
         "//config/params:go_default_library",
         "//consensus-types/blocks:go_default_library",

@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
 )
 
 func TestBeaconState_RotateAttestations(t *testing.T) {
@@ -48,6 +48,7 @@ func TestAppendBeyondIndicesLimit(t *testing.T) {
 		PreviousEpochAttestations: []*ethpb.PendingAttestation{{Data: &ethpb.AttestationData{Slot: 123}}},
 		Validators:                []*ethpb.Validator{},
 		Eth1Data:                  &ethpb.Eth1Data{},
+		SharedActivity:            &ethpb.SharedActivity{},
 		BlockRoots:                mockblockRoots,
 		StateRoots:                mockstateRoots,
 		RandaoMixes:               mockrandaoMixes,

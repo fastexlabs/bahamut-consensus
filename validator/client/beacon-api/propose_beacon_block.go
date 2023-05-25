@@ -8,9 +8,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/rpc/apimiddleware"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/apimiddleware"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 func (c beaconApiValidatorClient) proposeBeaconBlock(ctx context.Context, in *ethpb.GenericSignedBeaconBlock) (*ethpb.ProposeResponse, error) {
@@ -67,29 +67,6 @@ func (c beaconApiValidatorClient) proposeBeaconBlock(ctx context.Context, in *et
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to marshall blinded bellatrix beacon block")
 		}
-	case *ethpb.GenericSignedBeaconBlock_FastexPhase1:
-		consensusVersion = "fastex-phase1"
-		beaconBlockRoot, err = blockType.FastexPhase1.Block.HashTreeRoot()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to compute block root for bellatrix beacon block")
-		}
-
-		marshalledSignedBeaconBlockJson, err = marshallBeaconBlockFastexPhase1(blockType.FastexPhase1)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to marshall bellatrix beacon block")
-		}
-	case *ethpb.GenericSignedBeaconBlock_BlindedFastexPhase1:
-		blinded = true
-		consensusVersion = "fastex-phase1"
-		beaconBlockRoot, err = blockType.BlindedFastexPhase1.Block.HashTreeRoot()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to compute block root for blinded bellatrix beacon block")
-		}
-
-		marshalledSignedBeaconBlockJson, err = marshallBeaconBlockBlindedFastexPhase1(blockType.BlindedFastexPhase1)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to marshall blinded bellatrix beacon block")
-		}
 	case *ethpb.GenericSignedBeaconBlock_Capella:
 		consensusVersion = "capella"
 		beaconBlockRoot, err = blockType.Capella.Block.HashTreeRoot()
@@ -143,17 +120,14 @@ func marshallBeaconBlockPhase0(block *ethpb.SignedBeaconBlock) ([]byte, error) {
 		Signature: hexutil.Encode(block.Signature),
 		Message: &apimiddleware.BeaconBlockJson{
 			Body: &apimiddleware.BeaconBlockBodyJson{
-				Attestations:         jsonifyAttestations(block.Block.Body.Attestations),
-				AttesterSlashings:    jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
-				Deposits:             jsonifyDeposits(block.Block.Body.Deposits),
-				Eth1Data:             jsonifyEth1Data(block.Block.Body.Eth1Data),
-				Graffiti:             hexutil.Encode(block.Block.Body.Graffiti),
-				ProposerSlashings:    jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
-				RandaoReveal:         hexutil.Encode(block.Block.Body.RandaoReveal),
-				VoluntaryExits:       jsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
-				ActivityChanges:      jsonifyActivityChanges(block.Block.Body.ActivityChanges),
-				LatestProcessedBlock: uint64ToString(block.Block.Body.LatestProcessedBlock),
-				TransactionsCount:    uint64ToString(block.Block.Body.TransactionsCount),
+				Attestations:      jsonifyAttestations(block.Block.Body.Attestations),
+				AttesterSlashings: jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
+				Deposits:          jsonifyDeposits(block.Block.Body.Deposits),
+				Eth1Data:          jsonifyEth1Data(block.Block.Body.Eth1Data),
+				Graffiti:          hexutil.Encode(block.Block.Body.Graffiti),
+				ProposerSlashings: jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
+				RandaoReveal:      hexutil.Encode(block.Block.Body.RandaoReveal),
+				VoluntaryExits:    JsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
 			},
 			ParentRoot:    hexutil.Encode(block.Block.ParentRoot),
 			ProposerIndex: uint64ToString(block.Block.ProposerIndex),
@@ -174,17 +148,14 @@ func marshallBeaconBlockAltair(block *ethpb.SignedBeaconBlockAltair) ([]byte, er
 			Slot:          uint64ToString(block.Block.Slot),
 			StateRoot:     hexutil.Encode(block.Block.StateRoot),
 			Body: &apimiddleware.BeaconBlockBodyAltairJson{
-				Attestations:         jsonifyAttestations(block.Block.Body.Attestations),
-				AttesterSlashings:    jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
-				Deposits:             jsonifyDeposits(block.Block.Body.Deposits),
-				Eth1Data:             jsonifyEth1Data(block.Block.Body.Eth1Data),
-				Graffiti:             hexutil.Encode(block.Block.Body.Graffiti),
-				ProposerSlashings:    jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
-				RandaoReveal:         hexutil.Encode(block.Block.Body.RandaoReveal),
-				VoluntaryExits:       jsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
-				ActivityChanges:      jsonifyActivityChanges(block.Block.Body.ActivityChanges),
-				LatestProcessedBlock: uint64ToString(block.Block.Body.LatestProcessedBlock),
-				TransactionsCount:    uint64ToString(block.Block.Body.TransactionsCount),
+				Attestations:      jsonifyAttestations(block.Block.Body.Attestations),
+				AttesterSlashings: jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
+				Deposits:          jsonifyDeposits(block.Block.Body.Deposits),
+				Eth1Data:          jsonifyEth1Data(block.Block.Body.Eth1Data),
+				Graffiti:          hexutil.Encode(block.Block.Body.Graffiti),
+				ProposerSlashings: jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
+				RandaoReveal:      hexutil.Encode(block.Block.Body.RandaoReveal),
+				VoluntaryExits:    JsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
 				SyncAggregate: &apimiddleware.SyncAggregateJson{
 					SyncCommitteeBits:      hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeBits),
 					SyncCommitteeSignature: hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeSignature),
@@ -205,17 +176,14 @@ func marshallBeaconBlockBellatrix(block *ethpb.SignedBeaconBlockBellatrix) ([]by
 			Slot:          uint64ToString(block.Block.Slot),
 			StateRoot:     hexutil.Encode(block.Block.StateRoot),
 			Body: &apimiddleware.BeaconBlockBodyBellatrixJson{
-				Attestations:         jsonifyAttestations(block.Block.Body.Attestations),
-				AttesterSlashings:    jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
-				Deposits:             jsonifyDeposits(block.Block.Body.Deposits),
-				Eth1Data:             jsonifyEth1Data(block.Block.Body.Eth1Data),
-				Graffiti:             hexutil.Encode(block.Block.Body.Graffiti),
-				ProposerSlashings:    jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
-				RandaoReveal:         hexutil.Encode(block.Block.Body.RandaoReveal),
-				VoluntaryExits:       jsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
-				ActivityChanges:      jsonifyActivityChanges(block.Block.Body.ActivityChanges),
-				LatestProcessedBlock: uint64ToString(block.Block.Body.LatestProcessedBlock),
-				TransactionsCount:    uint64ToString(block.Block.Body.TransactionsCount),
+				Attestations:      jsonifyAttestations(block.Block.Body.Attestations),
+				AttesterSlashings: jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
+				Deposits:          jsonifyDeposits(block.Block.Body.Deposits),
+				Eth1Data:          jsonifyEth1Data(block.Block.Body.Eth1Data),
+				Graffiti:          hexutil.Encode(block.Block.Body.Graffiti),
+				ProposerSlashings: jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
+				RandaoReveal:      hexutil.Encode(block.Block.Body.RandaoReveal),
+				VoluntaryExits:    JsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
 				SyncAggregate: &apimiddleware.SyncAggregateJson{
 					SyncCommitteeBits:      hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeBits),
 					SyncCommitteeSignature: hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeSignature),
@@ -252,17 +220,14 @@ func marshallBeaconBlockBlindedBellatrix(block *ethpb.SignedBlindedBeaconBlockBe
 			Slot:          uint64ToString(block.Block.Slot),
 			StateRoot:     hexutil.Encode(block.Block.StateRoot),
 			Body: &apimiddleware.BlindedBeaconBlockBodyBellatrixJson{
-				Attestations:         jsonifyAttestations(block.Block.Body.Attestations),
-				AttesterSlashings:    jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
-				Deposits:             jsonifyDeposits(block.Block.Body.Deposits),
-				Eth1Data:             jsonifyEth1Data(block.Block.Body.Eth1Data),
-				Graffiti:             hexutil.Encode(block.Block.Body.Graffiti),
-				ProposerSlashings:    jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
-				RandaoReveal:         hexutil.Encode(block.Block.Body.RandaoReveal),
-				VoluntaryExits:       jsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
-				ActivityChanges:      jsonifyActivityChanges(block.Block.Body.ActivityChanges),
-				LatestProcessedBlock: uint64ToString(block.Block.Body.LatestProcessedBlock),
-				TransactionsCount:    uint64ToString(block.Block.Body.TransactionsCount),
+				Attestations:      jsonifyAttestations(block.Block.Body.Attestations),
+				AttesterSlashings: jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
+				Deposits:          jsonifyDeposits(block.Block.Body.Deposits),
+				Eth1Data:          jsonifyEth1Data(block.Block.Body.Eth1Data),
+				Graffiti:          hexutil.Encode(block.Block.Body.Graffiti),
+				ProposerSlashings: jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
+				RandaoReveal:      hexutil.Encode(block.Block.Body.RandaoReveal),
+				VoluntaryExits:    JsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
 				SyncAggregate: &apimiddleware.SyncAggregateJson{
 					SyncCommitteeBits:      hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeBits),
 					SyncCommitteeSignature: hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeSignature),
@@ -290,102 +255,6 @@ func marshallBeaconBlockBlindedBellatrix(block *ethpb.SignedBlindedBeaconBlockBe
 	return json.Marshal(signedBeaconBlockBellatrixJson)
 }
 
-func marshallBeaconBlockFastexPhase1(block *ethpb.SignedBeaconBlockFastexPhase1) ([]byte, error) {
-	signedBeaconBlockFastexPhase1Json := &apimiddleware.SignedBeaconBlockFastexPhase1ContainerJson{
-		Signature: hexutil.Encode(block.Signature),
-		Message: &apimiddleware.BeaconBlockFastexPhase1Json{
-			ParentRoot:    hexutil.Encode(block.Block.ParentRoot),
-			ProposerIndex: uint64ToString(block.Block.ProposerIndex),
-			Slot:          uint64ToString(block.Block.Slot),
-			StateRoot:     hexutil.Encode(block.Block.StateRoot),
-			Body: &apimiddleware.BeaconBlockBodyFastexPhase1Json{
-				Attestations:         jsonifyAttestations(block.Block.Body.Attestations),
-				AttesterSlashings:    jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
-				Deposits:             jsonifyDeposits(block.Block.Body.Deposits),
-				Eth1Data:             jsonifyEth1Data(block.Block.Body.Eth1Data),
-				Graffiti:             hexutil.Encode(block.Block.Body.Graffiti),
-				ProposerSlashings:    jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
-				RandaoReveal:         hexutil.Encode(block.Block.Body.RandaoReveal),
-				VoluntaryExits:       jsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
-				ActivityChanges:      jsonifyActivityChanges(block.Block.Body.ActivityChanges),
-				LatestProcessedBlock: uint64ToString(block.Block.Body.LatestProcessedBlock),
-				TransactionsCount:    uint64ToString(block.Block.Body.TransactionsCount),
-				SyncAggregate: &apimiddleware.SyncAggregateJson{
-					SyncCommitteeBits:      hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeBits),
-					SyncCommitteeSignature: hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeSignature),
-				},
-				ExecutionPayload: &apimiddleware.ExecutionPayloadJson{
-					BaseFeePerGas: bytesutil.LittleEndianBytesToBigInt(block.Block.Body.ExecutionPayload.BaseFeePerGas).String(),
-					BlockHash:     hexutil.Encode(block.Block.Body.ExecutionPayload.BlockHash),
-					BlockNumber:   uint64ToString(block.Block.Body.ExecutionPayload.BlockNumber),
-					ExtraData:     hexutil.Encode(block.Block.Body.ExecutionPayload.ExtraData),
-					FeeRecipient:  hexutil.Encode(block.Block.Body.ExecutionPayload.FeeRecipient),
-					GasLimit:      uint64ToString(block.Block.Body.ExecutionPayload.GasLimit),
-					GasUsed:       uint64ToString(block.Block.Body.ExecutionPayload.GasUsed),
-					LogsBloom:     hexutil.Encode(block.Block.Body.ExecutionPayload.LogsBloom),
-					ParentHash:    hexutil.Encode(block.Block.Body.ExecutionPayload.ParentHash),
-					PrevRandao:    hexutil.Encode(block.Block.Body.ExecutionPayload.PrevRandao),
-					ReceiptsRoot:  hexutil.Encode(block.Block.Body.ExecutionPayload.ReceiptsRoot),
-					StateRoot:     hexutil.Encode(block.Block.Body.ExecutionPayload.StateRoot),
-					TimeStamp:     uint64ToString(block.Block.Body.ExecutionPayload.Timestamp),
-					Transactions:  jsonifyTransactions(block.Block.Body.ExecutionPayload.Transactions),
-				},
-				BaseFee: uint64ToString(block.Block.Body.BaseFee),
-			},
-		},
-	}
-
-	return json.Marshal(signedBeaconBlockFastexPhase1Json)
-}
-
-func marshallBeaconBlockBlindedFastexPhase1(block *ethpb.SignedBlindedBeaconBlockFastexPhase1) ([]byte, error) {
-	signedBeaconBlockFastexPhase1Json := &apimiddleware.SignedBlindedBeaconBlockFastexPhase1ContainerJson{
-		Signature: hexutil.Encode(block.Signature),
-		Message: &apimiddleware.BlindedBeaconBlockFastexPhase1Json{
-			ParentRoot:    hexutil.Encode(block.Block.ParentRoot),
-			ProposerIndex: uint64ToString(block.Block.ProposerIndex),
-			Slot:          uint64ToString(block.Block.Slot),
-			StateRoot:     hexutil.Encode(block.Block.StateRoot),
-			Body: &apimiddleware.BlindedBeaconBlockBodyFastexPhase1Json{
-				Attestations:         jsonifyAttestations(block.Block.Body.Attestations),
-				AttesterSlashings:    jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
-				Deposits:             jsonifyDeposits(block.Block.Body.Deposits),
-				Eth1Data:             jsonifyEth1Data(block.Block.Body.Eth1Data),
-				Graffiti:             hexutil.Encode(block.Block.Body.Graffiti),
-				ProposerSlashings:    jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
-				RandaoReveal:         hexutil.Encode(block.Block.Body.RandaoReveal),
-				VoluntaryExits:       jsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
-				ActivityChanges:      jsonifyActivityChanges(block.Block.Body.ActivityChanges),
-				LatestProcessedBlock: uint64ToString(block.Block.Body.LatestProcessedBlock),
-				TransactionsCount:    uint64ToString(block.Block.Body.TransactionsCount),
-				SyncAggregate: &apimiddleware.SyncAggregateJson{
-					SyncCommitteeBits:      hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeBits),
-					SyncCommitteeSignature: hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeSignature),
-				},
-				ExecutionPayloadHeader: &apimiddleware.ExecutionPayloadHeaderJson{
-					BaseFeePerGas:    bytesutil.LittleEndianBytesToBigInt(block.Block.Body.ExecutionPayloadHeader.BaseFeePerGas).String(),
-					BlockHash:        hexutil.Encode(block.Block.Body.ExecutionPayloadHeader.BlockHash),
-					BlockNumber:      uint64ToString(block.Block.Body.ExecutionPayloadHeader.BlockNumber),
-					ExtraData:        hexutil.Encode(block.Block.Body.ExecutionPayloadHeader.ExtraData),
-					FeeRecipient:     hexutil.Encode(block.Block.Body.ExecutionPayloadHeader.FeeRecipient),
-					GasLimit:         uint64ToString(block.Block.Body.ExecutionPayloadHeader.GasLimit),
-					GasUsed:          uint64ToString(block.Block.Body.ExecutionPayloadHeader.GasUsed),
-					LogsBloom:        hexutil.Encode(block.Block.Body.ExecutionPayloadHeader.LogsBloom),
-					ParentHash:       hexutil.Encode(block.Block.Body.ExecutionPayloadHeader.ParentHash),
-					PrevRandao:       hexutil.Encode(block.Block.Body.ExecutionPayloadHeader.PrevRandao),
-					ReceiptsRoot:     hexutil.Encode(block.Block.Body.ExecutionPayloadHeader.ReceiptsRoot),
-					StateRoot:        hexutil.Encode(block.Block.Body.ExecutionPayloadHeader.StateRoot),
-					TimeStamp:        uint64ToString(block.Block.Body.ExecutionPayloadHeader.Timestamp),
-					TransactionsRoot: hexutil.Encode(block.Block.Body.ExecutionPayloadHeader.TransactionsRoot),
-				},
-				BaseFee: uint64ToString(block.Block.Body.BaseFee),
-			},
-		},
-	}
-
-	return json.Marshal(signedBeaconBlockFastexPhase1Json)
-}
-
 func marshallBeaconBlockCapella(block *ethpb.SignedBeaconBlockCapella) ([]byte, error) {
 	signedBeaconBlockCapellaJson := &apimiddleware.SignedBeaconBlockCapellaContainerJson{
 		Signature: hexutil.Encode(block.Signature),
@@ -395,17 +264,14 @@ func marshallBeaconBlockCapella(block *ethpb.SignedBeaconBlockCapella) ([]byte, 
 			Slot:          uint64ToString(block.Block.Slot),
 			StateRoot:     hexutil.Encode(block.Block.StateRoot),
 			Body: &apimiddleware.BeaconBlockBodyCapellaJson{
-				Attestations:         jsonifyAttestations(block.Block.Body.Attestations),
-				AttesterSlashings:    jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
-				Deposits:             jsonifyDeposits(block.Block.Body.Deposits),
-				Eth1Data:             jsonifyEth1Data(block.Block.Body.Eth1Data),
-				Graffiti:             hexutil.Encode(block.Block.Body.Graffiti),
-				ProposerSlashings:    jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
-				RandaoReveal:         hexutil.Encode(block.Block.Body.RandaoReveal),
-				VoluntaryExits:       jsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
-				ActivityChanges:      jsonifyActivityChanges(block.Block.Body.ActivityChanges),
-				LatestProcessedBlock: uint64ToString(block.Block.Body.LatestProcessedBlock),
-				TransactionsCount:    uint64ToString(block.Block.Body.TransactionsCount),
+				Attestations:      jsonifyAttestations(block.Block.Body.Attestations),
+				AttesterSlashings: jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
+				Deposits:          jsonifyDeposits(block.Block.Body.Deposits),
+				Eth1Data:          jsonifyEth1Data(block.Block.Body.Eth1Data),
+				Graffiti:          hexutil.Encode(block.Block.Body.Graffiti),
+				ProposerSlashings: jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
+				RandaoReveal:      hexutil.Encode(block.Block.Body.RandaoReveal),
+				VoluntaryExits:    JsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
 				SyncAggregate: &apimiddleware.SyncAggregateJson{
 					SyncCommitteeBits:      hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeBits),
 					SyncCommitteeSignature: hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeSignature),
@@ -427,7 +293,6 @@ func marshallBeaconBlockCapella(block *ethpb.SignedBeaconBlockCapella) ([]byte, 
 					Transactions:  jsonifyTransactions(block.Block.Body.ExecutionPayload.Transactions),
 					Withdrawals:   jsonifyWithdrawals(block.Block.Body.ExecutionPayload.Withdrawals),
 				},
-				BaseFee:               uint64ToString(block.Block.Body.BaseFee),
 				BLSToExecutionChanges: jsonifyBlsToExecutionChanges(block.Block.Body.BlsToExecutionChanges),
 			},
 		},
@@ -445,17 +310,14 @@ func marshallBeaconBlockBlindedCapella(block *ethpb.SignedBlindedBeaconBlockCape
 			Slot:          uint64ToString(block.Block.Slot),
 			StateRoot:     hexutil.Encode(block.Block.StateRoot),
 			Body: &apimiddleware.BlindedBeaconBlockBodyCapellaJson{
-				Attestations:         jsonifyAttestations(block.Block.Body.Attestations),
-				AttesterSlashings:    jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
-				Deposits:             jsonifyDeposits(block.Block.Body.Deposits),
-				Eth1Data:             jsonifyEth1Data(block.Block.Body.Eth1Data),
-				Graffiti:             hexutil.Encode(block.Block.Body.Graffiti),
-				ProposerSlashings:    jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
-				RandaoReveal:         hexutil.Encode(block.Block.Body.RandaoReveal),
-				VoluntaryExits:       jsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
-				ActivityChanges:      jsonifyActivityChanges(block.Block.Body.ActivityChanges),
-				LatestProcessedBlock: uint64ToString(block.Block.Body.LatestProcessedBlock),
-				TransactionsCount:    uint64ToString(block.Block.Body.TransactionsCount),
+				Attestations:      jsonifyAttestations(block.Block.Body.Attestations),
+				AttesterSlashings: jsonifyAttesterSlashings(block.Block.Body.AttesterSlashings),
+				Deposits:          jsonifyDeposits(block.Block.Body.Deposits),
+				Eth1Data:          jsonifyEth1Data(block.Block.Body.Eth1Data),
+				Graffiti:          hexutil.Encode(block.Block.Body.Graffiti),
+				ProposerSlashings: jsonifyProposerSlashings(block.Block.Body.ProposerSlashings),
+				RandaoReveal:      hexutil.Encode(block.Block.Body.RandaoReveal),
+				VoluntaryExits:    JsonifySignedVoluntaryExits(block.Block.Body.VoluntaryExits),
 				SyncAggregate: &apimiddleware.SyncAggregateJson{
 					SyncCommitteeBits:      hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeBits),
 					SyncCommitteeSignature: hexutil.Encode(block.Block.Body.SyncAggregate.SyncCommitteeSignature),
@@ -477,7 +339,6 @@ func marshallBeaconBlockBlindedCapella(block *ethpb.SignedBlindedBeaconBlockCape
 					TransactionsRoot: hexutil.Encode(block.Block.Body.ExecutionPayloadHeader.TransactionsRoot),
 					WithdrawalsRoot:  hexutil.Encode(block.Block.Body.ExecutionPayloadHeader.WithdrawalsRoot),
 				},
-				BaseFee:               uint64ToString(block.Block.Body.BaseFee),
 				BLSToExecutionChanges: jsonifyBlsToExecutionChanges(block.Block.Body.BlsToExecutionChanges),
 			},
 		},

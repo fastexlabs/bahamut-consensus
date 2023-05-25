@@ -1,12 +1,12 @@
 package capella
 
 import (
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	state_native "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	state_native "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 // UpgradeToCapella updates a generic state to return the version Capella state.
@@ -46,14 +46,6 @@ func UpgradeToCapella(state state.BeaconState) (state.BeaconState, error) {
 	if err != nil {
 		return nil, err
 	}
-	bfe, err := state.BaseFeePerEpoch()
-	if err != nil {
-		return nil, err
-	}
-	bfp, err := state.BaseFeePerPeriod()
-	if err != nil {
-		return nil, err
-	}
 	s := &ethpb.BeaconStateCapella{
 		GenesisTime:           state.GenesisTime(),
 		GenesisValidatorsRoot: state.GenesisValidatorsRoot(),
@@ -63,33 +55,29 @@ func UpgradeToCapella(state state.BeaconState) (state.BeaconState, error) {
 			CurrentVersion:  params.BeaconConfig().CapellaForkVersion,
 			Epoch:           epoch,
 		},
-		LatestBlockHeader:              state.LatestBlockHeader(),
-		BlockRoots:                     state.BlockRoots(),
-		StateRoots:                     state.StateRoots(),
-		HistoricalRoots:                hrs,
-		Eth1Data:                       state.Eth1Data(),
-		Eth1DataVotes:                  state.Eth1DataVotes(),
-		Eth1DepositIndex:               state.Eth1DepositIndex(),
-		LatestProcessedBlockActivities: state.LatestProcessedBlockActivities(),
-		TransactionsGasPerPeriod:       state.TransactionsGasPerPeriod(),
-		TransactionsPerLatestEpoch:     state.TransactionsPerLatestEpoch(),
-		NonStakersGasPerPeriod:         state.NonStakersGasPerPeriod(),
-		NonStakersGasPerEpoch:          state.NonStakersGasPerEpoch(),
-		Validators:                     state.Validators(),
-		Balances:                       state.Balances(),
-		Contracts:                      state.Contracts(),
-		Activities:                     state.Activities(),
-		RandaoMixes:                    state.RandaoMixes(),
-		Slashings:                      state.Slashings(),
-		PreviousEpochParticipation:     prevEpochParticipation,
-		CurrentEpochParticipation:      currentEpochParticipation,
-		JustificationBits:              state.JustificationBits(),
-		PreviousJustifiedCheckpoint:    state.PreviousJustifiedCheckpoint(),
-		CurrentJustifiedCheckpoint:     state.CurrentJustifiedCheckpoint(),
-		FinalizedCheckpoint:            state.FinalizedCheckpoint(),
-		InactivityScores:               inactivityScores,
-		CurrentSyncCommittee:           currentSyncCommittee,
-		NextSyncCommittee:              nextSyncCommittee,
+		LatestBlockHeader:           state.LatestBlockHeader(),
+		BlockRoots:                  state.BlockRoots(),
+		StateRoots:                  state.StateRoots(),
+		HistoricalRoots:             hrs,
+		Eth1Data:                    state.Eth1Data(),
+		Eth1DataVotes:               state.Eth1DataVotes(),
+		Eth1DepositIndex:            state.Eth1DepositIndex(),
+		SharedActivity:              state.SharedActivity(),
+		ExecutionHeight:             state.ExecutionHeight(),
+		Validators:                  state.Validators(),
+		Balances:                    state.Balances(),
+		Activities:                  state.Activities(),
+		RandaoMixes:                 state.RandaoMixes(),
+		Slashings:                   state.Slashings(),
+		PreviousEpochParticipation:  prevEpochParticipation,
+		CurrentEpochParticipation:   currentEpochParticipation,
+		JustificationBits:           state.JustificationBits(),
+		PreviousJustifiedCheckpoint: state.PreviousJustifiedCheckpoint(),
+		CurrentJustifiedCheckpoint:  state.CurrentJustifiedCheckpoint(),
+		FinalizedCheckpoint:         state.FinalizedCheckpoint(),
+		InactivityScores:            inactivityScores,
+		CurrentSyncCommittee:        currentSyncCommittee,
+		NextSyncCommittee:           nextSyncCommittee,
 		LatestExecutionPayloadHeader: &enginev1.ExecutionPayloadHeaderCapella{
 			ParentHash:       payloadHeader.ParentHash(),
 			FeeRecipient:     payloadHeader.FeeRecipient(),
@@ -107,8 +95,6 @@ func UpgradeToCapella(state state.BeaconState) (state.BeaconState, error) {
 			TransactionsRoot: txRoot,
 			WithdrawalsRoot:  make([]byte, 32),
 		},
-		BaseFeePerEpoch:              bfe,
-		BaseFeePerPeriod:             bfp,
 		NextWithdrawalIndex:          0,
 		NextWithdrawalValidatorIndex: 0,
 		HistoricalSummaries:          make([]*ethpb.HistoricalSummary, 0),

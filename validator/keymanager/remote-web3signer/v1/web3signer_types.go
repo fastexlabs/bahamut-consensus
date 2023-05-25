@@ -167,21 +167,14 @@ type BeaconBlock struct {
 
 // BeaconBlockBody a sub property of BeaconBlock.
 type BeaconBlockBody struct {
-	RandaoReveal         hexutil.Bytes          `json:"randao_reveal"`
-	Eth1Data             *Eth1Data              `json:"eth1_data"`
-	Graffiti             hexutil.Bytes          `json:"graffiti"` // 32 bytes
-	ProposerSlashings    []*ProposerSlashing    `json:"proposer_slashings"`
-	AttesterSlashings    []*AttesterSlashing    `json:"attester_slashings"`
-	Attestations         []*Attestation         `json:"attestations"`
-	Deposits             []*Deposit             `json:"deposits"`
-	VoluntaryExits       []*SignedVoluntaryExit `json:"voluntary_exits"`
-	ActivityChanges      []*ActivityChange      `json:"activity_changes"`
-	LatestProcessedBlock uint64                 `json:"latest_processed_block"`
-}
-
-type ActivityChange struct {
-	ContractAddres []byte `json:"contract_address"`
-	DeltaActivity  uint64 `json:"delta_activity"`
+	RandaoReveal      hexutil.Bytes          `json:"randao_reveal"`
+	Eth1Data          *Eth1Data              `json:"eth1_data"`
+	Graffiti          hexutil.Bytes          `json:"graffiti"` // 32 bytes
+	ProposerSlashings []*ProposerSlashing    `json:"proposer_slashings"`
+	AttesterSlashings []*AttesterSlashing    `json:"attester_slashings"`
+	Attestations      []*Attestation         `json:"attestations"`
+	Deposits          []*Deposit             `json:"deposits"`
+	VoluntaryExits    []*SignedVoluntaryExit `json:"voluntary_exits"`
 }
 
 // Eth1Data a sub property of BeaconBlockBody.
@@ -240,8 +233,6 @@ type DepositData struct {
 	WithdrawalCredentials hexutil.Bytes `json:"withdrawal_credentials"`
 	Amount                string        `json:"amount"` /* uint64 */
 	Signature             hexutil.Bytes `json:"signature"`
-	DeployedContract      hexutil.Bytes `json:"deployed_contract"`
-	DeploymentNonce       string        `json:"deployment_nonce"`
 }
 
 // SignedVoluntaryExit is a sub property of BeaconBlockBody.
@@ -274,17 +265,15 @@ type BeaconBlockAltair struct {
 
 // BeaconBlockBodyAltair a sub property of BeaconBlockAltair.
 type BeaconBlockBodyAltair struct {
-	RandaoReveal         hexutil.Bytes          `json:"randao_reveal"`
-	Eth1Data             *Eth1Data              `json:"eth1_data"`
-	Graffiti             hexutil.Bytes          `json:"graffiti"` /* Hash32 */
-	ProposerSlashings    []*ProposerSlashing    `json:"proposer_slashings"`
-	AttesterSlashings    []*AttesterSlashing    `json:"attester_slashings"`
-	Attestations         []*Attestation         `json:"attestations"`
-	Deposits             []*Deposit             `json:"deposits"`
-	VoluntaryExits       []*SignedVoluntaryExit `json:"voluntary_exits"`
-	ActivityChanges      []*ActivityChange      `json:"activity_changes"`
-	LatestProcessedBlock uint64                 `json:"latest_processed_block"`
-	SyncAggregate        *SyncAggregate         `json:"sync_aggregate"`
+	RandaoReveal      hexutil.Bytes          `json:"randao_reveal"`
+	Eth1Data          *Eth1Data              `json:"eth1_data"`
+	Graffiti          hexutil.Bytes          `json:"graffiti"` /* Hash32 */
+	ProposerSlashings []*ProposerSlashing    `json:"proposer_slashings"`
+	AttesterSlashings []*AttesterSlashing    `json:"attester_slashings"`
+	Attestations      []*Attestation         `json:"attestations"`
+	Deposits          []*Deposit             `json:"deposits"`
+	VoluntaryExits    []*SignedVoluntaryExit `json:"voluntary_exits"`
+	SyncAggregate     *SyncAggregate         `json:"sync_aggregate"`
 }
 
 // BeaconBlockV2Blinded a field of BlockV2BlindedSignRequest.

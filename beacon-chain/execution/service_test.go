@@ -14,32 +14,30 @@ import (
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/async/event"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache/depositcache"
-	dbutil "github.com/prysmaticlabs/prysm/v3/beacon-chain/db/testing"
-	mockExecution "github.com/prysmaticlabs/prysm/v3/beacon-chain/execution/testing"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/execution/types"
-	doublylinkedtree "github.com/prysmaticlabs/prysm/v3/beacon-chain/forkchoice/doubly-linked-tree"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stategen"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	contracts "github.com/prysmaticlabs/prysm/v3/contracts/deposit"
-	"github.com/prysmaticlabs/prysm/v3/contracts/deposit/mock"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	"github.com/prysmaticlabs/prysm/v3/monitoring/clientstats"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
-	"github.com/prysmaticlabs/prysm/v3/testing/util"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/async/event"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache/depositcache"
+	dbutil "github.com/prysmaticlabs/prysm/v4/beacon-chain/db/testing"
+	mockExecution "github.com/prysmaticlabs/prysm/v4/beacon-chain/execution/testing"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/execution/types"
+	doublylinkedtree "github.com/prysmaticlabs/prysm/v4/beacon-chain/forkchoice/doubly-linked-tree"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stategen"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	contracts "github.com/prysmaticlabs/prysm/v4/contracts/deposit"
+	"github.com/prysmaticlabs/prysm/v4/contracts/deposit/mock"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/monitoring/clientstats"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/testing/util"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	logTest "github.com/sirupsen/logrus/hooks/test"
 )
 
-var (
-	_ ChainStartFetcher = (*Service)(nil)
-	_ ChainInfoFetcher  = (*Service)(nil)
-	_ POWBlockFetcher   = (*Service)(nil)
-	_ Chain             = (*Service)(nil)
-)
+var _ ChainStartFetcher = (*Service)(nil)
+var _ ChainInfoFetcher = (*Service)(nil)
+var _ POWBlockFetcher = (*Service)(nil)
+var _ Chain = (*Service)(nil)
 
 type goodLogger struct {
 	backend *backends.SimulatedBackend
@@ -212,14 +210,14 @@ func TestFollowBlock_OK(t *testing.T) {
 
 	web3Service = setDefaultMocks(web3Service)
 	web3Service.rpcClient = &mockExecution.RPCClient{Backend: testAcc.Backend}
-	baseHeight := testAcc.Backend.Blockchain().CurrentBlock().NumberU64()
+	baseHeight := testAcc.Backend.Blockchain().CurrentBlock().Number.Uint64()
 	// process follow_distance blocks
 	for i := 0; i < int(params.BeaconConfig().Eth1FollowDistance); i++ {
 		testAcc.Backend.Commit()
 	}
 	// set current height
-	web3Service.latestEth1Data.BlockHeight = testAcc.Backend.Blockchain().CurrentBlock().NumberU64()
-	web3Service.latestEth1Data.BlockTime = testAcc.Backend.Blockchain().CurrentBlock().Time()
+	web3Service.latestEth1Data.BlockHeight = testAcc.Backend.Blockchain().CurrentBlock().Number.Uint64()
+	web3Service.latestEth1Data.BlockTime = testAcc.Backend.Blockchain().CurrentBlock().Time
 
 	h, err := web3Service.followedBlockHeight(context.Background())
 	require.NoError(t, err)
@@ -231,8 +229,8 @@ func TestFollowBlock_OK(t *testing.T) {
 		testAcc.Backend.Commit()
 	}
 	// set current height
-	web3Service.latestEth1Data.BlockHeight = testAcc.Backend.Blockchain().CurrentBlock().NumberU64()
-	web3Service.latestEth1Data.BlockTime = testAcc.Backend.Blockchain().CurrentBlock().Time()
+	web3Service.latestEth1Data.BlockHeight = testAcc.Backend.Blockchain().CurrentBlock().Number.Uint64()
+	web3Service.latestEth1Data.BlockTime = testAcc.Backend.Blockchain().CurrentBlock().Time
 
 	h, err = web3Service.followedBlockHeight(context.Background())
 	require.NoError(t, err)
@@ -259,6 +257,7 @@ func TestStatus(t *testing.T) {
 		status := web3ServiceState.Status()
 		if status == nil {
 			assert.Equal(t, "", wantedErrorText)
+
 		} else {
 			assert.Equal(t, wantedErrorText, status.Error())
 		}
@@ -375,7 +374,6 @@ func TestInitDepositCacheWithFinalization_OK(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{0}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
 				},
 			},
 		},
@@ -387,7 +385,6 @@ func TestInitDepositCacheWithFinalization_OK(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{1}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
 				},
 			},
 		},
@@ -399,7 +396,6 @@ func TestInitDepositCacheWithFinalization_OK(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{2}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
 				},
 			},
 		},
@@ -493,6 +489,7 @@ func TestNewService_EarliestVotingBlock(t *testing.T) {
 	blk, err = web3Service.determineEarliestVotingBlock(context.Background(), followBlock)
 	require.NoError(t, err)
 	assert.Equal(t, followBlock-conf.Eth1FollowDistance, blk, "unexpected earliest voting block")
+
 }
 
 func TestNewService_Eth1HeaderRequLimit(t *testing.T) {
@@ -647,7 +644,7 @@ func TestService_EnsureValidPowchainData(t *testing.T) {
 }
 
 func TestService_ValidateDepositContainers(t *testing.T) {
-	tt := []struct {
+	var tt = []struct {
 		name        string
 		ctrsFunc    func() []*ethpb.DepositContainer
 		expectedRes bool

@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/api/client/builder"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/blockchain"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/db"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/api/client/builder"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/blockchain"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	log "github.com/sirupsen/logrus"
 	"go.opencensus.io/trace"
 )
@@ -77,7 +77,8 @@ func (s *Service) Start() {
 }
 
 // Stop halts the service.
-func (*Service) Stop() error {
+func (s *Service) Stop() error {
+	s.cancel()
 	return nil
 }
 
@@ -89,6 +90,9 @@ func (s *Service) SubmitBlindedBlock(ctx context.Context, b interfaces.ReadOnlyS
 	defer func() {
 		submitBlindedBlockLatency.Observe(float64(time.Since(start).Milliseconds()))
 	}()
+	if s.c == nil {
+		return nil, ErrNoBuilder
+	}
 
 	return s.c.SubmitBlindedBlock(ctx, b)
 }
@@ -101,6 +105,9 @@ func (s *Service) GetHeader(ctx context.Context, slot primitives.Slot, parentHas
 	defer func() {
 		getHeaderLatency.Observe(float64(time.Since(start).Milliseconds()))
 	}()
+	if s.c == nil {
+		return nil, ErrNoBuilder
+	}
 
 	return s.c.GetHeader(ctx, slot, parentHash, pubKey)
 }
@@ -124,6 +131,9 @@ func (s *Service) RegisterValidator(ctx context.Context, reg []*ethpb.SignedVali
 	defer func() {
 		registerValidatorLatency.Observe(float64(time.Since(start).Milliseconds()))
 	}()
+	if s.c == nil {
+		return ErrNoBuilder
+	}
 
 	idxs := make([]primitives.ValidatorIndex, 0)
 	msgs := make([]*ethpb.ValidatorRegistrationV1, 0)

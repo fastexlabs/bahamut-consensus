@@ -10,18 +10,17 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/go-bitfield"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/container/slice"
-	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	"github.com/prysmaticlabs/prysm/v3/math"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/container/slice"
+	"github.com/prysmaticlabs/prysm/v4/crypto/hash"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/math"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
 
 var (
@@ -46,7 +45,7 @@ var (
 //	     uint64(len(get_active_validator_indices(state, epoch))) // SLOTS_PER_EPOCH // TARGET_COMMITTEE_SIZE,
 //	 ))
 func SlotCommitteeCount(activeValidatorCount uint64) uint64 {
-	committeesPerSlot := activeValidatorCount / uint64(params.BeaconConfig().SlotsPerEpoch) / params.BeaconConfig().TargetCommitteeSize
+	var committeesPerSlot = activeValidatorCount / uint64(params.BeaconConfig().SlotsPerEpoch) / params.BeaconConfig().TargetCommitteeSize
 
 	if committeesPerSlot > params.BeaconConfig().MaxCommitteesPerSlot {
 		return params.BeaconConfig().MaxCommitteesPerSlot
@@ -449,17 +448,9 @@ func precomputeProposerIndices(state state.ReadOnlyBeaconState, activeIndices []
 	for i := uint64(0); i < uint64(params.BeaconConfig().SlotsPerEpoch); i++ {
 		seedWithSlot := append(seed[:], bytesutil.Bytes8(uint64(slot)+i)...)
 		seedWithSlotHash := hashFunc(seedWithSlot)
-		var index primitives.ValidatorIndex
-		if state.Version() < version.FastexPhase1 {
-			index, err = ComputeProposerIndex(state, activeIndices, seedWithSlotHash)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			index, err = ComputeProposerIndexFastexPhase1(state, activeIndices, seedWithSlotHash)
-			if err != nil {
-				return nil, err
-			}
+		index, err := ComputeProposerIndex(state, activeIndices, seedWithSlotHash)
+		if err != nil {
+			return nil, err
 		}
 		proposerIndices[i] = index
 	}

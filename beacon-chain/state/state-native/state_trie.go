@@ -6,19 +6,18 @@ import (
 	"sort"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/fieldtrie"
-	customtypes "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/custom-types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/container/slice"
-	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	"github.com/prysmaticlabs/prysm/v3/encoding/ssz"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/fieldtrie"
+	customtypes "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/custom-types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/container/slice"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/encoding/ssz"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 	"go.opencensus.io/trace"
 	"google.golang.org/protobuf/proto"
 )
@@ -35,14 +34,10 @@ var phase0Fields = []types.FieldIndex{
 	types.Eth1Data,
 	types.Eth1DataVotes,
 	types.Eth1DepositIndex,
-	types.LatestProcessedBlockActivities,
-	types.TransactionsGasPerPeriod,
-	types.TransactionsPerLatestEpoch,
-	types.NonStakersGasPerEpoch,
-	types.NonStakersGasPerPeriod,
+	types.SharedActivity,
+	types.ExecutionHeight,
 	types.Validators,
 	types.Balances,
-	types.Contracts,
 	types.Activities,
 	types.RandaoMixes,
 	types.Slashings,
@@ -66,14 +61,10 @@ var altairFields = []types.FieldIndex{
 	types.Eth1Data,
 	types.Eth1DataVotes,
 	types.Eth1DepositIndex,
-	types.LatestProcessedBlockActivities,
-	types.TransactionsGasPerPeriod,
-	types.TransactionsPerLatestEpoch,
-	types.NonStakersGasPerEpoch,
-	types.NonStakersGasPerPeriod,
+	types.SharedActivity,
+	types.ExecutionHeight,
 	types.Validators,
 	types.Balances,
-	types.Contracts,
 	types.Activities,
 	types.RandaoMixes,
 	types.Slashings,
@@ -90,29 +81,19 @@ var altairFields = []types.FieldIndex{
 
 var bellatrixFields = append(altairFields, types.LatestExecutionPayloadHeader)
 
-var fastexPhase1Fields = append(
-	altairFields,
-	types.LatestExecutionPayloadHeader,
-	types.BaseFeePerEpoch,
-	types.BaseFeePerPeriod,
-)
-
 var capellaFields = append(
 	altairFields,
 	types.LatestExecutionPayloadHeaderCapella,
-	types.BaseFeePerEpoch,
-	types.BaseFeePerPeriod,
 	types.NextWithdrawalIndex,
 	types.NextWithdrawalValidatorIndex,
 	types.HistoricalSummaries,
 )
 
 const (
-	phase0SharedFieldRefCount       = 12
-	altairSharedFieldRefCount       = 13
-	bellatrixSharedFieldRefCount    = 14
-	fastexPhase1SharedFieldRefCount = 14
-	capellaSharedFieldRefCount      = 16
+	phase0SharedFieldRefCount    = 11
+	altairSharedFieldRefCount    = 12
+	bellatrixSharedFieldRefCount = 13
+	capellaSharedFieldRefCount   = 15
 )
 
 // InitializeFromProtoPhase0 the beacon state from a protobuf representation.
@@ -128,11 +109,6 @@ func InitializeFromProtoAltair(st *ethpb.BeaconStateAltair) (state.BeaconState, 
 // InitializeFromProtoBellatrix the beacon state from a protobuf representation.
 func InitializeFromProtoBellatrix(st *ethpb.BeaconStateBellatrix) (state.BeaconState, error) {
 	return InitializeFromProtoUnsafeBellatrix(proto.Clone(st).(*ethpb.BeaconStateBellatrix))
-}
-
-// InitializeFromProtoFastexPhase1 the beacon state from a protobuf representation.
-func InitializeFromProtoFastexPhase1(st *ethpb.BeaconStateFastexPhase1) (state.BeaconState, error) {
-	return InitializeFromProtoUnsafeFastexPhase1(proto.Clone(st).(*ethpb.BeaconStateFastexPhase1))
 }
 
 // InitializeFromProtoCapella the beacon state from a protobuf representation.
@@ -166,35 +142,31 @@ func InitializeFromProtoUnsafePhase0(st *ethpb.BeaconState) (state.BeaconState, 
 
 	fieldCount := params.BeaconConfig().BeaconStateFieldCount
 	b := &BeaconState{
-		version:                        version.Phase0,
-		genesisTime:                    st.GenesisTime,
-		genesisValidatorsRoot:          bytesutil.ToBytes32(st.GenesisValidatorsRoot),
-		slot:                           st.Slot,
-		fork:                           st.Fork,
-		latestBlockHeader:              st.LatestBlockHeader,
-		blockRoots:                     &bRoots,
-		stateRoots:                     &sRoots,
-		historicalRoots:                hRoots,
-		eth1Data:                       st.Eth1Data,
-		eth1DataVotes:                  st.Eth1DataVotes,
-		eth1DepositIndex:               st.Eth1DepositIndex,
-		latestProcessedBlockActivities: st.LatestProcessedBlockActivities,
-		transactionsGasPerPeriod:       st.TransactionsGasPerPeriod,
-		transactionsPerLatestEpoch:     st.TransactionsPerLatestEpoch,
-		nonStakersGasPerEpoch:          st.NonStakersGasPerEpoch,
-		nonStakersGasPerPeriod:         st.NonStakersGasPerPeriod,
-		validators:                     st.Validators,
-		balances:                       st.Balances,
-		contracts:                      st.Contracts,
-		activities:                     st.Activities,
-		randaoMixes:                    &mixes,
-		slashings:                      st.Slashings,
-		previousEpochAttestations:      st.PreviousEpochAttestations,
-		currentEpochAttestations:       st.CurrentEpochAttestations,
-		justificationBits:              st.JustificationBits,
-		previousJustifiedCheckpoint:    st.PreviousJustifiedCheckpoint,
-		currentJustifiedCheckpoint:     st.CurrentJustifiedCheckpoint,
-		finalizedCheckpoint:            st.FinalizedCheckpoint,
+		version:                     version.Phase0,
+		genesisTime:                 st.GenesisTime,
+		genesisValidatorsRoot:       bytesutil.ToBytes32(st.GenesisValidatorsRoot),
+		slot:                        st.Slot,
+		fork:                        st.Fork,
+		latestBlockHeader:           st.LatestBlockHeader,
+		blockRoots:                  &bRoots,
+		stateRoots:                  &sRoots,
+		historicalRoots:             hRoots,
+		eth1Data:                    st.Eth1Data,
+		eth1DataVotes:               st.Eth1DataVotes,
+		eth1DepositIndex:            st.Eth1DepositIndex,
+		sharedActivity:              st.SharedActivity,
+		executionHeight:             st.ExecutionHeight,
+		validators:                  st.Validators,
+		balances:                    st.Balances,
+		activities:                  st.Activities,
+		randaoMixes:                 &mixes,
+		slashings:                   st.Slashings,
+		previousEpochAttestations:   st.PreviousEpochAttestations,
+		currentEpochAttestations:    st.CurrentEpochAttestations,
+		justificationBits:           st.JustificationBits,
+		previousJustifiedCheckpoint: st.PreviousJustifiedCheckpoint,
+		currentJustifiedCheckpoint:  st.CurrentJustifiedCheckpoint,
+		finalizedCheckpoint:         st.FinalizedCheckpoint,
 
 		dirtyFields:           make(map[types.FieldIndex]bool, fieldCount),
 		dirtyIndices:          make(map[types.FieldIndex][]uint64, fieldCount),
@@ -202,7 +174,7 @@ func InitializeFromProtoUnsafePhase0(st *ethpb.BeaconState) (state.BeaconState, 
 		sharedFieldReferences: make(map[types.FieldIndex]*stateutil.Reference, phase0SharedFieldRefCount),
 		rebuildTrie:           make(map[types.FieldIndex]bool, fieldCount),
 		valMapHandler:         stateutil.NewValMapHandler(st.Validators),
-		contractsMapHandler:   stateutil.NewContractsMapHandler(st.Contracts),
+		contractMapHandler:    stateutil.NewContractMapHandler(st.Validators),
 	}
 
 	for _, f := range phase0Fields {
@@ -223,7 +195,6 @@ func InitializeFromProtoUnsafePhase0(st *ethpb.BeaconState) (state.BeaconState, 
 	b.sharedFieldReferences[types.Eth1DataVotes] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Validators] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Balances] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.Contracts] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.RandaoMixes] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Slashings] = stateutil.NewRef(1)
@@ -262,38 +233,34 @@ func InitializeFromProtoUnsafeAltair(st *ethpb.BeaconStateAltair) (state.BeaconS
 
 	fieldCount := params.BeaconConfig().BeaconStateAltairFieldCount
 	b := &BeaconState{
-		version:                        version.Altair,
-		genesisTime:                    st.GenesisTime,
-		genesisValidatorsRoot:          bytesutil.ToBytes32(st.GenesisValidatorsRoot),
-		slot:                           st.Slot,
-		fork:                           st.Fork,
-		latestBlockHeader:              st.LatestBlockHeader,
-		blockRoots:                     &bRoots,
-		stateRoots:                     &sRoots,
-		historicalRoots:                hRoots,
-		eth1Data:                       st.Eth1Data,
-		eth1DataVotes:                  st.Eth1DataVotes,
-		eth1DepositIndex:               st.Eth1DepositIndex,
-		latestProcessedBlockActivities: st.LatestProcessedBlockActivities,
-		transactionsGasPerPeriod:       st.TransactionsGasPerPeriod,
-		transactionsPerLatestEpoch:     st.TransactionsPerLatestEpoch,
-		nonStakersGasPerEpoch:          st.NonStakersGasPerEpoch,
-		nonStakersGasPerPeriod:         st.NonStakersGasPerPeriod,
-		validators:                     st.Validators,
-		balances:                       st.Balances,
-		contracts:                      st.Contracts,
-		activities:                     st.Activities,
-		randaoMixes:                    &mixes,
-		slashings:                      st.Slashings,
-		previousEpochParticipation:     st.PreviousEpochParticipation,
-		currentEpochParticipation:      st.CurrentEpochParticipation,
-		justificationBits:              st.JustificationBits,
-		previousJustifiedCheckpoint:    st.PreviousJustifiedCheckpoint,
-		currentJustifiedCheckpoint:     st.CurrentJustifiedCheckpoint,
-		finalizedCheckpoint:            st.FinalizedCheckpoint,
-		inactivityScores:               st.InactivityScores,
-		currentSyncCommittee:           st.CurrentSyncCommittee,
-		nextSyncCommittee:              st.NextSyncCommittee,
+		version:                     version.Altair,
+		genesisTime:                 st.GenesisTime,
+		genesisValidatorsRoot:       bytesutil.ToBytes32(st.GenesisValidatorsRoot),
+		slot:                        st.Slot,
+		fork:                        st.Fork,
+		latestBlockHeader:           st.LatestBlockHeader,
+		blockRoots:                  &bRoots,
+		stateRoots:                  &sRoots,
+		historicalRoots:             hRoots,
+		eth1Data:                    st.Eth1Data,
+		eth1DataVotes:               st.Eth1DataVotes,
+		eth1DepositIndex:            st.Eth1DepositIndex,
+		sharedActivity:              st.SharedActivity,
+		executionHeight:             st.ExecutionHeight,
+		validators:                  st.Validators,
+		balances:                    st.Balances,
+		activities:                  st.Activities,
+		randaoMixes:                 &mixes,
+		slashings:                   st.Slashings,
+		previousEpochParticipation:  st.PreviousEpochParticipation,
+		currentEpochParticipation:   st.CurrentEpochParticipation,
+		justificationBits:           st.JustificationBits,
+		previousJustifiedCheckpoint: st.PreviousJustifiedCheckpoint,
+		currentJustifiedCheckpoint:  st.CurrentJustifiedCheckpoint,
+		finalizedCheckpoint:         st.FinalizedCheckpoint,
+		inactivityScores:            st.InactivityScores,
+		currentSyncCommittee:        st.CurrentSyncCommittee,
+		nextSyncCommittee:           st.NextSyncCommittee,
 
 		dirtyFields:           make(map[types.FieldIndex]bool, fieldCount),
 		dirtyIndices:          make(map[types.FieldIndex][]uint64, fieldCount),
@@ -301,7 +268,7 @@ func InitializeFromProtoUnsafeAltair(st *ethpb.BeaconStateAltair) (state.BeaconS
 		sharedFieldReferences: make(map[types.FieldIndex]*stateutil.Reference, altairSharedFieldRefCount),
 		rebuildTrie:           make(map[types.FieldIndex]bool, fieldCount),
 		valMapHandler:         stateutil.NewValMapHandler(st.Validators),
-		contractsMapHandler:   stateutil.NewContractsMapHandler(st.Contracts),
+		contractMapHandler:    stateutil.NewContractMapHandler(st.Validators),
 	}
 
 	for _, f := range altairFields {
@@ -322,7 +289,6 @@ func InitializeFromProtoUnsafeAltair(st *ethpb.BeaconStateAltair) (state.BeaconS
 	b.sharedFieldReferences[types.Eth1DataVotes] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Validators] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Balances] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.Contracts] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.RandaoMixes] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Slashings] = stateutil.NewRef(1)
@@ -362,39 +328,35 @@ func InitializeFromProtoUnsafeBellatrix(st *ethpb.BeaconStateBellatrix) (state.B
 
 	fieldCount := params.BeaconConfig().BeaconStateBellatrixFieldCount
 	b := &BeaconState{
-		version:                        version.Bellatrix,
-		genesisTime:                    st.GenesisTime,
-		genesisValidatorsRoot:          bytesutil.ToBytes32(st.GenesisValidatorsRoot),
-		slot:                           st.Slot,
-		fork:                           st.Fork,
-		latestBlockHeader:              st.LatestBlockHeader,
-		blockRoots:                     &bRoots,
-		stateRoots:                     &sRoots,
-		historicalRoots:                hRoots,
-		eth1Data:                       st.Eth1Data,
-		eth1DataVotes:                  st.Eth1DataVotes,
-		eth1DepositIndex:               st.Eth1DepositIndex,
-		latestProcessedBlockActivities: st.LatestProcessedBlockActivities,
-		transactionsGasPerPeriod:       st.TransactionsGasPerPeriod,
-		transactionsPerLatestEpoch:     st.TransactionsPerLatestEpoch,
-		nonStakersGasPerEpoch:          st.NonStakersGasPerEpoch,
-		nonStakersGasPerPeriod:         st.NonStakersGasPerPeriod,
-		validators:                     st.Validators,
-		balances:                       st.Balances,
-		contracts:                      st.Contracts,
-		activities:                     st.Activities,
-		randaoMixes:                    &mixes,
-		slashings:                      st.Slashings,
-		previousEpochParticipation:     st.PreviousEpochParticipation,
-		currentEpochParticipation:      st.CurrentEpochParticipation,
-		justificationBits:              st.JustificationBits,
-		previousJustifiedCheckpoint:    st.PreviousJustifiedCheckpoint,
-		currentJustifiedCheckpoint:     st.CurrentJustifiedCheckpoint,
-		finalizedCheckpoint:            st.FinalizedCheckpoint,
-		inactivityScores:               st.InactivityScores,
-		currentSyncCommittee:           st.CurrentSyncCommittee,
-		nextSyncCommittee:              st.NextSyncCommittee,
-		latestExecutionPayloadHeader:   st.LatestExecutionPayloadHeader,
+		version:                      version.Bellatrix,
+		genesisTime:                  st.GenesisTime,
+		genesisValidatorsRoot:        bytesutil.ToBytes32(st.GenesisValidatorsRoot),
+		slot:                         st.Slot,
+		fork:                         st.Fork,
+		latestBlockHeader:            st.LatestBlockHeader,
+		blockRoots:                   &bRoots,
+		stateRoots:                   &sRoots,
+		historicalRoots:              hRoots,
+		eth1Data:                     st.Eth1Data,
+		eth1DataVotes:                st.Eth1DataVotes,
+		eth1DepositIndex:             st.Eth1DepositIndex,
+		sharedActivity:               st.SharedActivity,
+		executionHeight:              st.ExecutionHeight,
+		validators:                   st.Validators,
+		balances:                     st.Balances,
+		activities:                   st.Activities,
+		randaoMixes:                  &mixes,
+		slashings:                    st.Slashings,
+		previousEpochParticipation:   st.PreviousEpochParticipation,
+		currentEpochParticipation:    st.CurrentEpochParticipation,
+		justificationBits:            st.JustificationBits,
+		previousJustifiedCheckpoint:  st.PreviousJustifiedCheckpoint,
+		currentJustifiedCheckpoint:   st.CurrentJustifiedCheckpoint,
+		finalizedCheckpoint:          st.FinalizedCheckpoint,
+		inactivityScores:             st.InactivityScores,
+		currentSyncCommittee:         st.CurrentSyncCommittee,
+		nextSyncCommittee:            st.NextSyncCommittee,
+		latestExecutionPayloadHeader: st.LatestExecutionPayloadHeader,
 
 		dirtyFields:           make(map[types.FieldIndex]bool, fieldCount),
 		dirtyIndices:          make(map[types.FieldIndex][]uint64, fieldCount),
@@ -402,7 +364,7 @@ func InitializeFromProtoUnsafeBellatrix(st *ethpb.BeaconStateBellatrix) (state.B
 		sharedFieldReferences: make(map[types.FieldIndex]*stateutil.Reference, bellatrixSharedFieldRefCount),
 		rebuildTrie:           make(map[types.FieldIndex]bool, fieldCount),
 		valMapHandler:         stateutil.NewValMapHandler(st.Validators),
-		contractsMapHandler:   stateutil.NewContractsMapHandler(st.Contracts),
+		contractMapHandler:    stateutil.NewContractMapHandler(st.Validators),
 	}
 
 	for _, f := range bellatrixFields {
@@ -423,111 +385,6 @@ func InitializeFromProtoUnsafeBellatrix(st *ethpb.BeaconStateBellatrix) (state.B
 	b.sharedFieldReferences[types.Eth1DataVotes] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Validators] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Balances] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.Contracts] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.RandaoMixes] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.Slashings] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.PreviousEpochParticipationBits] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.CurrentEpochParticipationBits] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.InactivityScores] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.LatestExecutionPayloadHeader] = stateutil.NewRef(1) // New in Bellatrix.
-
-	state.StateCount.Inc()
-	// Finalizer runs when dst is being destroyed in garbage collection.
-	runtime.SetFinalizer(b, finalizerCleanup)
-	return b, nil
-}
-
-// InitializeFromProtoUnsafeFastexPhase1 directly uses the beacon state protobuf fields
-// and sets them as fields of the BeaconState type.
-func InitializeFromProtoUnsafeFastexPhase1(st *ethpb.BeaconStateFastexPhase1) (state.BeaconState, error) {
-	if st == nil {
-		return nil, errors.New("received nil state")
-	}
-
-	var bRoots customtypes.BlockRoots
-	for i, r := range st.BlockRoots {
-		bRoots[i] = bytesutil.ToBytes32(r)
-	}
-	var sRoots customtypes.StateRoots
-	for i, r := range st.StateRoots {
-		sRoots[i] = bytesutil.ToBytes32(r)
-	}
-	hRoots := customtypes.HistoricalRoots(make([][32]byte, len(st.HistoricalRoots)))
-	for i, r := range st.HistoricalRoots {
-		hRoots[i] = bytesutil.ToBytes32(r)
-	}
-	var mixes customtypes.RandaoMixes
-	for i, m := range st.RandaoMixes {
-		mixes[i] = bytesutil.ToBytes32(m)
-	}
-
-	fieldCount := params.BeaconConfig().BeaconStateFastexPhase1FieldCount
-	b := &BeaconState{
-		version:                        version.FastexPhase1,
-		genesisTime:                    st.GenesisTime,
-		genesisValidatorsRoot:          bytesutil.ToBytes32(st.GenesisValidatorsRoot),
-		slot:                           st.Slot,
-		fork:                           st.Fork,
-		latestBlockHeader:              st.LatestBlockHeader,
-		blockRoots:                     &bRoots,
-		stateRoots:                     &sRoots,
-		historicalRoots:                hRoots,
-		eth1Data:                       st.Eth1Data,
-		eth1DataVotes:                  st.Eth1DataVotes,
-		eth1DepositIndex:               st.Eth1DepositIndex,
-		latestProcessedBlockActivities: st.LatestProcessedBlockActivities,
-		transactionsGasPerPeriod:       st.TransactionsGasPerPeriod,
-		transactionsPerLatestEpoch:     st.TransactionsPerLatestEpoch,
-		nonStakersGasPerEpoch:          st.NonStakersGasPerEpoch,
-		nonStakersGasPerPeriod:         st.NonStakersGasPerPeriod,
-		validators:                     st.Validators,
-		balances:                       st.Balances,
-		contracts:                      st.Contracts,
-		activities:                     st.Activities,
-		randaoMixes:                    &mixes,
-		slashings:                      st.Slashings,
-		previousEpochParticipation:     st.PreviousEpochParticipation,
-		currentEpochParticipation:      st.CurrentEpochParticipation,
-		justificationBits:              st.JustificationBits,
-		previousJustifiedCheckpoint:    st.PreviousJustifiedCheckpoint,
-		currentJustifiedCheckpoint:     st.CurrentJustifiedCheckpoint,
-		finalizedCheckpoint:            st.FinalizedCheckpoint,
-		inactivityScores:               st.InactivityScores,
-		currentSyncCommittee:           st.CurrentSyncCommittee,
-		nextSyncCommittee:              st.NextSyncCommittee,
-		latestExecutionPayloadHeader:   st.LatestExecutionPayloadHeader,
-		baseFeePerEpoch:                st.BaseFeePerEpoch,
-		baseFeePerPeriod:               st.BaseFeePerPeriod,
-
-		dirtyFields:           make(map[types.FieldIndex]bool, fieldCount),
-		dirtyIndices:          make(map[types.FieldIndex][]uint64, fieldCount),
-		stateFieldLeaves:      make(map[types.FieldIndex]*fieldtrie.FieldTrie, fieldCount),
-		sharedFieldReferences: make(map[types.FieldIndex]*stateutil.Reference, fastexPhase1SharedFieldRefCount),
-		rebuildTrie:           make(map[types.FieldIndex]bool, fieldCount),
-		valMapHandler:         stateutil.NewValMapHandler(st.Validators),
-		contractsMapHandler:   stateutil.NewContractsMapHandler(st.Contracts),
-	}
-
-	for _, f := range bellatrixFields {
-		b.dirtyFields[f] = true
-		b.rebuildTrie[f] = true
-		b.dirtyIndices[f] = []uint64{}
-		trie, err := fieldtrie.NewFieldTrie(f, types.BasicArray, nil, 0)
-		if err != nil {
-			return nil, err
-		}
-		b.stateFieldLeaves[f] = trie
-	}
-
-	// Initialize field reference tracking for shared data.
-	b.sharedFieldReferences[types.BlockRoots] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.StateRoots] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.HistoricalRoots] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.Eth1DataVotes] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.Validators] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.Balances] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.Contracts] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.RandaoMixes] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Slashings] = stateutil.NewRef(1)
@@ -580,14 +437,10 @@ func InitializeFromProtoUnsafeCapella(st *ethpb.BeaconStateCapella) (state.Beaco
 		eth1Data:                            st.Eth1Data,
 		eth1DataVotes:                       st.Eth1DataVotes,
 		eth1DepositIndex:                    st.Eth1DepositIndex,
-		latestProcessedBlockActivities:      st.LatestProcessedBlockActivities,
-		transactionsGasPerPeriod:            st.TransactionsGasPerPeriod,
-		transactionsPerLatestEpoch:          st.TransactionsPerLatestEpoch,
-		nonStakersGasPerEpoch:               st.NonStakersGasPerEpoch,
-		nonStakersGasPerPeriod:              st.NonStakersGasPerPeriod,
+		sharedActivity:                      st.SharedActivity,
+		executionHeight:                     st.ExecutionHeight,
 		validators:                          st.Validators,
 		balances:                            st.Balances,
-		contracts:                           st.Contracts,
 		activities:                          st.Activities,
 		randaoMixes:                         &mixes,
 		slashings:                           st.Slashings,
@@ -601,8 +454,6 @@ func InitializeFromProtoUnsafeCapella(st *ethpb.BeaconStateCapella) (state.Beaco
 		currentSyncCommittee:                st.CurrentSyncCommittee,
 		nextSyncCommittee:                   st.NextSyncCommittee,
 		latestExecutionPayloadHeaderCapella: st.LatestExecutionPayloadHeader,
-		baseFeePerEpoch:                     st.BaseFeePerEpoch,
-		baseFeePerPeriod:                    st.BaseFeePerPeriod,
 		nextWithdrawalIndex:                 st.NextWithdrawalIndex,
 		nextWithdrawalValidatorIndex:        st.NextWithdrawalValidatorIndex,
 		historicalSummaries:                 st.HistoricalSummaries,
@@ -613,7 +464,7 @@ func InitializeFromProtoUnsafeCapella(st *ethpb.BeaconStateCapella) (state.Beaco
 		sharedFieldReferences: make(map[types.FieldIndex]*stateutil.Reference, capellaSharedFieldRefCount),
 		rebuildTrie:           make(map[types.FieldIndex]bool, fieldCount),
 		valMapHandler:         stateutil.NewValMapHandler(st.Validators),
-		contractsMapHandler:   stateutil.NewContractsMapHandler(st.Contracts),
+		contractMapHandler:    stateutil.NewContractMapHandler(st.Validators),
 	}
 
 	for _, f := range capellaFields {
@@ -634,7 +485,6 @@ func InitializeFromProtoUnsafeCapella(st *ethpb.BeaconStateCapella) (state.Beaco
 	b.sharedFieldReferences[types.Eth1DataVotes] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Validators] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Balances] = stateutil.NewRef(1)
-	b.sharedFieldReferences[types.Contracts] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Activities] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.RandaoMixes] = stateutil.NewRef(1)
 	b.sharedFieldReferences[types.Slashings] = stateutil.NewRef(1)
@@ -663,8 +513,6 @@ func (b *BeaconState) Copy() state.BeaconState {
 		fieldCount = params.BeaconConfig().BeaconStateAltairFieldCount
 	case version.Bellatrix:
 		fieldCount = params.BeaconConfig().BeaconStateBellatrixFieldCount
-	case version.FastexPhase1:
-		fieldCount = params.BeaconConfig().BeaconStateFastexPhase1FieldCount
 	case version.Capella:
 		fieldCount = params.BeaconConfig().BeaconStateCapellaFieldCount
 	}
@@ -672,17 +520,13 @@ func (b *BeaconState) Copy() state.BeaconState {
 	dst := &BeaconState{
 		version: b.version,
 
-		// Primitive nativetypes, safe to copy.
-		genesisTime:                    b.genesisTime,
-		slot:                           b.slot,
-		eth1DepositIndex:               b.eth1DepositIndex,
-		latestProcessedBlockActivities: b.latestProcessedBlockActivities,
-		transactionsGasPerPeriod:       b.transactionsGasPerPeriod,
-		transactionsPerLatestEpoch:     b.transactionsPerLatestEpoch,
-		nonStakersGasPerEpoch:          b.nonStakersGasPerEpoch,
-		nonStakersGasPerPeriod:         b.nonStakersGasPerPeriod,
-		nextWithdrawalIndex:            b.nextWithdrawalIndex,
-		nextWithdrawalValidatorIndex:   b.nextWithdrawalValidatorIndex,
+		// Primitive types, safe to copy.
+		genesisTime:                  b.genesisTime,
+		slot:                         b.slot,
+		eth1DepositIndex:             b.eth1DepositIndex,
+		executionHeight:              b.executionHeight,
+		nextWithdrawalIndex:          b.nextWithdrawalIndex,
+		nextWithdrawalValidatorIndex: b.nextWithdrawalValidatorIndex,
 
 		// Large arrays, infrequently changed, constant size.
 		blockRoots:                b.blockRoots,
@@ -695,11 +539,10 @@ func (b *BeaconState) Copy() state.BeaconState {
 
 		// Large arrays, increases over time.
 		balances:                   b.balances,
+		activities:                 b.activities,
 		historicalRoots:            b.historicalRoots,
 		historicalSummaries:        b.historicalSummaries,
 		validators:                 b.validators,
-		contracts:                  b.contracts,
-		activities:                 b.activities,
 		previousEpochParticipation: b.previousEpochParticipation,
 		currentEpochParticipation:  b.currentEpochParticipation,
 		inactivityScores:           b.inactivityScores,
@@ -710,6 +553,7 @@ func (b *BeaconState) Copy() state.BeaconState {
 		fork:                                b.forkVal(),
 		latestBlockHeader:                   b.latestBlockHeaderVal(),
 		eth1Data:                            b.eth1DataVal(),
+		sharedActivity:                      b.sharedActivityVal(),
 		previousJustifiedCheckpoint:         b.previousJustifiedCheckpointVal(),
 		currentJustifiedCheckpoint:          b.currentJustifiedCheckpointVal(),
 		finalizedCheckpoint:                 b.finalizedCheckpointVal(),
@@ -718,17 +562,14 @@ func (b *BeaconState) Copy() state.BeaconState {
 		latestExecutionPayloadHeader:        b.latestExecutionPayloadHeaderVal(),
 		latestExecutionPayloadHeaderCapella: b.latestExecutionPayloadHeaderCapellaVal(),
 
-		baseFeePerEpoch:  b.baseFeePerEpoch,
-		baseFeePerPeriod: b.baseFeePerPeriod,
-
 		dirtyFields:      make(map[types.FieldIndex]bool, fieldCount),
 		dirtyIndices:     make(map[types.FieldIndex][]uint64, fieldCount),
 		rebuildTrie:      make(map[types.FieldIndex]bool, fieldCount),
 		stateFieldLeaves: make(map[types.FieldIndex]*fieldtrie.FieldTrie, fieldCount),
 
 		// Share the reference to validator index map.
-		valMapHandler:       b.valMapHandler,
-		contractsMapHandler: b.contractsMapHandler,
+		valMapHandler:      b.valMapHandler,
+		contractMapHandler: b.contractMapHandler,
 	}
 
 	switch b.version {
@@ -738,8 +579,6 @@ func (b *BeaconState) Copy() state.BeaconState {
 		dst.sharedFieldReferences = make(map[types.FieldIndex]*stateutil.Reference, altairSharedFieldRefCount)
 	case version.Bellatrix:
 		dst.sharedFieldReferences = make(map[types.FieldIndex]*stateutil.Reference, bellatrixSharedFieldRefCount)
-	case version.FastexPhase1:
-		dst.sharedFieldReferences = make(map[types.FieldIndex]*stateutil.Reference, fastexPhase1SharedFieldRefCount)
 	case version.Capella:
 		dst.sharedFieldReferences = make(map[types.FieldIndex]*stateutil.Reference, capellaSharedFieldRefCount)
 	}
@@ -751,7 +590,7 @@ func (b *BeaconState) Copy() state.BeaconState {
 
 	// Increment ref for validator map
 	b.valMapHandler.AddRef()
-	b.contractsMapHandler.AddRef()
+	b.contractMapHandler.AddRef()
 
 	for i := range b.dirtyFields {
 		dst.dirtyFields[i] = true
@@ -830,8 +669,6 @@ func (b *BeaconState) initializeMerkleLayers(ctx context.Context) error {
 		b.dirtyFields = make(map[types.FieldIndex]bool, params.BeaconConfig().BeaconStateAltairFieldCount)
 	case version.Bellatrix:
 		b.dirtyFields = make(map[types.FieldIndex]bool, params.BeaconConfig().BeaconStateBellatrixFieldCount)
-	case version.FastexPhase1:
-		b.dirtyFields = make(map[types.FieldIndex]bool, params.BeaconConfig().BeaconStateFastexPhase1FieldCount)
 	case version.Capella:
 		b.dirtyFields = make(map[types.FieldIndex]bool, params.BeaconConfig().BeaconStateCapellaFieldCount)
 	}
@@ -887,7 +724,6 @@ func (b *BeaconState) rootSelector(ctx context.Context, field types.FieldIndex) 
 	defer span.End()
 	span.AddAttributes(trace.StringAttribute("field", field.String(b.version)))
 
-	hasher := hash.CustomSHA256Hasher()
 	switch field {
 	case types.GenesisTime:
 		return ssz.Uint64Root(b.genesisTime), nil
@@ -897,6 +733,8 @@ func (b *BeaconState) rootSelector(ctx context.Context, field types.FieldIndex) 
 		return ssz.Uint64Root(uint64(b.slot)), nil
 	case types.Eth1DepositIndex:
 		return ssz.Uint64Root(b.eth1DepositIndex), nil
+	case types.ExecutionHeight:
+		return ssz.Uint64Root(b.executionHeight), nil
 	case types.Fork:
 		return ssz.ForkRoot(b.fork)
 	case types.LatestBlockHeader:
@@ -928,7 +766,7 @@ func (b *BeaconState) rootSelector(ctx context.Context, field types.FieldIndex) 
 		}
 		return ssz.ByteArrayRootWithLimit(hRoots, fieldparams.HistoricalRootsLength)
 	case types.Eth1Data:
-		return stateutil.Eth1Root(hasher, b.eth1Data)
+		return stateutil.Eth1Root(b.eth1Data)
 	case types.Eth1DataVotes:
 		if b.rebuildTrie[field] {
 			err := b.resetFieldTrie(
@@ -943,6 +781,8 @@ func (b *BeaconState) rootSelector(ctx context.Context, field types.FieldIndex) 
 			return b.stateFieldLeaves[field].TrieRoot()
 		}
 		return b.recomputeFieldTrie(field, b.eth1DataVotes)
+	case types.SharedActivity:
+		return stateutil.SharedActivityRoot(b.sharedActivity)
 	case types.Validators:
 		if b.rebuildTrie[field] {
 			err := b.resetFieldTrie(field, b.validators, fieldparams.ValidatorRegistryLimit)
@@ -952,7 +792,7 @@ func (b *BeaconState) rootSelector(ctx context.Context, field types.FieldIndex) 
 			delete(b.rebuildTrie, field)
 			return b.stateFieldLeaves[field].TrieRoot()
 		}
-		return b.recomputeFieldTrie(16, b.validators)
+		return b.recomputeFieldTrie(field, b.validators)
 	case types.Balances:
 		if b.rebuildTrie[field] {
 			err := b.resetFieldTrie(field, b.balances, stateutil.ValidatorLimitForBalancesChunks())
@@ -962,17 +802,7 @@ func (b *BeaconState) rootSelector(ctx context.Context, field types.FieldIndex) 
 			delete(b.rebuildTrie, field)
 			return b.stateFieldLeaves[field].TrieRoot()
 		}
-		return b.recomputeFieldTrie(17, b.balances)
-	case types.Contracts:
-		if b.rebuildTrie[field] {
-			err := b.resetFieldTrie(field, b.contracts, fieldparams.ValidatorRegistryLimit)
-			if err != nil {
-				return [32]byte{}, err
-			}
-			delete(b.rebuildTrie, field)
-			return b.stateFieldLeaves[field].TrieRoot()
-		}
-		return b.recomputeFieldTrie(18, b.contracts)
+		return b.recomputeFieldTrie(field, b.balances)
 	case types.Activities:
 		if b.rebuildTrie[field] {
 			err := b.resetFieldTrie(field, b.activities, stateutil.ValidatorLimitForBalancesChunks())
@@ -982,7 +812,7 @@ func (b *BeaconState) rootSelector(ctx context.Context, field types.FieldIndex) 
 			delete(b.rebuildTrie, field)
 			return b.stateFieldLeaves[field].TrieRoot()
 		}
-		return b.recomputeFieldTrie(19, b.activities)
+		return b.recomputeFieldTrie(field, b.balances)
 	case types.RandaoMixes:
 		if b.rebuildTrie[field] {
 			err := b.resetFieldTrie(field, b.randaoMixes, fieldparams.RandaoMixesLength)
@@ -992,7 +822,7 @@ func (b *BeaconState) rootSelector(ctx context.Context, field types.FieldIndex) 
 			delete(b.rebuildTrie, field)
 			return b.stateFieldLeaves[field].TrieRoot()
 		}
-		return b.recomputeFieldTrie(20, b.randaoMixes)
+		return b.recomputeFieldTrie(field, b.randaoMixes)
 	case types.Slashings:
 		return ssz.SlashingsRoot(b.slashings)
 	case types.PreviousEpochAttestations:
@@ -1030,11 +860,11 @@ func (b *BeaconState) rootSelector(ctx context.Context, field types.FieldIndex) 
 	case types.JustificationBits:
 		return bytesutil.ToBytes32(b.justificationBits), nil
 	case types.PreviousJustifiedCheckpoint:
-		return ssz.CheckpointRoot(hasher, b.previousJustifiedCheckpoint)
+		return ssz.CheckpointRoot(b.previousJustifiedCheckpoint)
 	case types.CurrentJustifiedCheckpoint:
-		return ssz.CheckpointRoot(hasher, b.currentJustifiedCheckpoint)
+		return ssz.CheckpointRoot(b.currentJustifiedCheckpoint)
 	case types.FinalizedCheckpoint:
-		return ssz.CheckpointRoot(hasher, b.finalizedCheckpoint)
+		return ssz.CheckpointRoot(b.finalizedCheckpoint)
 	case types.InactivityScores:
 		return stateutil.Uint64ListRootWithRegistryLimit(b.inactivityScores)
 	case types.CurrentSyncCommittee:
@@ -1043,22 +873,8 @@ func (b *BeaconState) rootSelector(ctx context.Context, field types.FieldIndex) 
 		return stateutil.SyncCommitteeRoot(b.nextSyncCommittee)
 	case types.LatestExecutionPayloadHeader:
 		return b.latestExecutionPayloadHeader.HashTreeRoot()
-	case types.LatestProcessedBlockActivities:
-		return ssz.Uint64Root(b.latestProcessedBlockActivities), nil
-	case types.TransactionsGasPerPeriod:
-		return ssz.Uint64Root(b.transactionsGasPerPeriod), nil
-	case types.TransactionsPerLatestEpoch:
-		return ssz.Uint64Root(b.transactionsPerLatestEpoch), nil
-	case types.NonStakersGasPerEpoch:
-		return ssz.Uint64Root(b.nonStakersGasPerEpoch), nil
-	case types.NonStakersGasPerPeriod:
-		return ssz.Uint64Root(b.nonStakersGasPerPeriod), nil
 	case types.LatestExecutionPayloadHeaderCapella:
 		return b.latestExecutionPayloadHeaderCapella.HashTreeRoot()
-	case types.BaseFeePerEpoch:
-		return ssz.Uint64Root(b.baseFeePerEpoch), nil
-	case types.BaseFeePerPeriod:
-		return ssz.Uint64Root(b.baseFeePerPeriod), nil
 	case types.NextWithdrawalIndex:
 		return ssz.Uint64Root(b.nextWithdrawalIndex), nil
 	case types.NextWithdrawalValidatorIndex:

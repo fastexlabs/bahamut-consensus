@@ -1,12 +1,12 @@
 package execution
 
 import (
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	state_native "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	state_native "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 // UpgradeToBellatrix updates inputs a generic state to return the version Bellatrix state.
@@ -48,22 +48,17 @@ func UpgradeToBellatrix(state state.BeaconState) (state.BeaconState, error) {
 			CurrentVersion:  params.BeaconConfig().BellatrixForkVersion,
 			Epoch:           epoch,
 		},
-		LatestBlockHeader:              state.LatestBlockHeader(),
-		BlockRoots:                     state.BlockRoots(),
-		StateRoots:                     state.StateRoots(),
-		HistoricalRoots:                hrs,
-		Eth1Data:                       state.Eth1Data(),
-		Eth1DataVotes:                  state.Eth1DataVotes(),
-		Eth1DepositIndex:               state.Eth1DepositIndex(),
-		LatestProcessedBlockActivities: state.LatestProcessedBlockActivities(),
-		TransactionsGasPerPeriod:       state.TransactionsGasPerPeriod(),
-		TransactionsPerLatestEpoch:     state.TransactionsPerLatestEpoch(),
-		// TODO(fastex): Uncomment this lines before mainnet start.
-		// NonStakersGasPerPeriod:         state.NonStakersGasPerPeriod(),
-		// NonStakersGasPerEpoch:          state.NonStakersGasPerEpoch(),
+		LatestBlockHeader:           state.LatestBlockHeader(),
+		BlockRoots:                  state.BlockRoots(),
+		StateRoots:                  state.StateRoots(),
+		HistoricalRoots:             hrs,
+		Eth1Data:                    state.Eth1Data(),
+		Eth1DataVotes:               state.Eth1DataVotes(),
+		Eth1DepositIndex:            state.Eth1DepositIndex(),
+		SharedActivity:              state.SharedActivity(),
+		ExecutionHeight:             state.ExecutionHeight(),
 		Validators:                  state.Validators(),
 		Balances:                    state.Balances(),
-		Contracts:                   state.Contracts(),
 		Activities:                  state.Activities(),
 		RandaoMixes:                 state.RandaoMixes(),
 		Slashings:                   state.Slashings(),

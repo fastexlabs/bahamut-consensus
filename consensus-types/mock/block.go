@@ -2,11 +2,11 @@ package mock
 
 import (
 	ssz "github.com/prysmaticlabs/fastssz"
-	field_params "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	eth "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	validatorpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1/validator-client"
+	field_params "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	eth "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	validatorpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1/validator-client"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -55,14 +55,6 @@ func (SignedBeaconBlock) PbBellatrixBlock() (*eth.SignedBeaconBlockBellatrix, er
 }
 
 func (SignedBeaconBlock) PbBlindedBellatrixBlock() (*eth.SignedBlindedBeaconBlockBellatrix, error) {
-	panic("implement me")
-}
-
-func (SignedBeaconBlock) PbFastexPhase1Block() (*eth.SignedBeaconBlockFastexPhase1, error) {
-	panic("implement me")
-}
-
-func (SignedBeaconBlock) PbBlindedFastexPhase1Block() (*eth.SignedBlindedBeaconBlockFastexPhase1, error) {
 	panic("implement me")
 }
 
@@ -235,6 +227,14 @@ func (BeaconBlockBody) VoluntaryExits() []*eth.SignedVoluntaryExit {
 	panic("implement me")
 }
 
+func (BeaconBlockBody) ActivityChanges() []*eth.ActivityChange {
+	panic("implement me")
+}
+
+func (BeaconBlockBody) TransactionsCount() uint64 {
+	panic("implement me")
+}
+
 func (BeaconBlockBody) SyncAggregate() (*eth.SyncAggregate, error) {
 	panic("implement me")
 }
@@ -307,8 +307,6 @@ func (b *BeaconBlockBody) SetBLSToExecutionChanges([]*eth.SignedBLSToExecutionCh
 	panic("implement me")
 }
 
-var (
-	_ interfaces.ReadOnlySignedBeaconBlock = &SignedBeaconBlock{}
-	_ interfaces.ReadOnlyBeaconBlock       = &BeaconBlock{}
-	_ interfaces.ReadOnlyBeaconBlockBody   = &BeaconBlockBody{}
-)
+var _ interfaces.ReadOnlySignedBeaconBlock = &SignedBeaconBlock{}
+var _ interfaces.ReadOnlyBeaconBlock = &BeaconBlock{}
+var _ interfaces.ReadOnlyBeaconBlockBody = &BeaconBlockBody{}

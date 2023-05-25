@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -38,8 +38,6 @@ func TestRemovePendingDeposit_OK(t *testing.T) {
 		WithdrawalCredentials: make([]byte, 32),
 		Amount:                0,
 		Signature:             make([]byte, 96),
-		DeployedContract:      make([]byte, 20),
-		DeploymentNonce:       0,
 	}
 	depToRemove := &ethpb.Deposit{Proof: proof1, Data: data}
 	otherDep := &ethpb.Deposit{Proof: proof2, Data: data}
@@ -70,8 +68,6 @@ func TestPendingDeposit_RoundTrip(t *testing.T) {
 		WithdrawalCredentials: make([]byte, 32),
 		Amount:                0,
 		Signature:             make([]byte, 96),
-		DeployedContract:      make([]byte, 20),
-		DeploymentNonce:       0,
 	}
 	dep := &ethpb.Deposit{Proof: proof, Data: data}
 	dc.InsertPendingDeposit(context.Background(), dep, 111, 100, [32]byte{})

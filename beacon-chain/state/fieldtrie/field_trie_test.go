@@ -3,15 +3,15 @@ package fieldtrie_test
 import (
 	"testing"
 
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/fieldtrie"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
-	"github.com/prysmaticlabs/prysm/v3/testing/util"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/fieldtrie"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/testing/util"
 )
 
 func TestFieldTrie_NewTrie(t *testing.T) {
@@ -37,7 +37,7 @@ func TestFieldTrie_NewTrie_NilElements(t *testing.T) {
 func TestFieldTrie_RecomputeTrie(t *testing.T) {
 	newState, _ := util.DeterministicGenesisState(t, 32)
 	// 10 represents the enum value of validators
-	trie, err := fieldtrie.NewFieldTrie(types.FieldIndex(11), types.CompositeArray, newState.Validators(), params.BeaconConfig().ValidatorRegistryLimit)
+	trie, err := fieldtrie.NewFieldTrie(types.FieldIndex(16), types.CompositeArray, newState.Validators(), params.BeaconConfig().ValidatorRegistryLimit)
 	require.NoError(t, err)
 
 	oldroot, err := trie.TrieRoot()
@@ -68,7 +68,7 @@ func TestFieldTrie_RecomputeTrie(t *testing.T) {
 
 func TestFieldTrie_RecomputeTrie_CompressedArray(t *testing.T) {
 	newState, _ := util.DeterministicGenesisState(t, 32)
-	trie, err := fieldtrie.NewFieldTrie(types.FieldIndex(12), types.CompressedArray, newState.Balances(), stateutil.ValidatorLimitForBalancesChunks())
+	trie, err := fieldtrie.NewFieldTrie(types.FieldIndex(17), types.CompressedArray, newState.Balances(), stateutil.ValidatorLimitForBalancesChunks())
 	require.NoError(t, err)
 	require.Equal(t, trie.Length(), stateutil.ValidatorLimitForBalancesChunks())
 	changedIdx := []uint64{4, 8}
@@ -85,14 +85,14 @@ func TestFieldTrie_RecomputeTrie_CompressedArray(t *testing.T) {
 
 func TestNewFieldTrie_UnknownType(t *testing.T) {
 	newState, _ := util.DeterministicGenesisState(t, 32)
-	_, err := fieldtrie.NewFieldTrie(types.FieldIndex(12), 4, newState.Balances(), 32)
+	_, err := fieldtrie.NewFieldTrie(types.FieldIndex(17), 4, newState.Balances(), 32)
 	require.ErrorContains(t, "unrecognized data type", err)
 }
 
 func TestFieldTrie_CopyTrieImmutable(t *testing.T) {
 	newState, _ := util.DeterministicGenesisState(t, 32)
 	// 12 represents the enum value of randao mixes.
-	trie, err := fieldtrie.NewFieldTrie(types.FieldIndex(15), types.BasicArray, newState.RandaoMixes(), uint64(params.BeaconConfig().EpochsPerHistoricalVector))
+	trie, err := fieldtrie.NewFieldTrie(types.FieldIndex(19), types.BasicArray, newState.RandaoMixes(), uint64(params.BeaconConfig().EpochsPerHistoricalVector))
 	require.NoError(t, err)
 
 	newTrie := trie.CopyTrie()
@@ -113,7 +113,7 @@ func TestFieldTrie_CopyTrieImmutable(t *testing.T) {
 }
 
 func TestFieldTrie_CopyAndTransferEmpty(t *testing.T) {
-	trie, err := fieldtrie.NewFieldTrie(types.FieldIndex(15), types.BasicArray, nil, uint64(params.BeaconConfig().EpochsPerHistoricalVector))
+	trie, err := fieldtrie.NewFieldTrie(types.FieldIndex(16), types.BasicArray, nil, uint64(params.BeaconConfig().EpochsPerHistoricalVector))
 	require.NoError(t, err)
 
 	require.DeepEqual(t, trie, trie.CopyTrie())
@@ -123,7 +123,7 @@ func TestFieldTrie_CopyAndTransferEmpty(t *testing.T) {
 func TestFieldTrie_TransferTrie(t *testing.T) {
 	newState, _ := util.DeterministicGenesisState(t, 32)
 	maxLength := (params.BeaconConfig().ValidatorRegistryLimit*8 + 31) / 32
-	trie, err := fieldtrie.NewFieldTrie(types.FieldIndex(12), types.CompressedArray, newState.Balances(), maxLength)
+	trie, err := fieldtrie.NewFieldTrie(types.FieldIndex(17), types.CompressedArray, newState.Balances(), maxLength)
 	require.NoError(t, err)
 	oldRoot, err := trie.TrieRoot()
 	require.NoError(t, err)

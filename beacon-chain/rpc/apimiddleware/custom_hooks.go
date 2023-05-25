@@ -10,11 +10,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/api/gateway/apimiddleware"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	ethpbv2 "github.com/prysmaticlabs/prysm/v3/proto/eth/v2"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/api/gateway/apimiddleware"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	ethpbv2 "github.com/prysmaticlabs/prysm/v4/proto/eth/v2"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
 
 // https://ethereum.github.io/beacon-APIs/?urls.primaryName=dev#/Beacon/submitPoolBLSToExecutionChange
@@ -496,13 +496,6 @@ type bellatrixBlockResponseJson struct {
 	Finalized           bool                                     `json:"finalized"`
 }
 
-type fastexPhase1BlockResponseJson struct {
-	Version             string                                      `json:"version" enum:"true"`
-	Data                *SignedBeaconBlockFastexPhase1ContainerJson `json:"data"`
-	ExecutionOptimistic bool                                        `json:"execution_optimistic"`
-	Finalized           bool                                        `json:"finalized"`
-}
-
 type capellaBlockResponseJson struct {
 	Version             string                                 `json:"version"`
 	Data                *SignedBeaconBlockCapellaContainerJson `json:"data"`
@@ -515,13 +508,6 @@ type bellatrixBlindedBlockResponseJson struct {
 	Data                *SignedBlindedBeaconBlockBellatrixContainerJson `json:"data"`
 	ExecutionOptimistic bool                                            `json:"execution_optimistic"`
 	Finalized           bool                                            `json:"finalized"`
-}
-
-type fastexPhase1BlindedBlockResponseJson struct {
-	Version             string                                             `json:"version" enum:"true"`
-	Data                *SignedBlindedBeaconBlockFastexPhase1ContainerJson `json:"data"`
-	ExecutionOptimistic bool                                               `json:"execution_optimistic"`
-	Finalized           bool                                               `json:"finalized"`
 }
 
 type capellaBlindedBlockResponseJson struct {
@@ -564,16 +550,6 @@ func serializeV2Block(response interface{}) (apimiddleware.RunDefault, []byte, a
 			Version: respContainer.Version,
 			Data: &SignedBeaconBlockBellatrixContainerJson{
 				Message:   respContainer.Data.BellatrixBlock,
-				Signature: respContainer.Data.Signature,
-			},
-			ExecutionOptimistic: respContainer.ExecutionOptimistic,
-			Finalized:           respContainer.Finalized,
-		}
-	case strings.EqualFold(respContainer.Version, strings.ToLower(ethpbv2.Version_FASTEX_PHASE1.String())):
-		actualRespContainer = &fastexPhase1BlockResponseJson{
-			Version: respContainer.Version,
-			Data: &SignedBeaconBlockFastexPhase1ContainerJson{
-				Message:   respContainer.Data.FastexPhase1Block,
 				Signature: respContainer.Data.Signature,
 			},
 			ExecutionOptimistic: respContainer.ExecutionOptimistic,
@@ -633,16 +609,6 @@ func serializeBlindedBlock(response interface{}) (apimiddleware.RunDefault, []by
 			Version: respContainer.Version,
 			Data: &SignedBlindedBeaconBlockBellatrixContainerJson{
 				Message:   respContainer.Data.BellatrixBlock,
-				Signature: respContainer.Data.Signature,
-			},
-			ExecutionOptimistic: respContainer.ExecutionOptimistic,
-			Finalized:           respContainer.Finalized,
-		}
-	case strings.EqualFold(respContainer.Version, strings.ToLower(ethpbv2.Version_FASTEX_PHASE1.String())):
-		actualRespContainer = &fastexPhase1BlindedBlockResponseJson{
-			Version: respContainer.Version,
-			Data: &SignedBlindedBeaconBlockFastexPhase1ContainerJson{
-				Message:   respContainer.Data.FastexPhase1Block,
 				Signature: respContainer.Data.Signature,
 			},
 			ExecutionOptimistic: respContainer.ExecutionOptimistic,
@@ -743,11 +709,6 @@ type bellatrixProduceBlockResponseJson struct {
 	Data    *BeaconBlockBellatrixJson `json:"data"`
 }
 
-type fastexPhase1ProduceBlockResponseJson struct {
-	Version string                       `json:"version" enum:"true"`
-	Data    *BeaconBlockFastexPhase1Json `json:"data"`
-}
-
 type capellaProduceBlockResponseJson struct {
 	Version string                  `json:"version" enum:"true"`
 	Data    *BeaconBlockCapellaJson `json:"data"`
@@ -756,11 +717,6 @@ type capellaProduceBlockResponseJson struct {
 type bellatrixProduceBlindedBlockResponseJson struct {
 	Version string                           `json:"version" enum:"true"`
 	Data    *BlindedBeaconBlockBellatrixJson `json:"data"`
-}
-
-type fastexPhase1ProduceBlindedBlockResponseJson struct {
-	Version string                              `json:"version" enum:"true"`
-	Data    *BlindedBeaconBlockFastexPhase1Json `json:"data"`
 }
 
 type capellaProduceBlindedBlockResponseJson struct {
@@ -790,11 +746,6 @@ func serializeProducedV2Block(response interface{}) (apimiddleware.RunDefault, [
 		actualRespContainer = &bellatrixProduceBlockResponseJson{
 			Version: respContainer.Version,
 			Data:    respContainer.Data.BellatrixBlock,
-		}
-	case strings.EqualFold(respContainer.Version, strings.ToLower(ethpbv2.Version_FASTEX_PHASE1.String())):
-		actualRespContainer = &fastexPhase1ProduceBlockResponseJson{
-			Version: respContainer.Version,
-			Data:    respContainer.Data.FastexPhase1Block,
 		}
 	case strings.EqualFold(respContainer.Version, strings.ToLower(ethpbv2.Version_CAPELLA.String())):
 		actualRespContainer = &capellaProduceBlockResponseJson{
@@ -835,18 +786,13 @@ func serializeProducedBlindedBlock(response interface{}) (apimiddleware.RunDefau
 			Version: respContainer.Version,
 			Data:    respContainer.Data.BellatrixBlock,
 		}
-	case strings.EqualFold(respContainer.Version, strings.ToLower(ethpbv2.Version_FASTEX_PHASE1.String())):
-		actualRespContainer = &fastexPhase1ProduceBlindedBlockResponseJson{
-			Version: respContainer.Version,
-			Data:    respContainer.Data.FastexPhase1Block,
-		}
 	case strings.EqualFold(respContainer.Version, strings.ToLower(ethpbv2.Version_CAPELLA.String())):
 		actualRespContainer = &capellaProduceBlindedBlockResponseJson{
 			Version: respContainer.Version,
 			Data:    respContainer.Data.CapellaBlock,
 		}
 	default:
-		return false, nil, apimiddleware.InternalServerError(fmt.Errorf("4 unsupported block version '%s'", respContainer.Version))
+		return false, nil, apimiddleware.InternalServerError(fmt.Errorf("unsupported block version '%s'", respContainer.Version))
 	}
 
 	j, err := json.Marshal(actualRespContainer)

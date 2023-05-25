@@ -6,13 +6,13 @@ import (
 	"sync"
 
 	"github.com/prysmaticlabs/go-bitfield"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/fieldtrie"
-	customtypes "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/custom-types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/fieldtrie"
+	customtypes "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/custom-types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 // BeaconState defines a struct containing utilities for the Ethereum Beacon Chain state, defining
@@ -31,14 +31,10 @@ type BeaconState struct {
 	eth1Data                            *ethpb.Eth1Data
 	eth1DataVotes                       []*ethpb.Eth1Data
 	eth1DepositIndex                    uint64
-	latestProcessedBlockActivities      uint64
-	transactionsGasPerPeriod            uint64
-	transactionsPerLatestEpoch          uint64
-	nonStakersGasPerEpoch               uint64
-	nonStakersGasPerPeriod              uint64
+	sharedActivity                      *ethpb.SharedActivity
+	executionHeight                     uint64
 	validators                          []*ethpb.Validator
 	balances                            []uint64
-	contracts                           []*ethpb.ContractsContainer
 	activities                          []uint64
 	randaoMixes                         *customtypes.RandaoMixes
 	slashings                           []uint64
@@ -55,8 +51,6 @@ type BeaconState struct {
 	nextSyncCommittee                   *ethpb.SyncCommittee
 	latestExecutionPayloadHeader        *enginev1.ExecutionPayloadHeader
 	latestExecutionPayloadHeaderCapella *enginev1.ExecutionPayloadHeaderCapella
-	baseFeePerEpoch                     uitn64
-	baseFeePerPeriod                    uint64
 	nextWithdrawalIndex                 uint64
 	nextWithdrawalValidatorIndex        primitives.ValidatorIndex
 
@@ -66,7 +60,7 @@ type BeaconState struct {
 	stateFieldLeaves      map[types.FieldIndex]*fieldtrie.FieldTrie
 	rebuildTrie           map[types.FieldIndex]bool
 	valMapHandler         *stateutil.ValidatorMapHandler
-	contractsMapHandler   *stateutil.ContractsMapHandler
+	contractMapHandler    *stateutil.ContractMapHandler
 	merkleLayers          [][][]byte
 	sharedFieldReferences map[types.FieldIndex]*stateutil.Reference
 }

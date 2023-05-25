@@ -1,10 +1,9 @@
 package state_native
 
 import (
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 // SetEth1Data for the beacon state.
@@ -63,78 +62,22 @@ func (b *BeaconState) AppendEth1DataVotes(val *ethpb.Eth1Data) error {
 	return nil
 }
 
-// SetLatestProcessedBlockActivities for the beacon state.
-func (b *BeaconState) SetLatestProcessedBlockActivities(val uint64) error {
+// SetSharedActivity for the beacon state.
+func (b *BeaconState) SetSharedActivity(val *ethpb.SharedActivity) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	b.latestProcessedBlockActivities = val
-	b.markFieldAsDirty(types.LatestProcessedBlockActivities)
+	b.sharedActivity = val
+	b.markFieldAsDirty(types.SharedActivity)
 	return nil
 }
 
-// SetTransactionsGasPerPeriod for the beacon state.
-func (b *BeaconState) SetTransactionsGasPerPeriod(val uint64) error {
+// SetExecutionHeight for the beacon state.
+func (b *BeaconState) SetExecutionHeight(val uint64) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	b.transactionsGasPerPeriod = val
-	b.markFieldAsDirty(types.TransactionsGasPerPeriod)
-	return nil
-}
-
-// SetTransactionsPerLatestEpoch for the beacon state.
-func (b *BeaconState) SetTransactionsPerLatestEpoch(val uint64) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	b.transactionsPerLatestEpoch = val
-	b.markFieldAsDirty(types.TransactionsPerLatestEpoch)
-	return nil
-}
-
-// SetNonStakersGasPerEpoch for the beacon state.
-func (b *BeaconState) SetNonStakersGasPerEpoch(val uint64) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	b.nonStakersGasPerEpoch = val
-	b.markFieldAsDirty(types.NonStakersGasPerEpoch)
-	return nil
-}
-
-// SetNonStakersGasPerPeriod for the beacon state.
-func (b *BeaconState) SetNonStakersGasPerPeriod(val uint64) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	b.nonStakersGasPerPeriod = val
-	b.markFieldAsDirty(types.NonStakersGasPerPeriod)
-	return nil
-}
-
-func (b *BeaconState) SetBaseFeePerEpoch(val uint64) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	if b.version < version.FastexPhase1 {
-		return errNotSupported("SetBaseFeePerEpoch", b.version)
-	}
-
-	b.baseFeePerEpoch = val
-	b.markFieldAsDirty(types.BaseFeePerEpoch)
-	return nil
-}
-
-func (b *BeaconState) SetBaseFeePerPeriod(val uint64) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	if b.version < version.FastexPhase1 {
-		return errNotSupported("SetBaseFeePerPeriod", b.version)
-	}
-
-	b.baseFeePerPeriod = val
-	b.markFieldAsDirty(types.BaseFeePerPeriod)
+	b.executionHeight = val
+	b.markFieldAsDirty(types.ExecutionHeight)
 	return nil
 }

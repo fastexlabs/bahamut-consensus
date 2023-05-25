@@ -7,12 +7,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/container/trie"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/container/trie"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
 	logTest "github.com/sirupsen/logrus/hooks/test"
 )
 
@@ -323,8 +323,6 @@ func TestDepositByPubkey_ReturnsFirstMatchingDeposit(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte("pk0"), 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 		},
@@ -335,8 +333,6 @@ func TestDepositByPubkey_ReturnsFirstMatchingDeposit(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte("pk1"), 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 		},
@@ -347,8 +343,6 @@ func TestDepositByPubkey_ReturnsFirstMatchingDeposit(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte("pk1"), 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 		},
@@ -359,8 +353,6 @@ func TestDepositByPubkey_ReturnsFirstMatchingDeposit(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte("pk2"), 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 		},
@@ -388,8 +380,6 @@ func TestFinalizedDeposits_DepositsCachedCorrectly(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{0}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 0,
@@ -400,8 +390,6 @@ func TestFinalizedDeposits_DepositsCachedCorrectly(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{1}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 1,
@@ -412,8 +400,6 @@ func TestFinalizedDeposits_DepositsCachedCorrectly(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{2}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 2,
@@ -425,8 +411,6 @@ func TestFinalizedDeposits_DepositsCachedCorrectly(t *testing.T) {
 				PublicKey:             bytesutil.PadTo([]byte{3}, 48),
 				WithdrawalCredentials: make([]byte, 32),
 				Signature:             make([]byte, 96),
-				DeployedContract:      make([]byte, 20),
-				DeploymentNonce:       0,
 			},
 		},
 		Index: 3,
@@ -464,8 +448,6 @@ func TestFinalizedDeposits_UtilizesPreviouslyCachedDeposits(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{0}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 0,
@@ -476,8 +458,6 @@ func TestFinalizedDeposits_UtilizesPreviouslyCachedDeposits(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{1}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 1,
@@ -489,8 +469,6 @@ func TestFinalizedDeposits_UtilizesPreviouslyCachedDeposits(t *testing.T) {
 				PublicKey:             bytesutil.PadTo([]byte{2}, 48),
 				WithdrawalCredentials: make([]byte, 32),
 				Signature:             make([]byte, 96),
-				DeployedContract:      make([]byte, 20),
-				DeploymentNonce:       0,
 			},
 		},
 		Index: 2,
@@ -543,8 +521,6 @@ func TestFinalizedDeposits_HandleSmallerThanExpectedDeposits(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{0}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 0,
@@ -555,8 +531,6 @@ func TestFinalizedDeposits_HandleSmallerThanExpectedDeposits(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{1}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 1,
@@ -567,8 +541,6 @@ func TestFinalizedDeposits_HandleSmallerThanExpectedDeposits(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{2}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 2,
@@ -594,8 +566,6 @@ func TestFinalizedDeposits_HandleLowerEth1DepositIndex(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{0}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 0,
@@ -606,8 +576,6 @@ func TestFinalizedDeposits_HandleLowerEth1DepositIndex(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{1}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 1,
@@ -618,8 +586,6 @@ func TestFinalizedDeposits_HandleLowerEth1DepositIndex(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{2}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 2,
@@ -630,8 +596,6 @@ func TestFinalizedDeposits_HandleLowerEth1DepositIndex(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{3}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 3,
@@ -642,8 +606,6 @@ func TestFinalizedDeposits_HandleLowerEth1DepositIndex(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{4}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 4,
@@ -654,8 +616,6 @@ func TestFinalizedDeposits_HandleLowerEth1DepositIndex(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{5}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 5,
@@ -695,8 +655,6 @@ func TestNonFinalizedDeposits_ReturnsAllNonFinalizedDeposits(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{0}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 0,
@@ -708,8 +666,6 @@ func TestNonFinalizedDeposits_ReturnsAllNonFinalizedDeposits(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{1}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 1,
@@ -723,8 +679,6 @@ func TestNonFinalizedDeposits_ReturnsAllNonFinalizedDeposits(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{2}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 2,
@@ -736,8 +690,6 @@ func TestNonFinalizedDeposits_ReturnsAllNonFinalizedDeposits(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{3}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 3,
@@ -760,8 +712,6 @@ func TestNonFinalizedDeposits_ReturnsNonFinalizedDepositsUpToBlockNumber(t *test
 					PublicKey:             bytesutil.PadTo([]byte{0}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 0,
@@ -773,8 +723,6 @@ func TestNonFinalizedDeposits_ReturnsNonFinalizedDepositsUpToBlockNumber(t *test
 					PublicKey:             bytesutil.PadTo([]byte{1}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 1,
@@ -788,8 +736,6 @@ func TestNonFinalizedDeposits_ReturnsNonFinalizedDepositsUpToBlockNumber(t *test
 					PublicKey:             bytesutil.PadTo([]byte{2}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 2,
@@ -801,8 +747,6 @@ func TestNonFinalizedDeposits_ReturnsNonFinalizedDepositsUpToBlockNumber(t *test
 					PublicKey:             bytesutil.PadTo([]byte{3}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: 3,
@@ -824,10 +768,7 @@ func TestFinalizedDeposits_ReturnsTrieCorrectly(t *testing.T) {
 				Data: &ethpb.Deposit_Data{
 					PublicKey:             bytesutil.PadTo([]byte{uint8(index)}, 48),
 					WithdrawalCredentials: make([]byte, 32),
-					Amount:                0,
 					Signature:             make([]byte, 96),
-					DeployedContract:      make([]byte, 20),
-					DeploymentNonce:       0,
 				},
 			},
 			Index: index,
@@ -906,34 +847,26 @@ func TestPruneProofs_Ok(t *testing.T) {
 	}{
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk0"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk0"), 48)}},
 			index: 0,
 		},
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk1"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk1"), 48)}},
 			index: 1,
 		},
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk2"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk2"), 48)}},
 			index: 2,
 		},
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk3"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk3"), 48)}},
 			index: 3,
 		},
 	}
@@ -962,15 +895,13 @@ func TestPruneProofs_SomeAlreadyPruned(t *testing.T) {
 		{
 			blkNum: 0,
 			deposit: &ethpb.Deposit{Proof: nil, Data: &ethpb.Deposit_Data{
-				PublicKey: bytesutil.PadTo([]byte("pk0"), 48),
-			}},
+				PublicKey: bytesutil.PadTo([]byte("pk0"), 48)}},
 			index: 0,
 		},
 		{
 			blkNum: 0,
 			deposit: &ethpb.Deposit{Proof: nil, Data: &ethpb.Deposit_Data{
-				PublicKey: bytesutil.PadTo([]byte("pk1"), 48),
-			}}, index: 1,
+				PublicKey: bytesutil.PadTo([]byte("pk1"), 48)}}, index: 1,
 		},
 		{
 			blkNum:  0,
@@ -979,10 +910,8 @@ func TestPruneProofs_SomeAlreadyPruned(t *testing.T) {
 		},
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk3"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk3"), 48)}},
 			index: 3,
 		},
 	}
@@ -1007,34 +936,26 @@ func TestPruneProofs_PruneAllWhenDepositIndexTooBig(t *testing.T) {
 	}{
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk0"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk0"), 48)}},
 			index: 0,
 		},
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk1"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk1"), 48)}},
 			index: 1,
 		},
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk2"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk2"), 48)}},
 			index: 2,
 		},
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk3"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk3"), 48)}},
 			index: 3,
 		},
 	}
@@ -1062,34 +983,26 @@ func TestPruneProofs_CorrectlyHandleLastIndex(t *testing.T) {
 	}{
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk0"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk0"), 48)}},
 			index: 0,
 		},
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk1"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk1"), 48)}},
 			index: 1,
 		},
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk2"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk2"), 48)}},
 			index: 2,
 		},
 		{
 			blkNum: 0,
-			deposit: &ethpb.Deposit{
-				Proof: makeDepositProof(),
-				Data:  &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk3"), 48)},
-			},
+			deposit: &ethpb.Deposit{Proof: makeDepositProof(),
+				Data: &ethpb.Deposit_Data{PublicKey: bytesutil.PadTo([]byte("pk3"), 48)}},
 			index: 3,
 		},
 	}

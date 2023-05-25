@@ -4,11 +4,11 @@ import (
 	"math/big"
 
 	ssz "github.com/prysmaticlabs/fastssz"
-	field_params "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	validatorpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1/validator-client"
+	field_params "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	validatorpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1/validator-client"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -26,8 +26,6 @@ type ReadOnlySignedBeaconBlock interface {
 	ToBlinded() (ReadOnlySignedBeaconBlock, error)
 	PbBellatrixBlock() (*ethpb.SignedBeaconBlockBellatrix, error)
 	PbBlindedBellatrixBlock() (*ethpb.SignedBlindedBeaconBlockBellatrix, error)
-	PbFastexPhase1Block() (*ethpb.SignedBeaconBlockFastexPhase1, error)
-	PbBlindedFastexPhase1Block() (*ethpb.SignedBlindedBeaconBlockFastexPhase1, error)
 	PbCapellaBlock() (*ethpb.SignedBeaconBlockCapella, error)
 	PbBlindedCapellaBlock() (*ethpb.SignedBlindedBeaconBlockCapella, error)
 	ssz.Marshaler
@@ -69,25 +67,25 @@ type ReadOnlyBeaconBlockBody interface {
 	Deposits() []*ethpb.Deposit
 	VoluntaryExits() []*ethpb.SignedVoluntaryExit
 	ActivityChanges() []*ethpb.ActivityChange
-	LatestProcessedBlock() uint64
 	TransactionsCount() uint64
+	BaseFee() uint64
+	ExecutionHeight() uint64
 	SyncAggregate() (*ethpb.SyncAggregate, error)
 	IsNil() bool
 	HashTreeRoot() ([field_params.RootLength]byte, error)
 	Proto() (proto.Message, error)
 	Execution() (ExecutionData, error)
-	BaseFee() (uint64, error)
 	BLSToExecutionChanges() ([]*ethpb.SignedBLSToExecutionChange, error)
 }
 
 type SignedBeaconBlock interface {
 	ReadOnlySignedBeaconBlock
-	SetBaseFee(uint64) error
 	SetExecution(ExecutionData) error
 	SetBLSToExecutionChanges([]*ethpb.SignedBLSToExecutionChange) error
 	SetSyncAggregate(*ethpb.SyncAggregate) error
+	SetExecutionHeight(uint64)
+	SetBaseFee(uint64)
 	SetTransactionsCount(uint64)
-	SetLatestProcessedBlock(uint64)
 	SetActivityChanges([]*ethpb.ActivityChange)
 	SetVoluntaryExits([]*ethpb.SignedVoluntaryExit)
 	SetDeposits([]*ethpb.Deposit)

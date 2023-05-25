@@ -4,8 +4,8 @@ import (
 	"math"
 	"time"
 
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 )
 
 // MainnetConfig returns the configuration to be used in the main network.
@@ -17,6 +17,7 @@ func MainnetConfig() *BeaconChainConfig {
 }
 
 const (
+    // TODO(fastex-chain): Set fastex-chain hard-fork epochs.
 	// Genesis Fork Epoch for the mainnet config.
 	genesisForkEpoch = 0
 	// Altair Fork Epoch for mainnet config.
@@ -43,6 +44,7 @@ var mainnetNetworkConfig = &NetworkConfig{
 	SyncCommsSubnetKey:              "syncnets",
 	MinimumPeersInSubnetSearch:      20,
 	ContractDeploymentBlock:         11184524, // Note: contract was deployed in block 11052984 but no transactions were sent until 11184524.
+    // TODO(fastex-chain): Set fastex-chain bootnodes.
 	BootstrapNodes: []string{
 		// Teku team's bootnode
 		"enr:-KG4QOtcP9X1FbIMOe17QNMKqDxCpm14jcX5tiOE4_TyMrFqbmhPZHK_ZPG2Gxb1GE2xdtodOfx9-cgvNtxnRyHEmC0ghGV0aDKQ9aX9QgAAAAD__________4JpZIJ2NIJpcIQDE8KdiXNlY3AyNTZrMaEDhpehBDbZjM_L9ek699Y7vhUJ-eAdMyQW_Fil522Y0fODdGNwgiMog3VkcIIjKA",
@@ -89,8 +91,8 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 
 	// Gwei value constants.
 	MinDepositAmount:          1 * 1e9,
-	MaxEffectiveBalance:       32 * 1e9,
-	EjectionBalance:           16 * 1e9,
+	MaxEffectiveBalance:       8192 * 1e9,
+	EjectionBalance:           4096 * 1e9,
 	EffectiveBalanceIncrement: 1 * 1e9,
 
 	// Initial value constants.
@@ -111,7 +113,6 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	ShardCommitteePeriod:             256,
 	MinEpochsToInactivityPenalty:     4,
 	Eth1FollowDistance:               2048,
-	SafeSlotsToUpdateJustified:       8,
 
 	// Fork choice algorithm constants.
 	ProposerScoreBoost:              40,
@@ -120,6 +121,7 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	IntervalsPerSlot:                3,
 
 	// Ethereum PoW parameters.
+    // TODO(fastex-chain): Change Chain and Network IDs for FastexChain.
 	DepositChainID:         1, // Chain ID of eth1 mainnet.
 	DepositNetworkID:       1, // Network ID of eth1 mainnet.
 	DepositContractAddress: "0x00000000219ab540356cBB839Cbe05303d7705Fa",
@@ -134,7 +136,7 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	// Additional context: https://github.com/ethereum/consensus-specs/issues/2132
 	// Bug prompting this change: https://github.com/prysmaticlabs/prysm/issues/7856
 	// Future optimization: https://github.com/prysmaticlabs/prysm/issues/7739
-	SecondsPerETH1Block: 14,
+	SecondsPerETH1Block: 12,
 
 	// State list length constants.
 	EpochsPerHistoricalVector: 65536,
@@ -143,8 +145,7 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	ValidatorRegistryLimit:    1099511627776,
 
 	// Reward and penalty quotients constants.
-	BaseRewardFactor:               64,
-	BaseRewardFactorFTN:            156,
+	BaseRewardFactor:               56,
 	WhistleBlowerRewardQuotient:    512,
 	ProposerRewardQuotient:         8,
 	InactivityPenaltyQuotient:      67108864,
@@ -176,30 +177,30 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	DomainApplicationBuilder:          bytesutil.Uint32ToBytes4(0x00000001),
 	DomainBLSToExecutionChange:        bytesutil.Uint32ToBytes4(0x0A000000),
 
-	// Prysm constants.
-	GweiPerEth:                        1000000000,
-	WeiPerGwei:                        1000000000,
-	BLSSecretKeyLength:                32,
-	BLSPubkeyLength:                   48,
-	DefaultBufferSize:                 10000,
-	WithdrawalPrivkeyFileName:         "/shardwithdrawalkey",
-	ValidatorPrivkeyFileName:          "/validatorprivatekey",
-	RPCSyncCheck:                      1,
-	EmptySignature:                    [96]byte{},
-	DefaultPageSize:                   250,
-	MaxPeersToSync:                    15,
-	SlotsPerArchivedPoint:             2048,
-	GenesisCountdownInterval:          time.Minute,
-	ConfigName:                        MainnetName,
-	PresetBase:                        "mainnet",
-	BeaconStateFieldCount:             28,
-	BeaconStateAltairFieldCount:       31,
-	BeaconStateBellatrixFieldCount:    32,
-	BeaconStateFastexPhase1FieldCount: 34,
-	BeaconStateCapellaFieldCount:      37,
+	// FastexChain consensus constants.
+	EpochsPerActivityPeriod: 1575, // One week (12s * 32 * 1575)
 
-	EpochsPerActivityPeriod: 1575,
-	EpochsPerAcrivityUpdate: 1,
+	// Prysm constants.
+	GweiPerEth:                     1000000000,
+	WeiPerGwei:                     1000000000,
+	BaseTransactionCost:            21000,
+	BLSSecretKeyLength:             32,
+	BLSPubkeyLength:                48,
+	DefaultBufferSize:              10000,
+	WithdrawalPrivkeyFileName:      "/shardwithdrawalkey",
+	ValidatorPrivkeyFileName:       "/validatorprivatekey",
+	RPCSyncCheck:                   1,
+	EmptySignature:                 [96]byte{},
+	DefaultPageSize:                250,
+	MaxPeersToSync:                 15,
+	SlotsPerArchivedPoint:          2048,
+	GenesisCountdownInterval:       time.Minute,
+	ConfigName:                     MainnetName,
+	PresetBase:                     "mainnet",
+	BeaconStateFieldCount:          24,
+	BeaconStateAltairFieldCount:    27,
+	BeaconStateBellatrixFieldCount: 28,
+	BeaconStateCapellaFieldCount:   31,
 
 	// Slasher related values.
 	WeakSubjectivityPeriod:          54000,
@@ -210,16 +211,14 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	SafetyDecay: 10,
 
 	// Fork related values.
-	GenesisEpoch:            genesisForkEpoch,
-	GenesisForkVersion:      []byte{0, 0, 0, 0},
-	AltairForkVersion:       []byte{1, 0, 0, 0},
-	AltairForkEpoch:         mainnetAltairForkEpoch,
-	BellatrixForkVersion:    []byte{2, 0, 0, 0},
-	BellatrixForkEpoch:      mainnetBellatrixForkEpoch,
-	FastexPhase1ForkVersion: []byte{3, 0, 0, 0},
-	FastexPhase1ForkEpoch:   math.MaxUint64,
-	CapellaForkVersion:      []byte{4, 0, 0, 0},
-	CapellaForkEpoch:        math.MaxUint64,
+	GenesisEpoch:         genesisForkEpoch,
+	GenesisForkVersion:   []byte{0, 0, 0, 0},
+	AltairForkVersion:    []byte{1, 0, 0, 0},
+	AltairForkEpoch:      mainnetAltairForkEpoch,
+	BellatrixForkVersion: []byte{2, 0, 0, 0},
+	BellatrixForkEpoch:   mainnetBellatrixForkEpoch,
+	CapellaForkVersion:   []byte{3, 0, 0, 0},
+	CapellaForkEpoch:     194048,
 
 	// New values introduced in Altair hard fork 1.
 	// Participation flag indices.
@@ -228,13 +227,12 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	TimelyHeadFlagIndex:   2,
 
 	// Incentivization weight values.
-	TimelySourceWeight:   14,
-	TimelyTargetWeight:   26,
-	TimelyHeadWeight:     14,
-	SyncRewardWeight:     2,
-	ProposerWeight:       8,
-	WeightDenominator:    64,
-	WeightDenominatorFTN: 56,
+	TimelySourceWeight: 14,
+	TimelyTargetWeight: 26,
+	TimelyHeadWeight:   14,
+	SyncRewardWeight:   2,
+	ProposerWeight:     0, // Is not used by Proof-Of-Stake-and-Activity algorithm.
+	WeightDenominator:  56,
 
 	// Validator related values.
 	TargetAggregatorsPerSyncSubcommittee: 16,
@@ -260,13 +258,13 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	// Bellatrix
 	TerminalBlockHashActivationEpoch: 18446744073709551615,
 	TerminalBlockHash:                [32]byte{},
-	TerminalTotalDifficulty:          "58750000000000000000000", // Estimated: Sept 15, 2022
+    TerminalTotalDifficulty:          "58750000000000000000000", // Estimated: Sept 15, 2022 // TODO(fastex-chain): Change TTD.
 	EthBurnAddressHex:                "0x0000000000000000000000000000000000000000",
 	DefaultBuilderGasLimit:           uint64(30000000),
 
 	// Mevboost circuit breaker
 	MaxBuilderConsecutiveMissedSlots: 3,
-	MaxBuilderEpochMissedSlots:       8,
+	MaxBuilderEpochMissedSlots:       5,
 
 	// Execution engine timeout value
 	ExecutionEngineTimeoutValue: 8, // 8 seconds default based on: https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md#core

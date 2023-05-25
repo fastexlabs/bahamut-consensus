@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	mathutil "github.com/prysmaticlabs/prysm/v3/math"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
+	mathutil "github.com/prysmaticlabs/prysm/v4/math"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
 )
 
 func TestValidatorConstants(t *testing.T) {
@@ -24,7 +24,7 @@ func TestValidatorConstants(t *testing.T) {
 		}
 		numOfValFields++
 	}
-	assert.Equal(t, validatorFieldRoots, numOfValFields)
+	assert.Equal(t, validatorFieldRoots, numOfValFields+6)
 	assert.Equal(t, uint64(validatorFieldRoots), mathutil.PowerOf2(validatorTreeDepth))
 
 	_, err := ValidatorRegistryRoot([]*ethpb.Validator{v})

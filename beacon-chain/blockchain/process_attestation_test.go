@@ -5,19 +5,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition"
-	testDB "github.com/prysmaticlabs/prysm/v3/beacon-chain/db/testing"
-	doublylinkedtree "github.com/prysmaticlabs/prysm/v3/beacon-chain/forkchoice/doubly-linked-tree"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stategen"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
-	"github.com/prysmaticlabs/prysm/v3/testing/util"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
+	testDB "github.com/prysmaticlabs/prysm/v4/beacon-chain/db/testing"
+	doublylinkedtree "github.com/prysmaticlabs/prysm/v4/beacon-chain/forkchoice/doubly-linked-tree"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stategen"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/testing/util"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
 
 func TestStore_OnAttestation_ErrorConditions(t *testing.T) {
@@ -86,8 +86,10 @@ func TestStore_OnAttestation_ErrorConditions(t *testing.T) {
 		},
 		{
 			name: "process attestation doesn't match current epoch",
-			a: util.HydrateAttestation(&ethpb.Attestation{Data: &ethpb.AttestationData{Slot: 100 * params.BeaconConfig().SlotsPerEpoch, Target: &ethpb.Checkpoint{Epoch: 100,
-				Root: BlkWithStateBadAttRoot[:]}}}),
+			a: util.HydrateAttestation(&ethpb.Attestation{Data: &ethpb.AttestationData{Slot: 100 * params.BeaconConfig().SlotsPerEpoch, Target: &ethpb.Checkpoint{
+				Epoch: 100,
+				Root:  BlkWithStateBadAttRoot[:],
+			}}}),
 			wantedErr: "target epoch 100 does not match current epoch",
 		},
 		{
@@ -117,7 +119,7 @@ func TestStore_OnAttestation_ErrorConditions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := service.OnAttestation(ctx, tt.a)
+			err := service.OnAttestation(ctx, tt.a, 0)
 			if tt.wantedErr != "" {
 				assert.ErrorContains(t, tt.wantedErr, err)
 			} else {
@@ -154,7 +156,7 @@ func TestStore_OnAttestation_Ok_DoublyLinkedTree(t *testing.T) {
 	state, blkRoot, err := prepareForkchoiceState(ctx, 0, tRoot, tRoot, params.BeaconConfig().ZeroHash, ojc, ofc)
 	require.NoError(t, err)
 	require.NoError(t, service.cfg.ForkChoiceStore.InsertNode(ctx, state, blkRoot))
-	require.NoError(t, service.OnAttestation(ctx, att[0]))
+	require.NoError(t, service.OnAttestation(ctx, att[0], 0))
 }
 
 func TestStore_SaveCheckpointState(t *testing.T) {
@@ -174,6 +176,7 @@ func TestStore_SaveCheckpointState(t *testing.T) {
 	require.NoError(t, err)
 	val := &ethpb.Validator{
 		PublicKey:             bytesutil.PadTo([]byte("foo"), 48),
+		Contract:              params.BeaconConfig().ZeroContract[:],
 		WithdrawalCredentials: bytesutil.PadTo([]byte("bar"), fieldparams.RootLength),
 	}
 	err = s.SetValidators([]*ethpb.Validator{val})

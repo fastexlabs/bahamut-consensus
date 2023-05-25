@@ -6,14 +6,14 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 // NewGenesisBlock returns the canonical, genesis block for the beacon chain protocol.
@@ -57,7 +57,8 @@ func NewGenesisBlockForState(ctx context.Context, st state.BeaconState) (interfa
 						DepositRoot: make([]byte, 32),
 						BlockHash:   make([]byte, 32),
 					},
-					Graffiti: make([]byte, 32),
+					Graffiti:        make([]byte, 32),
+					ActivityChanges: make([]*ethpb.ActivityChange, 0),
 				},
 			},
 			Signature: params.BeaconConfig().EmptySignature[:],
@@ -73,7 +74,8 @@ func NewGenesisBlockForState(ctx context.Context, st state.BeaconState) (interfa
 						DepositRoot: make([]byte, 32),
 						BlockHash:   make([]byte, 32),
 					},
-					Graffiti: make([]byte, 32),
+					Graffiti:        make([]byte, 32),
+					ActivityChanges: make([]*ethpb.ActivityChange, 0),
 					SyncAggregate: &ethpb.SyncAggregate{
 						SyncCommitteeBits:      make([]byte, fieldparams.SyncCommitteeLength/8),
 						SyncCommitteeSignature: make([]byte, fieldparams.BLSSignatureLength),
@@ -93,38 +95,8 @@ func NewGenesisBlockForState(ctx context.Context, st state.BeaconState) (interfa
 						DepositRoot: make([]byte, 32),
 						BlockHash:   make([]byte, 32),
 					},
-					Graffiti: make([]byte, 32),
-					SyncAggregate: &ethpb.SyncAggregate{
-						SyncCommitteeBits:      make([]byte, fieldparams.SyncCommitteeLength/8),
-						SyncCommitteeSignature: make([]byte, fieldparams.BLSSignatureLength),
-					},
-					ExecutionPayload: &enginev1.ExecutionPayload{
-						ParentHash:    make([]byte, 32),
-						FeeRecipient:  make([]byte, 20),
-						StateRoot:     make([]byte, 32),
-						ReceiptsRoot:  make([]byte, 32),
-						LogsBloom:     make([]byte, 256),
-						PrevRandao:    make([]byte, 32),
-						BaseFeePerGas: make([]byte, 32),
-						BlockHash:     make([]byte, 32),
-						Transactions:  make([][]byte, 0),
-					},
-				},
-			},
-			Signature: params.BeaconConfig().EmptySignature[:],
-		})
-	case *ethpb.BeaconStateFastexPhase1:
-		return blocks.NewSignedBeaconBlock(&ethpb.SignedBeaconBlockFastexPhase1{
-			Block: &ethpb.BeaconBlockFastexPhase1{
-				ParentRoot: params.BeaconConfig().ZeroHash[:],
-				StateRoot:  root[:],
-				Body: &ethpb.BeaconBlockBodyFastexPhase1{
-					RandaoReveal: make([]byte, 96),
-					Eth1Data: &ethpb.Eth1Data{
-						DepositRoot: make([]byte, 32),
-						BlockHash:   make([]byte, 32),
-					},
-					Graffiti: make([]byte, 32),
+					Graffiti:        make([]byte, 32),
+					ActivityChanges: make([]*ethpb.ActivityChange, 0),
 					SyncAggregate: &ethpb.SyncAggregate{
 						SyncCommitteeBits:      make([]byte, fieldparams.SyncCommitteeLength/8),
 						SyncCommitteeSignature: make([]byte, fieldparams.BLSSignatureLength),
@@ -155,7 +127,8 @@ func NewGenesisBlockForState(ctx context.Context, st state.BeaconState) (interfa
 						DepositRoot: make([]byte, 32),
 						BlockHash:   make([]byte, 32),
 					},
-					Graffiti: make([]byte, 32),
+					Graffiti:        make([]byte, 32),
+					ActivityChanges: make([]*ethpb.ActivityChange, 0),
 					SyncAggregate: &ethpb.SyncAggregate{
 						SyncCommitteeBits:      make([]byte, fieldparams.SyncCommitteeLength/8),
 						SyncCommitteeSignature: make([]byte, fieldparams.BLSSignatureLength),

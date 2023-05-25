@@ -4,12 +4,12 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
 
 // ValidatorIndexOutOfRangeError represents an error scenario where a validator does not exist
@@ -130,6 +130,23 @@ func (b *BeaconState) ValidatorIndexByPubkey(key [fieldparams.BLSPubkeyLength]by
 	return idx, ok
 }
 
+// ValidatorIndexByContract returns a given validator by its 20-byte contract address.
+func (b *BeaconState) ValidatorIndexByContract(key [fieldparams.ContractAddressLength]byte) (primitives.ValidatorIndex, bool) {
+	if b == nil || b.contractMapHandler == nil || b.contractMapHandler.IsNil() {
+		return 0, false
+	}
+
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+	numOfVals := len(b.validators)
+
+	idx, ok := b.contractMapHandler.Get(key)
+	if ok && primitives.ValidatorIndex(numOfVals) <= idx {
+		return 0, false
+	}
+	return idx, ok
+}
+
 // PubkeyAtIndex returns the pubkey at the given
 // validator index.
 func (b *BeaconState) PubkeyAtIndex(idx primitives.ValidatorIndex) [fieldparams.BLSPubkeyLength]byte {
@@ -143,6 +160,21 @@ func (b *BeaconState) PubkeyAtIndex(idx primitives.ValidatorIndex) [fieldparams.
 		return [fieldparams.BLSPubkeyLength]byte{}
 	}
 	return bytesutil.ToBytes48(b.validators[idx].PublicKey)
+}
+
+// ContractAtIndex returns the contract at the given validator index.
+// We also have to return bool, because some validators can store zero contract address.
+func (b *BeaconState) ContractAtIndex(idx primitives.ValidatorIndex) ([fieldparams.ContractAddressLength]byte, bool) {
+	if uint64(idx) >= uint64(len(b.validators)) {
+		return [fieldparams.ContractAddressLength]byte{}, false
+	}
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+
+	if b.validators[idx] == nil {
+		return [fieldparams.ContractAddressLength]byte{}, false
+	}
+	return bytesutil.ToBytes20(b.validators[idx].Contract), true
 }
 
 // NumValidators returns the size of the validator registry.
@@ -227,6 +259,57 @@ func (b *BeaconState) BalancesLength() int {
 	return b.balancesLength()
 }
 
+// Activities of validators participating in consensus on the beacon chain.
+func (b *BeaconState) Activities() []uint64 {
+	if b.activities == nil {
+		return nil
+	}
+
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+
+	return b.activitiesVal()
+}
+
+// activitiesVal of validators participating in consensus on the beacon chain.
+// This assumes that a lock is already held on BeaconState.
+func (b *BeaconState) activitiesVal() []uint64 {
+	if b.balances == nil {
+		return nil
+	}
+
+	res := make([]uint64, len(b.activities))
+	copy(res, b.activities)
+	return res
+}
+
+// ActivityAtIndex of validator with the provided index.
+func (b *BeaconState) ActivityAtIndex(idx primitives.ValidatorIndex) (uint64, error) {
+	if b.activities == nil {
+		return 0, nil
+	}
+
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+
+	if uint64(len(b.activities)) <= uint64(idx) {
+		return 0, fmt.Errorf("index of %d does not exist", idx)
+	}
+	return b.activities[idx], nil
+}
+
+// ActivitiesLength returns the length of the activities slice.
+func (b *BeaconState) ActivitiesLength() int {
+	if b.activities == nil {
+		return 0
+	}
+
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+
+	return b.activitiesLength()
+}
+
 // Slashings of validators on the beacon chain.
 func (b *BeaconState) Slashings() []uint64 {
 	if b.slashings == nil {
@@ -277,164 +360,4 @@ func (b *BeaconState) inactivityScoresVal() []uint64 {
 	res := make([]uint64, len(b.inactivityScores))
 	copy(res, b.inactivityScores)
 	return res
-}
-
-// Contracts of validators participating in consensus on the beacon chain.
-func (b *BeaconState) Contracts() []*ethpb.ContractsContainer {
-	if b.contracts == nil {
-		return nil
-	}
-
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	return b.contractsVal()
-}
-
-// contractsVal of validators participating in consensus on the beacon chain.
-// This assumes that a lock is already held on BeaconState.
-func (b *BeaconState) contractsVal() []*ethpb.ContractsContainer {
-	if b.contracts == nil {
-		return nil
-	}
-
-	res := make([]*ethpb.ContractsContainer, len(b.contracts))
-	for i := 0; i < len(res); i++ {
-		cc := b.contracts[i]
-		if cc == nil {
-			continue
-		}
-		res[i] = ethpb.CopyContractsContainer(cc)
-	}
-	return res
-}
-
-// references of contracts of validators participating in consensus on the beacon chain.
-// This assumes that a lock is already held on BeaconState. This does not
-// copy fully and instead just copies the reference.
-func (b *BeaconState) contractsReferences() []*ethpb.ContractsContainer {
-	if b.contracts == nil {
-		return nil
-	}
-
-	res := make([]*ethpb.ContractsContainer, len(b.contracts))
-	for i := 0; i < len(res); i++ {
-		cc := b.contracts[i]
-		if cc == nil {
-			continue
-		}
-		// copy contracts container reference instead.
-		res[i] = cc
-	}
-	return res
-}
-
-// ContractsAtIndex is the contracts of the validator at the provided index.
-func (b *BeaconState) ContractsAtIndex(idx primitives.ValidatorIndex) (*ethpb.ContractsContainer, error) {
-	if b.contracts == nil {
-		return &ethpb.ContractsContainer{}, nil
-	}
-	if uint64(len(b.contracts)) <= uint64(idx) {
-		e := NewValidatorIndexOutOfRangeError(idx)
-		return nil, &e
-	}
-
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	cc := b.contracts[idx]
-	return ethpb.CopyContractsContainer(cc), nil
-}
-
-// ValidatorIndexByContractAddress returns a given validator by its 20-byte contract address.
-func (b *BeaconState) ValidatorIndexByContractAddress(key [fieldparams.ExecutionLayerAddressLength]byte) (primitives.ValidatorIndex, bool) {
-	if b == nil || b.contractsMapHandler == nil || b.contractsMapHandler.IsNil() {
-		return 0, false
-	}
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-	numOfContracts := len(b.contracts)
-
-	idx, ok := b.contractsMapHandler.Get(key)
-	if ok && primitives.ValidatorIndex(numOfContracts) <= idx {
-		return primitives.ValidatorIndex(0), false
-	}
-	return idx, ok
-}
-
-// ContractsAtIndexReadOnly is the contracts of the validator at the provided index. This method
-// doesn't clone the validator's contracts.
-func (b *BeaconState) ContractsAtIndexReadOnly(idx primitives.ValidatorIndex) (state.ReadOnlyContractsContainer, error) {
-	if b.contracts == nil {
-		return nil, state.ErrNilValidatorsInState
-	}
-	if uint64(len(b.contracts)) <= uint64(idx) {
-		e := NewValidatorIndexOutOfRangeError(idx)
-		return nil, &e
-	}
-
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	return NewContractsContainer(b.contracts[idx])
-}
-
-// ContractsLength returns the size of the contracts containers registry.
-func (b *BeaconState) ContractsLength() int {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	return len(b.contracts)
-}
-
-// Activities of validators participating in consensus on the beacon chain.
-func (b *BeaconState) Activities() []uint64 {
-	if b.activities == nil {
-		return nil
-	}
-
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	return b.activitiesVal()
-}
-
-// activitiesVal of validators participating in consensus on the beacon chain.
-// This assumes that a lock is already held on BeaconState.
-func (b *BeaconState) activitiesVal() []uint64 {
-	if b.activities == nil {
-		return nil
-	}
-
-	res := make([]uint64, len(b.activities))
-	copy(res, b.activities)
-	return res
-}
-
-// ActivityAtIndex of validator with the provided index.
-func (b *BeaconState) ActivityAtIndex(idx primitives.ValidatorIndex) (uint64, error) {
-	if b.activities == nil {
-		return 0, nil
-	}
-
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	if uint64(len(b.activities)) <= uint64(idx) {
-		e := NewValidatorIndexOutOfRangeError(idx)
-		return 0, &e
-	}
-	return b.activities[idx], nil
-}
-
-// ActivitiesLength returns the length of the balances slice.
-func (b *BeaconState) ActivitiesLength() int {
-	if b.activities == nil {
-		return 0
-	}
-
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	return b.activitiesLength()
 }

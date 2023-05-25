@@ -6,18 +6,17 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/rpc/apimiddleware"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/apimiddleware"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 type beaconBlockConverter interface {
 	ConvertRESTPhase0BlockToProto(block *apimiddleware.BeaconBlockJson) (*ethpb.BeaconBlock, error)
 	ConvertRESTAltairBlockToProto(block *apimiddleware.BeaconBlockAltairJson) (*ethpb.BeaconBlockAltair, error)
 	ConvertRESTBellatrixBlockToProto(block *apimiddleware.BeaconBlockBellatrixJson) (*ethpb.BeaconBlockBellatrix, error)
-	ConvertRESTFastexPhase1BlockToProto(block *apimiddleware.BeaconBlockFastexPhase1Json) (*ethpb.BeaconBlockFastexPhase1, error)
 	ConvertRESTCapellaBlockToProto(block *apimiddleware.BeaconBlockCapellaJson) (*ethpb.BeaconBlockCapella, error)
 }
 
@@ -103,21 +102,6 @@ func (c beaconApiBeaconBlockConverter) ConvertRESTPhase0BlockToProto(block *apim
 		return nil, errors.Wrap(err, "failed to get voluntary exits")
 	}
 
-	activityChanges, err := convertActivityChangesToProto(block.Body.ActivityChanges)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get activity changes")
-	}
-
-	latestProcessedBlock, err := strconv.ParseUint(block.Body.LatestProcessedBlock, 10, 64)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse latest processed block `%s`", block.Body.LatestProcessedBlock)
-	}
-
-	transactionsCount, err := strconv.ParseUint(block.Body.TransactionsCount, 10, 64)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse transactions count `%s`", block.Body.TransactionsCount)
-	}
-
 	return &ethpb.BeaconBlock{
 		Slot:          primitives.Slot(blockSlot),
 		ProposerIndex: primitives.ValidatorIndex(blockProposerIndex),
@@ -130,15 +114,12 @@ func (c beaconApiBeaconBlockConverter) ConvertRESTPhase0BlockToProto(block *apim
 				DepositCount: depositCount,
 				BlockHash:    blockHash,
 			},
-			Graffiti:             graffiti,
-			ProposerSlashings:    proposerSlashings,
-			AttesterSlashings:    attesterSlashings,
-			Attestations:         attestations,
-			Deposits:             deposits,
-			VoluntaryExits:       voluntaryExits,
-			ActivityChanges:      activityChanges,
-			LatestProcessedBlock: latestProcessedBlock,
-			TransactionsCount:    transactionsCount,
+			Graffiti:          graffiti,
+			ProposerSlashings: proposerSlashings,
+			AttesterSlashings: attesterSlashings,
+			Attestations:      attestations,
+			Deposits:          deposits,
+			VoluntaryExits:    voluntaryExits,
 		},
 	}, nil
 }
@@ -157,17 +138,14 @@ func (c beaconApiBeaconBlockConverter) ConvertRESTAltairBlockToProto(block *apim
 		ParentRoot:    block.ParentRoot,
 		StateRoot:     block.StateRoot,
 		Body: &apimiddleware.BeaconBlockBodyJson{
-			RandaoReveal:         block.Body.RandaoReveal,
-			Eth1Data:             block.Body.Eth1Data,
-			Graffiti:             block.Body.Graffiti,
-			ProposerSlashings:    block.Body.ProposerSlashings,
-			AttesterSlashings:    block.Body.AttesterSlashings,
-			Attestations:         block.Body.Attestations,
-			Deposits:             block.Body.Deposits,
-			VoluntaryExits:       block.Body.VoluntaryExits,
-			ActivityChanges:      block.Body.ActivityChanges,
-			LatestProcessedBlock: block.Body.LatestProcessedBlock,
-			TransactionsCount:    block.Body.TransactionsCount,
+			RandaoReveal:      block.Body.RandaoReveal,
+			Eth1Data:          block.Body.Eth1Data,
+			Graffiti:          block.Body.Graffiti,
+			ProposerSlashings: block.Body.ProposerSlashings,
+			AttesterSlashings: block.Body.AttesterSlashings,
+			Attestations:      block.Body.Attestations,
+			Deposits:          block.Body.Deposits,
+			VoluntaryExits:    block.Body.VoluntaryExits,
 		},
 	})
 	if err != nil {
@@ -194,17 +172,14 @@ func (c beaconApiBeaconBlockConverter) ConvertRESTAltairBlockToProto(block *apim
 		ParentRoot:    phase0Block.ParentRoot,
 		StateRoot:     phase0Block.StateRoot,
 		Body: &ethpb.BeaconBlockBodyAltair{
-			RandaoReveal:         phase0Block.Body.RandaoReveal,
-			Eth1Data:             phase0Block.Body.Eth1Data,
-			Graffiti:             phase0Block.Body.Graffiti,
-			ProposerSlashings:    phase0Block.Body.ProposerSlashings,
-			AttesterSlashings:    phase0Block.Body.AttesterSlashings,
-			Attestations:         phase0Block.Body.Attestations,
-			Deposits:             phase0Block.Body.Deposits,
-			VoluntaryExits:       phase0Block.Body.VoluntaryExits,
-			ActivityChanges:      phase0Block.Body.ActivityChanges,
-			LatestProcessedBlock: phase0Block.Body.LatestProcessedBlock,
-			TransactionsCount:    phase0Block.Body.TransactionsCount,
+			RandaoReveal:      phase0Block.Body.RandaoReveal,
+			Eth1Data:          phase0Block.Body.Eth1Data,
+			Graffiti:          phase0Block.Body.Graffiti,
+			ProposerSlashings: phase0Block.Body.ProposerSlashings,
+			AttesterSlashings: phase0Block.Body.AttesterSlashings,
+			Attestations:      phase0Block.Body.Attestations,
+			Deposits:          phase0Block.Body.Deposits,
+			VoluntaryExits:    phase0Block.Body.VoluntaryExits,
 			SyncAggregate: &ethpb.SyncAggregate{
 				SyncCommitteeBits:      syncCommitteeBits,
 				SyncCommitteeSignature: syncCommitteeSignature,
@@ -227,18 +202,15 @@ func (c beaconApiBeaconBlockConverter) ConvertRESTBellatrixBlockToProto(block *a
 		ParentRoot:    block.ParentRoot,
 		StateRoot:     block.StateRoot,
 		Body: &apimiddleware.BeaconBlockBodyAltairJson{
-			RandaoReveal:         block.Body.RandaoReveal,
-			Eth1Data:             block.Body.Eth1Data,
-			Graffiti:             block.Body.Graffiti,
-			ProposerSlashings:    block.Body.ProposerSlashings,
-			AttesterSlashings:    block.Body.AttesterSlashings,
-			Attestations:         block.Body.Attestations,
-			Deposits:             block.Body.Deposits,
-			VoluntaryExits:       block.Body.VoluntaryExits,
-			ActivityChanges:      block.Body.ActivityChanges,
-			LatestProcessedBlock: block.Body.LatestProcessedBlock,
-			TransactionsCount:    block.Body.TransactionsCount,
-			SyncAggregate:        block.Body.SyncAggregate,
+			RandaoReveal:      block.Body.RandaoReveal,
+			Eth1Data:          block.Body.Eth1Data,
+			Graffiti:          block.Body.Graffiti,
+			ProposerSlashings: block.Body.ProposerSlashings,
+			AttesterSlashings: block.Body.AttesterSlashings,
+			Attestations:      block.Body.Attestations,
+			Deposits:          block.Body.Deposits,
+			VoluntaryExits:    block.Body.VoluntaryExits,
+			SyncAggregate:     block.Body.SyncAggregate,
 		},
 	})
 	if err != nil {
@@ -325,18 +297,15 @@ func (c beaconApiBeaconBlockConverter) ConvertRESTBellatrixBlockToProto(block *a
 		ParentRoot:    altairBlock.ParentRoot,
 		StateRoot:     altairBlock.StateRoot,
 		Body: &ethpb.BeaconBlockBodyBellatrix{
-			RandaoReveal:         altairBlock.Body.RandaoReveal,
-			Eth1Data:             altairBlock.Body.Eth1Data,
-			Graffiti:             altairBlock.Body.Graffiti,
-			ProposerSlashings:    altairBlock.Body.ProposerSlashings,
-			AttesterSlashings:    altairBlock.Body.AttesterSlashings,
-			Attestations:         altairBlock.Body.Attestations,
-			Deposits:             altairBlock.Body.Deposits,
-			VoluntaryExits:       altairBlock.Body.VoluntaryExits,
-			ActivityChanges:      altairBlock.Body.ActivityChanges,
-			LatestProcessedBlock: altairBlock.Body.LatestProcessedBlock,
-			TransactionsCount:    altairBlock.Body.TransactionsCount,
-			SyncAggregate:        altairBlock.Body.SyncAggregate,
+			RandaoReveal:      altairBlock.Body.RandaoReveal,
+			Eth1Data:          altairBlock.Body.Eth1Data,
+			Graffiti:          altairBlock.Body.Graffiti,
+			ProposerSlashings: altairBlock.Body.ProposerSlashings,
+			AttesterSlashings: altairBlock.Body.AttesterSlashings,
+			Attestations:      altairBlock.Body.Attestations,
+			Deposits:          altairBlock.Body.Deposits,
+			VoluntaryExits:    altairBlock.Body.VoluntaryExits,
+			SyncAggregate:     altairBlock.Body.SyncAggregate,
 			ExecutionPayload: &enginev1.ExecutionPayload{
 				ParentHash:    parentHash,
 				FeeRecipient:  feeRecipient,
@@ -357,8 +326,8 @@ func (c beaconApiBeaconBlockConverter) ConvertRESTBellatrixBlockToProto(block *a
 	}, nil
 }
 
-// ConvertRESTFastexPhase1BlockToProto converts a FastexPhase1 JSON beacon block to its protobuf equivalent
-func (c beaconApiBeaconBlockConverter) ConvertRESTFastexPhase1BlockToProto(block *apimiddleware.BeaconBlockFastexPhase1Json) (*ethpb.BeaconBlockFastexPhase1, error) {
+// ConvertRESTCapellaBlockToProto converts a Capella JSON beacon block to its protobuf equivalent
+func (c beaconApiBeaconBlockConverter) ConvertRESTCapellaBlockToProto(block *apimiddleware.BeaconBlockCapellaJson) (*ethpb.BeaconBlockCapella, error) {
 	if block.Body == nil {
 		return nil, errors.New("block body is nil")
 	}
@@ -375,18 +344,15 @@ func (c beaconApiBeaconBlockConverter) ConvertRESTFastexPhase1BlockToProto(block
 		ParentRoot:    block.ParentRoot,
 		StateRoot:     block.StateRoot,
 		Body: &apimiddleware.BeaconBlockBodyBellatrixJson{
-			RandaoReveal:         block.Body.RandaoReveal,
-			Eth1Data:             block.Body.Eth1Data,
-			Graffiti:             block.Body.Graffiti,
-			ProposerSlashings:    block.Body.ProposerSlashings,
-			AttesterSlashings:    block.Body.AttesterSlashings,
-			Attestations:         block.Body.Attestations,
-			Deposits:             block.Body.Deposits,
-			VoluntaryExits:       block.Body.VoluntaryExits,
-			ActivityChanges:      block.Body.ActivityChanges,
-			LatestProcessedBlock: block.Body.LatestProcessedBlock,
-			TransactionsCount:    block.Body.TransactionsCount,
-			SyncAggregate:        block.Body.SyncAggregate,
+			RandaoReveal:      block.Body.RandaoReveal,
+			Eth1Data:          block.Body.Eth1Data,
+			Graffiti:          block.Body.Graffiti,
+			ProposerSlashings: block.Body.ProposerSlashings,
+			AttesterSlashings: block.Body.AttesterSlashings,
+			Attestations:      block.Body.Attestations,
+			Deposits:          block.Body.Deposits,
+			VoluntaryExits:    block.Body.VoluntaryExits,
+			SyncAggregate:     block.Body.SyncAggregate,
 			ExecutionPayload: &apimiddleware.ExecutionPayloadJson{
 				ParentHash:    block.Body.ExecutionPayload.ParentHash,
 				FeeRecipient:  block.Body.ExecutionPayload.FeeRecipient,
@@ -409,88 +375,6 @@ func (c beaconApiBeaconBlockConverter) ConvertRESTFastexPhase1BlockToProto(block
 		return nil, errors.Wrap(err, "failed to get the bellatrix fields of the capella block")
 	}
 
-	baseFee, err := strconv.ParseUint(block.Body.BaseFee, 10, 64)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse base fee `%s`", block.Body.BaseFee)
-	}
-
-	return &ethpb.BeaconBlockFastexPhase1{
-		Slot:          bellatrixBlock.Slot,
-		ProposerIndex: bellatrixBlock.ProposerIndex,
-		ParentRoot:    bellatrixBlock.ParentRoot,
-		StateRoot:     bellatrixBlock.StateRoot,
-		Body: &ethpb.BeaconBlockBodyFastexPhase1{
-			RandaoReveal:         bellatrixBlock.Body.RandaoReveal,
-			Eth1Data:             bellatrixBlock.Body.Eth1Data,
-			Graffiti:             bellatrixBlock.Body.Graffiti,
-			ProposerSlashings:    bellatrixBlock.Body.ProposerSlashings,
-			AttesterSlashings:    bellatrixBlock.Body.AttesterSlashings,
-			Attestations:         bellatrixBlock.Body.Attestations,
-			Deposits:             bellatrixBlock.Body.Deposits,
-			VoluntaryExits:       bellatrixBlock.Body.VoluntaryExits,
-			ActivityChanges:      bellatrixBlock.Body.ActivityChanges,
-			LatestProcessedBlock: bellatrixBlock.Body.LatestProcessedBlock,
-			TransactionsCount:    bellatrixBlock.Body.TransactionsCount,
-			SyncAggregate:        bellatrixBlock.Body.SyncAggregate,
-			ExecutionPayload:     bellatrixBlock.Body.ExecutionPayload,
-			BaseFee:              baseFee,
-		},
-	}, nil
-}
-
-// ConvertRESTCapellaBlockToProto converts a Capella JSON beacon block to its protobuf equivalent
-func (c beaconApiBeaconBlockConverter) ConvertRESTCapellaBlockToProto(block *apimiddleware.BeaconBlockCapellaJson) (*ethpb.BeaconBlockCapella, error) {
-	if block.Body == nil {
-		return nil, errors.New("block body is nil")
-	}
-
-	if block.Body.ExecutionPayload == nil {
-		return nil, errors.New("execution payload is nil")
-	}
-
-	// Call convertRESTFastexPhase1BlockToProto to set the fastex-phase1 fields because all the error handling and the heavy
-	// lifting has already been done
-	fastexPhase1Block, err := c.ConvertRESTFastexPhase1BlockToProto(&apimiddleware.BeaconBlockFastexPhase1Json{
-		Slot:          block.Slot,
-		ProposerIndex: block.ProposerIndex,
-		ParentRoot:    block.ParentRoot,
-		StateRoot:     block.StateRoot,
-		Body: &apimiddleware.BeaconBlockBodyFastexPhase1Json{
-			RandaoReveal:         block.Body.RandaoReveal,
-			Eth1Data:             block.Body.Eth1Data,
-			Graffiti:             block.Body.Graffiti,
-			ProposerSlashings:    block.Body.ProposerSlashings,
-			AttesterSlashings:    block.Body.AttesterSlashings,
-			Attestations:         block.Body.Attestations,
-			Deposits:             block.Body.Deposits,
-			VoluntaryExits:       block.Body.VoluntaryExits,
-			ActivityChanges:      block.Body.ActivityChanges,
-			LatestProcessedBlock: block.Body.LatestProcessedBlock,
-			TransactionsCount:    block.Body.TransactionsCount,
-			SyncAggregate:        block.Body.SyncAggregate,
-			ExecutionPayload: &apimiddleware.ExecutionPayloadJson{
-				ParentHash:    block.Body.ExecutionPayload.ParentHash,
-				FeeRecipient:  block.Body.ExecutionPayload.FeeRecipient,
-				StateRoot:     block.Body.ExecutionPayload.StateRoot,
-				ReceiptsRoot:  block.Body.ExecutionPayload.ReceiptsRoot,
-				LogsBloom:     block.Body.ExecutionPayload.LogsBloom,
-				PrevRandao:    block.Body.ExecutionPayload.PrevRandao,
-				BlockNumber:   block.Body.ExecutionPayload.BlockNumber,
-				GasLimit:      block.Body.ExecutionPayload.GasLimit,
-				GasUsed:       block.Body.ExecutionPayload.GasUsed,
-				TimeStamp:     block.Body.ExecutionPayload.TimeStamp,
-				ExtraData:     block.Body.ExecutionPayload.ExtraData,
-				BaseFeePerGas: block.Body.ExecutionPayload.BaseFeePerGas,
-				BlockHash:     block.Body.ExecutionPayload.BlockHash,
-				Transactions:  block.Body.ExecutionPayload.Transactions,
-			},
-			BaseFee: block.Body.BaseFee,
-		},
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get the fastex-phase1 fields of the capella block")
-	}
-
 	withdrawals, err := convertWithdrawalsToProto(block.Body.ExecutionPayload.Withdrawals)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get withdrawals")
@@ -502,41 +386,37 @@ func (c beaconApiBeaconBlockConverter) ConvertRESTCapellaBlockToProto(block *api
 	}
 
 	return &ethpb.BeaconBlockCapella{
-		Slot:          fastexPhase1Block.Slot,
-		ProposerIndex: fastexPhase1Block.ProposerIndex,
-		ParentRoot:    fastexPhase1Block.ParentRoot,
-		StateRoot:     fastexPhase1Block.StateRoot,
+		Slot:          bellatrixBlock.Slot,
+		ProposerIndex: bellatrixBlock.ProposerIndex,
+		ParentRoot:    bellatrixBlock.ParentRoot,
+		StateRoot:     bellatrixBlock.StateRoot,
 		Body: &ethpb.BeaconBlockBodyCapella{
-			RandaoReveal:         fastexPhase1Block.Body.RandaoReveal,
-			Eth1Data:             fastexPhase1Block.Body.Eth1Data,
-			Graffiti:             fastexPhase1Block.Body.Graffiti,
-			ProposerSlashings:    fastexPhase1Block.Body.ProposerSlashings,
-			AttesterSlashings:    fastexPhase1Block.Body.AttesterSlashings,
-			Attestations:         fastexPhase1Block.Body.Attestations,
-			Deposits:             fastexPhase1Block.Body.Deposits,
-			VoluntaryExits:       fastexPhase1Block.Body.VoluntaryExits,
-			ActivityChanges:      fastexPhase1Block.Body.ActivityChanges,
-			LatestProcessedBlock: fastexPhase1Block.Body.LatestProcessedBlock,
-			TransactionsCount:    fastexPhase1Block.Body.TransactionsCount,
-			SyncAggregate:        fastexPhase1Block.Body.SyncAggregate,
+			RandaoReveal:      bellatrixBlock.Body.RandaoReveal,
+			Eth1Data:          bellatrixBlock.Body.Eth1Data,
+			Graffiti:          bellatrixBlock.Body.Graffiti,
+			ProposerSlashings: bellatrixBlock.Body.ProposerSlashings,
+			AttesterSlashings: bellatrixBlock.Body.AttesterSlashings,
+			Attestations:      bellatrixBlock.Body.Attestations,
+			Deposits:          bellatrixBlock.Body.Deposits,
+			VoluntaryExits:    bellatrixBlock.Body.VoluntaryExits,
+			SyncAggregate:     bellatrixBlock.Body.SyncAggregate,
 			ExecutionPayload: &enginev1.ExecutionPayloadCapella{
-				ParentHash:    fastexPhase1Block.Body.ExecutionPayload.ParentHash,
-				FeeRecipient:  fastexPhase1Block.Body.ExecutionPayload.FeeRecipient,
-				StateRoot:     fastexPhase1Block.Body.ExecutionPayload.StateRoot,
-				ReceiptsRoot:  fastexPhase1Block.Body.ExecutionPayload.ReceiptsRoot,
-				LogsBloom:     fastexPhase1Block.Body.ExecutionPayload.LogsBloom,
-				PrevRandao:    fastexPhase1Block.Body.ExecutionPayload.PrevRandao,
-				BlockNumber:   fastexPhase1Block.Body.ExecutionPayload.BlockNumber,
-				GasLimit:      fastexPhase1Block.Body.ExecutionPayload.GasLimit,
-				GasUsed:       fastexPhase1Block.Body.ExecutionPayload.GasUsed,
-				Timestamp:     fastexPhase1Block.Body.ExecutionPayload.Timestamp,
-				ExtraData:     fastexPhase1Block.Body.ExecutionPayload.ExtraData,
-				BaseFeePerGas: fastexPhase1Block.Body.ExecutionPayload.BaseFeePerGas,
-				BlockHash:     fastexPhase1Block.Body.ExecutionPayload.BlockHash,
-				Transactions:  fastexPhase1Block.Body.ExecutionPayload.Transactions,
+				ParentHash:    bellatrixBlock.Body.ExecutionPayload.ParentHash,
+				FeeRecipient:  bellatrixBlock.Body.ExecutionPayload.FeeRecipient,
+				StateRoot:     bellatrixBlock.Body.ExecutionPayload.StateRoot,
+				ReceiptsRoot:  bellatrixBlock.Body.ExecutionPayload.ReceiptsRoot,
+				LogsBloom:     bellatrixBlock.Body.ExecutionPayload.LogsBloom,
+				PrevRandao:    bellatrixBlock.Body.ExecutionPayload.PrevRandao,
+				BlockNumber:   bellatrixBlock.Body.ExecutionPayload.BlockNumber,
+				GasLimit:      bellatrixBlock.Body.ExecutionPayload.GasLimit,
+				GasUsed:       bellatrixBlock.Body.ExecutionPayload.GasUsed,
+				Timestamp:     bellatrixBlock.Body.ExecutionPayload.Timestamp,
+				ExtraData:     bellatrixBlock.Body.ExecutionPayload.ExtraData,
+				BaseFeePerGas: bellatrixBlock.Body.ExecutionPayload.BaseFeePerGas,
+				BlockHash:     bellatrixBlock.Body.ExecutionPayload.BlockHash,
+				Transactions:  bellatrixBlock.Body.ExecutionPayload.Transactions,
 				Withdrawals:   withdrawals,
 			},
-			BaseFee:               fastexPhase1Block.Body.BaseFee,
 			BlsToExecutionChanges: blsToExecutionChanges,
 		},
 	}, nil

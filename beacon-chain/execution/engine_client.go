@@ -14,20 +14,34 @@ import (
 	gethRPC "github.com/ethereum/go-ethereum/rpc"
 	"github.com/holiman/uint256"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/execution/types"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	payloadattribute "github.com/prysmaticlabs/prysm/v3/consensus-types/payload-attribute"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	pb "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/execution/types"
+	"github.com/prysmaticlabs/prysm/v4/config/features"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	payloadattribute "github.com/prysmaticlabs/prysm/v4/consensus-types/payload-attribute"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	pb "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	"github.com/sirupsen/logrus"
 	"go.opencensus.io/trace"
 )
+
+var supportedEngineEndpoints = []string{
+	NewPayloadMethod,
+	NewPayloadMethodV2,
+	ForkchoiceUpdatedMethod,
+	ForkchoiceUpdatedMethodV2,
+	GetPayloadMethod,
+	GetPayloadMethodV2,
+	ExchangeTransitionConfigurationMethod,
+	GetPayloadBodiesByHashV1,
+	GetPayloadBodiesByRangeV1,
+}
 
 const (
 	// NewPayloadMethod v1 request string for JSON-RPC.
@@ -48,6 +62,14 @@ const (
 	ExecutionBlockByHashMethod = "eth_getBlockByHash"
 	// ExecutionBlockByNumberMethod request string for JSON-RPC.
 	ExecutionBlockByNumberMethod = "eth_getBlockByNumber"
+	// GetBlockActivitiesMethod request string for JSON-RPC.
+	GetBlockActivitiesMethod = "eth_getBlockActivities"
+	// GetPayloadBodiesByHashV1 v1 request string for JSON-RPC.
+	GetPayloadBodiesByHashV1 = "engine_getPayloadBodiesByHashV1"
+	// GetPayloadBodiesByRangeV1 v1 request string for JSON-RPC.
+	GetPayloadBodiesByRangeV1 = "engine_getPayloadBodiesByRangeV1"
+	// ExchangeCapabilities request string for JSON-RPC.
+	ExchangeCapabilities = "engine_exchangeCapabilities"
 	// Defines the seconds before timing out engine endpoints with non-block execution semantics.
 	defaultEngineTimeout = time.Second
 )
@@ -84,6 +106,7 @@ type EngineCaller interface {
 	) error
 	ExecutionBlockByHash(ctx context.Context, hash common.Hash, withTxs bool) (*pb.ExecutionBlock, error)
 	GetTerminalBlockHash(ctx context.Context, transitionTime uint64) ([]byte, bool, error)
+	GetBlockActivitiesByHash(ctx context.Context, blockHash common.Hash) (*ethpb.BlockActivities, error)
 }
 
 var EmptyBlockHash = errors.New("Block hash is empty 0x0000...")
@@ -159,7 +182,7 @@ func (s *Service) ForkchoiceUpdated(
 		return nil, nil, errors.New("nil payload attributer")
 	}
 	switch attrs.Version() {
-	case version.Bellatrix, version.FastexPhase1:
+	case version.Bellatrix:
 		a, err := attrs.PbV1()
 		if err != nil {
 			return nil, nil, err
@@ -273,6 +296,35 @@ func (s *Service) ExchangeTransitionConfiguration(
 	return nil
 }
 
+func (s *Service) ExchangeCapabilities(ctx context.Context) ([]string, error) {
+	if !features.Get().EnableOptionalEngineMethods {
+		return nil, errors.New("optional engine methods not enabled")
+	}
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.ExchangeCapabilities")
+	defer span.End()
+
+	result := &pb.ExchangeCapabilities{}
+	err := s.rpcClient.CallContext(ctx, &result, ExchangeCapabilities, supportedEngineEndpoints)
+
+	var unsupported []string
+	for _, s1 := range supportedEngineEndpoints {
+		supported := false
+		for _, s2 := range result.SupportedMethods {
+			if s1 == s2 {
+				supported = true
+				break
+			}
+		}
+		if !supported {
+			unsupported = append(unsupported, s1)
+		}
+	}
+	if len(unsupported) != 0 {
+		log.Warnf("Please update client, detected the following unsupported engine methods: %s", unsupported)
+	}
+	return result.SupportedMethods, handleRPCError(err)
+}
+
 // GetTerminalBlockHash returns the valid terminal block hash based on total difficulty.
 //
 // Spec code:
@@ -356,6 +408,22 @@ func (s *Service) GetTerminalBlockHash(ctx context.Context, transitionTime uint6
 	}
 }
 
+// GetBlockActivitiesByHash fetches block activities from execution engine block with given hash by
+// calling eth_getBlockActivities via JSON-RPC.
+func (s *Service) GetBlockActivitiesByHash(ctx context.Context, blockHash common.Hash) (*ethpb.BlockActivities, error) {
+	blockActivities := &ethpb.BlockActivities{}
+	if err := s.rpcClient.CallContext(
+		ctx,
+		blockActivities,
+		GetBlockActivitiesMethod,
+		blockHash,
+	); err != nil {
+		return nil, handleRPCError(err)
+	}
+
+	return blockActivities, nil
+}
+
 // LatestExecutionBlock fetches the latest execution engine block by calling
 // eth_blockByNumber via JSON-RPC.
 func (s *Service) LatestExecutionBlock(ctx context.Context) (*pb.ExecutionBlock, error) {
@@ -435,6 +503,50 @@ func (s *Service) HeaderByNumber(ctx context.Context, number *big.Int) (*types.H
 		err = ethereum.NotFound
 	}
 	return hdr, err
+}
+
+// GetPayloadBodiesByHash returns the relevant payload bodies for the provided block hash.
+func (s *Service) GetPayloadBodiesByHash(ctx context.Context, executionBlockHashes []common.Hash) ([]*pb.ExecutionPayloadBodyV1, error) {
+	if !features.Get().EnableOptionalEngineMethods {
+		return nil, errors.New("optional engine methods not enabled")
+	}
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.GetPayloadBodiesByHashV1")
+	defer span.End()
+
+	result := make([]*pb.ExecutionPayloadBodyV1, 0)
+	err := s.rpcClient.CallContext(ctx, &result, GetPayloadBodiesByHashV1, executionBlockHashes)
+
+	for i, item := range result {
+		if item == nil {
+			result[i] = &pb.ExecutionPayloadBodyV1{
+				Transactions: make([][]byte, 0),
+				Withdrawals:  make([]*pb.Withdrawal, 0),
+			}
+		}
+	}
+	return result, handleRPCError(err)
+}
+
+// GetPayloadBodiesByRange returns the relevant payload bodies for the provided range.
+func (s *Service) GetPayloadBodiesByRange(ctx context.Context, start, count uint64) ([]*pb.ExecutionPayloadBodyV1, error) {
+	if !features.Get().EnableOptionalEngineMethods {
+		return nil, errors.New("optional engine methods not enabled")
+	}
+	ctx, span := trace.StartSpan(ctx, "powchain.engine-api-client.GetPayloadBodiesByRangeV1")
+	defer span.End()
+
+	result := make([]*pb.ExecutionPayloadBodyV1, 0)
+	err := s.rpcClient.CallContext(ctx, &result, GetPayloadBodiesByRangeV1, start, count)
+
+	for i, item := range result {
+		if item == nil {
+			result[i] = &pb.ExecutionPayloadBodyV1{
+				Transactions: make([][]byte, 0),
+				Withdrawals:  make([]*pb.Withdrawal, 0),
+			}
+		}
+	}
+	return result, handleRPCError(err)
 }
 
 // ReconstructFullBlock takes in a blinded beacon block and reconstructs
@@ -588,7 +700,7 @@ func fullPayloadFromExecutionBlock(
 		txs[i] = txBin
 	}
 
-	if block.Version == version.Bellatrix || block.Version == version.FastexPhase1 {
+	if block.Version == version.Bellatrix {
 		return blocks.WrappedExecutionPayload(&pb.ExecutionPayload{
 			ParentHash:    header.ParentHash(),
 			FeeRecipient:  header.FeeRecipient(),
@@ -669,6 +781,9 @@ func handleRPCError(err error) error {
 	case -38003:
 		errInvalidPayloadAttributesCount.Inc()
 		return ErrInvalidPayloadAttributes
+	case -38004:
+		errRequestTooLargeCount.Inc()
+		return ErrRequestTooLarge
 	case -32000:
 		errServerErrorCount.Inc()
 		// Only -32000 status codes are data errors in the RPC specification.

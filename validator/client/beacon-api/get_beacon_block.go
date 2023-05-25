@@ -9,9 +9,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/rpc/apimiddleware"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/apimiddleware"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 type abstractProduceBlockResponseJson struct {
@@ -84,21 +84,6 @@ func (c beaconApiValidatorClient) getBeaconBlock(ctx context.Context, slot primi
 		response.Block = &ethpb.GenericBeaconBlock_Bellatrix{
 			Bellatrix: bellatrixBlock,
 		}
-
-	case "fastex-phase1":
-		jsonFastexPhase1Block := apimiddleware.BeaconBlockFastexPhase1Json{}
-		if err := decoder.Decode(&jsonFastexPhase1Block); err != nil {
-			return nil, errors.Wrap(err, "failed to decode fastex-phase1 block response json")
-		}
-
-		fastexPhase1Block, err := c.beaconBlockConverter.ConvertRESTFastexPhase1BlockToProto(&jsonFastexPhase1Block)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get fastex-phase1 block")
-		}
-		response.Block = &ethpb.GenericBeaconBlock_FastexPhase1{
-			FastexPhase1: fastexPhase1Block,
-		}
-
 
 	case "capella":
 		jsonCapellaBlock := apimiddleware.BeaconBlockCapellaJson{}

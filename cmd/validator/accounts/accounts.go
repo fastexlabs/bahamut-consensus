@@ -3,10 +3,10 @@ package accounts
 import (
 	"os"
 
-	"github.com/prysmaticlabs/prysm/v3/cmd"
-	"github.com/prysmaticlabs/prysm/v3/cmd/validator/flags"
-	"github.com/prysmaticlabs/prysm/v3/config/features"
-	"github.com/prysmaticlabs/prysm/v3/runtime/tos"
+	"github.com/prysmaticlabs/prysm/v4/cmd"
+	"github.com/prysmaticlabs/prysm/v4/cmd/validator/flags"
+	"github.com/prysmaticlabs/prysm/v4/config/features"
+	"github.com/prysmaticlabs/prysm/v4/runtime/tos"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
@@ -26,10 +26,9 @@ var Commands = &cli.Command{
 				flags.WalletDirFlag,
 				flags.WalletPasswordFileFlag,
 				flags.DeletePublicKeysFlag,
-				features.FastexChainTestnet,
-				// features.Mainnet,
-				// features.PraterTestnet,
-				// features.SepoliaTestnet,
+				features.Mainnet,
+				features.PraterTestnet,
+				features.SepoliaTestnet,
 				cmd.AcceptTosFlag,
 			}),
 			Before: func(cliCtx *cli.Context) error {
@@ -63,10 +62,9 @@ var Commands = &cli.Command{
 				flags.GrpcHeadersFlag,
 				flags.GrpcRetriesFlag,
 				flags.GrpcRetryDelayFlag,
-				features.FastexChainTestnet,
-				// features.Mainnet,
-				// features.PraterTestnet,
-				// features.SepoliaTestnet,
+				features.Mainnet,
+				features.PraterTestnet,
+				features.SepoliaTestnet,
 				cmd.AcceptTosFlag,
 			}),
 			Before: func(cliCtx *cli.Context) error {
@@ -97,10 +95,9 @@ var Commands = &cli.Command{
 				flags.BackupDirFlag,
 				flags.BackupPublicKeysFlag,
 				flags.BackupPasswordFile,
-				features.FastexChainTestnet,
-				// features.Mainnet,
-				// features.PraterTestnet,
-				// features.SepoliaTestnet,
+				features.Mainnet,
+				features.PraterTestnet,
+				features.SepoliaTestnet,
 				cmd.AcceptTosFlag,
 			}),
 			Before: func(cliCtx *cli.Context) error {
@@ -128,10 +125,9 @@ var Commands = &cli.Command{
 				flags.WalletPasswordFileFlag,
 				flags.AccountPasswordFileFlag,
 				flags.ImportPrivateKeyFileFlag,
-				features.FastexChainTestnet,
-				// features.Mainnet,
-				// features.PraterTestnet,
-				// features.SepoliaTestnet,
+				features.Mainnet,
+				features.PraterTestnet,
+				features.SepoliaTestnet,
 				cmd.AcceptTosFlag,
 			}),
 			Before: func(cliCtx *cli.Context) error {
@@ -169,10 +165,11 @@ var Commands = &cli.Command{
 				flags.GrpcRetriesFlag,
 				flags.GrpcRetryDelayFlag,
 				flags.ExitAllFlag,
-				features.FastexChainTestnet,
-				// features.Mainnet,
-				// features.PraterTestnet,
-				// features.SepoliaTestnet,
+				flags.ForceExitFlag,
+				flags.VoluntaryExitJSONOutputPath,
+				features.Mainnet,
+				features.PraterTestnet,
+				features.SepoliaTestnet,
 				cmd.AcceptTosFlag,
 			}),
 			Before: func(cliCtx *cli.Context) error {

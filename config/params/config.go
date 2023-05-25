@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 )
 
 // BeaconChainConfig contains constant configs for node to participate in beacon chain.
@@ -47,6 +47,7 @@ type BeaconChainConfig struct {
 	BLSWithdrawalPrefixByte         byte     `yaml:"BLS_WITHDRAWAL_PREFIX" spec:"true"`          // BLSWithdrawalPrefixByte is used for BLS withdrawal and it's the first byte.
 	ETH1AddressWithdrawalPrefixByte byte     `yaml:"ETH1_ADDRESS_WITHDRAWAL_PREFIX" spec:"true"` // ETH1AddressWithdrawalPrefixByte is used for withdrawals and it's the first byte.
 	ZeroHash                        [32]byte // ZeroHash is used to represent a zeroed out 32 byte array.
+	ZeroContract                    [20]byte // ZeroContract is used to represent a zeroed out 20 byte array.
 
 	// Time parameters constants.
 	GenesisDelay                              uint64           `yaml:"GENESIS_DELAY" spec:"true"`                   // GenesisDelay is the minimum number of seconds to delay starting the Ethereum Beacon Chain genesis. Must be at least 1 second.
@@ -62,7 +63,7 @@ type BeaconChainConfig struct {
 	ShardCommitteePeriod                      primitives.Epoch `yaml:"SHARD_COMMITTEE_PERIOD" spec:"true"`              // ShardCommitteePeriod is the minimum amount of epochs a validator must participate before exiting.
 	MinEpochsToInactivityPenalty              primitives.Epoch `yaml:"MIN_EPOCHS_TO_INACTIVITY_PENALTY" spec:"true"`    // MinEpochsToInactivityPenalty defines the minimum amount of epochs since finality to begin penalizing inactivity.
 	Eth1FollowDistance                        uint64           `yaml:"ETH1_FOLLOW_DISTANCE" spec:"true"`                // Eth1FollowDistance is the number of eth1.0 blocks to wait before considering a new deposit for voting. This only applies after the chain as been started.
-	SafeSlotsToUpdateJustified                primitives.Slot  `yaml:"SAFE_SLOTS_TO_UPDATE_JUSTIFIED" spec:"true"`      // SafeSlotsToUpdateJustified is the minimal slots needed to update justified check point.
+	DeprecatedSafeSlotsToUpdateJustified      primitives.Slot  `yaml:"SAFE_SLOTS_TO_UPDATE_JUSTIFIED" spec:"true"`      // DeprecateSafeSlotsToUpdateJustified is the minimal slots needed to update justified check point.
 	DeprecatedSafeSlotsToImportOptimistically primitives.Slot  `yaml:"SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" spec:"true"` // SafeSlotsToImportOptimistically is the minimal number of slots to wait before importing optimistically a pre-merge block
 	SecondsPerETH1Block                       uint64           `yaml:"SECONDS_PER_ETH1_BLOCK" spec:"true"`              // SecondsPerETH1Block is the approximate time for a single eth1 block to be produced.
 
@@ -89,7 +90,6 @@ type BeaconChainConfig struct {
 
 	// Reward and penalty quotients constants.
 	BaseRewardFactor               uint64 `yaml:"BASE_REWARD_FACTOR" spec:"true"`               // BaseRewardFactor is used to calculate validator per-slot interest rate.
-	BaseRewardFactorFTN            uint64 `yaml:"BASE_REWARD_FACTOR_FTN" spec:"true"`           // BaseRewardFactorFTN is used to calculate validator per-slot interest rate in post-FastexPhase1 forks.
 	WhistleBlowerRewardQuotient    uint64 `yaml:"WHISTLEBLOWER_REWARD_QUOTIENT" spec:"true"`    // WhistleBlowerRewardQuotient is used to calculate whistle blower reward.
 	ProposerRewardQuotient         uint64 `yaml:"PROPOSER_REWARD_QUOTIENT" spec:"true"`         // ProposerRewardQuotient is used to calculate the reward for proposers.
 	InactivityPenaltyQuotient      uint64 `yaml:"INACTIVITY_PENALTY_QUOTIENT" spec:"true"`      // InactivityPenaltyQuotient is used to calculate the penalty for a validator that is offline.
@@ -121,30 +121,28 @@ type BeaconChainConfig struct {
 	DomainApplicationBuilder          [4]byte // DomainApplicationBuilder defines the BLS signature domain for application builder.
 	DomainBLSToExecutionChange        [4]byte // DomainBLSToExecutionChange defines the BLS signature domain to change withdrawal addresses to ETH1 prefix
 
-	// Prysm constants.
-	GweiPerEth                        uint64          // GweiPerEth is the amount of gwei corresponding to 1 eth.
-	WeiPerGwei                        uint64          // WeiPerGwei is the amount of wei corresponding to 1 gwei.
-	BLSSecretKeyLength                int             // BLSSecretKeyLength defines the expected length of BLS secret keys in bytes.
-	BLSPubkeyLength                   int             // BLSPubkeyLength defines the expected length of BLS public keys in bytes.
-	DefaultBufferSize                 int             // DefaultBufferSize for channels across the Prysm repository.
-	ValidatorPrivkeyFileName          string          // ValidatorPrivKeyFileName specifies the string name of a validator private key file.
-	WithdrawalPrivkeyFileName         string          // WithdrawalPrivKeyFileName specifies the string name of a withdrawal private key file.
-	RPCSyncCheck                      time.Duration   // Number of seconds to query the sync service, to find out if the node is synced or not.
-	EmptySignature                    [96]byte        // EmptySignature is used to represent a zeroed out BLS Signature.
-	DefaultPageSize                   int             // DefaultPageSize defines the default page size for RPC server request.
-	MaxPeersToSync                    int             // MaxPeersToSync describes the limit for number of peers in round robin sync.
-	SlotsPerArchivedPoint             primitives.Slot // SlotsPerArchivedPoint defines the number of slots per one archived point.
-	GenesisCountdownInterval          time.Duration   // How often to log the countdown until the genesis time is reached.
-	BeaconStateFieldCount             int             // BeaconStateFieldCount defines how many fields are in the Phase0 beacon state.
-	BeaconStateAltairFieldCount       int             // BeaconStateAltairFieldCount defines how many fields are in the beacon state post upgrade to Altair.
-	BeaconStateBellatrixFieldCount    int             // BeaconStateBellatrixFieldCount defines how many fields are in beacon state post upgrade to Bellatrix.
-	BeaconStateFastexPhase1FieldCount int             // BeaconStateFastexPhase1FieldCount defines how many fields are in beacon state post upgrade to FastexPhase1.
-	BeaconStateCapellaFieldCount      int             // BeaconStateCapellaFieldCount defines how many fields are in beacon state post upgrade to Capella.
+	// FastexChain consensus constants.
+	EpochsPerActivityPeriod primitives.Epoch // EpochsPerActivityPeriod defines activity period length to calculate effective activities in beacon state.
 
-	EpochsPerActivityPeriod primitives.Epoch `yaml:"EPOCHS_PER_ACTIVITY_PERIOD"` // EpochsPerActivityPeriod is the number of epochs that is used in effective activity calculation.
-	EpochsPerAcrivityUpdate primitives.Epoch `yaml:"EPOCHS_PER_ACTIVITY_UPDATE"` // EpochsPerActivityUpdate is the number of epochs between effective activity updates.
-	SigmoidExpCoefficient   float64          `yaml:"SIGMOID_EXP_COEFFICIENT"`    // SigmoidExpCoefficient is the coefficient of sigmoid function that is used in power calculation.
-	SigmoidLimit            float64          `yaml:"SIGMOID_LIMIT"`              // SigmoidLimit is the limit of sigmoid function with given SigmoidExpCoefficient
+	// Prysm constants.
+	GweiPerEth                     uint64          // GweiPerEth is the amount of gwei corresponding to 1 eth.
+	WeiPerGwei                     uint64          // WeiPerGwei is the amount of wei corresponding to 1 gwei.
+	BaseTransactionCost            uint64          // BaseTransactionCost is the minimal amount of gas needed for transaction execution.
+	BLSSecretKeyLength             int             // BLSSecretKeyLength defines the expected length of BLS secret keys in bytes.
+	BLSPubkeyLength                int             // BLSPubkeyLength defines the expected length of BLS public keys in bytes.
+	DefaultBufferSize              int             // DefaultBufferSize for channels across the Prysm repository.
+	ValidatorPrivkeyFileName       string          // ValidatorPrivKeyFileName specifies the string name of a validator private key file.
+	WithdrawalPrivkeyFileName      string          // WithdrawalPrivKeyFileName specifies the string name of a withdrawal private key file.
+	RPCSyncCheck                   time.Duration   // Number of seconds to query the sync service, to find out if the node is synced or not.
+	EmptySignature                 [96]byte        // EmptySignature is used to represent a zeroed out BLS Signature.
+	DefaultPageSize                int             // DefaultPageSize defines the default page size for RPC server request.
+	MaxPeersToSync                 int             // MaxPeersToSync describes the limit for number of peers in round robin sync.
+	SlotsPerArchivedPoint          primitives.Slot // SlotsPerArchivedPoint defines the number of slots per one archived point.
+	GenesisCountdownInterval       time.Duration   // How often to log the countdown until the genesis time is reached.
+	BeaconStateFieldCount          int             // BeaconStateFieldCount defines how many fields are in the Phase0 beacon state.
+	BeaconStateAltairFieldCount    int             // BeaconStateAltairFieldCount defines how many fields are in the beacon state post upgrade to Altair.
+	BeaconStateBellatrixFieldCount int             // BeaconStateBellatrixFieldCount defines how many fields are in beacon state post upgrade to Bellatrix.
+	BeaconStateCapellaFieldCount   int             // BeaconStateCapellaFieldCount defines how many fields are in beacon state post upgrade to Capella.
 
 	// Slasher constants.
 	WeakSubjectivityPeriod    primitives.Epoch // WeakSubjectivityPeriod defines the time period expressed in number of epochs were proof of stake network should validate block headers and attestations for slashable events.
@@ -154,15 +152,13 @@ type BeaconChainConfig struct {
 	SlashingProtectionPruningEpochs primitives.Epoch // SlashingProtectionPruningEpochs defines a period after which all prior epochs are pruned in the validator database.
 
 	// Fork-related values.
-	GenesisForkVersion      []byte           `yaml:"GENESIS_FORK_VERSION" spec:"true"`       // GenesisForkVersion is used to track fork version between state transitions.
-	AltairForkVersion       []byte           `yaml:"ALTAIR_FORK_VERSION" spec:"true"`        // AltairForkVersion is used to represent the fork version for altair.
-	AltairForkEpoch         primitives.Epoch `yaml:"ALTAIR_FORK_EPOCH" spec:"true"`          // AltairForkEpoch is used to represent the assigned fork epoch for altair.
-	BellatrixForkVersion    []byte           `yaml:"BELLATRIX_FORK_VERSION" spec:"true"`     // BellatrixForkVersion is used to represent the fork version for bellatrix.
-	BellatrixForkEpoch      primitives.Epoch `yaml:"BELLATRIX_FORK_EPOCH" spec:"true"`       // BellatrixForkEpoch is used to represent the assigned fork epoch for bellatrix.
-	FastexPhase1ForkVersion []byte           `yaml:"FASTEX_PHASE1_FORK_VERSION" spec:"true"` // FastexPhase1ForkVersion is used to represent the fork version for fastex-phase1.
-	FastexPhase1ForkEpoch   primitives.Epoch `yaml:"FASTEX_PHASE1_FORK_EPOCH" spec:"true"`   // FastexPhase1ForkEpoch is used to represent the assigned fork epoch for fastex-phase1.
-	CapellaForkVersion      []byte           `yaml:"CAPELLA_FORK_VERSION" spec:"true"`       // CapellaForkVersion is used to represent the fork version for capella.
-	CapellaForkEpoch        primitives.Epoch `yaml:"CAPELLA_FORK_EPOCH" spec:"true"`         // CapellaForkEpoch is used to represent the assigned fork epoch for capella.
+	GenesisForkVersion   []byte           `yaml:"GENESIS_FORK_VERSION" spec:"true"`   // GenesisForkVersion is used to track fork version between state transitions.
+	AltairForkVersion    []byte           `yaml:"ALTAIR_FORK_VERSION" spec:"true"`    // AltairForkVersion is used to represent the fork version for altair.
+	AltairForkEpoch      primitives.Epoch `yaml:"ALTAIR_FORK_EPOCH" spec:"true"`      // AltairForkEpoch is used to represent the assigned fork epoch for altair.
+	BellatrixForkVersion []byte           `yaml:"BELLATRIX_FORK_VERSION" spec:"true"` // BellatrixForkVersion is used to represent the fork version for bellatrix.
+	BellatrixForkEpoch   primitives.Epoch `yaml:"BELLATRIX_FORK_EPOCH" spec:"true"`   // BellatrixForkEpoch is used to represent the assigned fork epoch for bellatrix.
+	CapellaForkVersion   []byte           `yaml:"CAPELLA_FORK_VERSION" spec:"true"`   // CapellaForkVersion is used to represent the fork version for capella.
+	CapellaForkEpoch     primitives.Epoch `yaml:"CAPELLA_FORK_EPOCH" spec:"true"`     // CapellaForkEpoch is used to represent the assigned fork epoch for capella.
 
 	ForkVersionSchedule map[[fieldparams.VersionLength]byte]primitives.Epoch // Schedule of fork epochs by version.
 	ForkVersionNames    map[[fieldparams.VersionLength]byte]string           // Human-readable names of fork versions.
@@ -177,13 +173,12 @@ type BeaconChainConfig struct {
 	TimelyHeadFlagIndex   uint8 `yaml:"TIMELY_HEAD_FLAG_INDEX" spec:"true"`   // TimelyHeadFlagIndex is the head flag position of the participation bits.
 
 	// Incentivization weights.
-	TimelySourceWeight   uint64 `yaml:"TIMELY_SOURCE_WEIGHT" spec:"true"`   // TimelySourceWeight is the factor of how much source rewards receives.
-	TimelyTargetWeight   uint64 `yaml:"TIMELY_TARGET_WEIGHT" spec:"true"`   // TimelyTargetWeight is the factor of how much target rewards receives.
-	TimelyHeadWeight     uint64 `yaml:"TIMELY_HEAD_WEIGHT" spec:"true"`     // TimelyHeadWeight is the factor of how much head rewards receives.
-	SyncRewardWeight     uint64 `yaml:"SYNC_REWARD_WEIGHT" spec:"true"`     // SyncRewardWeight is the factor of how much sync committee rewards receives.
-	WeightDenominator    uint64 `yaml:"WEIGHT_DENOMINATOR" spec:"true"`     // WeightDenominator accounts for total rewards denomination.
-	WeightDenominatorFTN uint64 `yaml:"WEIGHT_DENOMINATOR_FTN" spec:"true"` // WeightDenominatorFTN accounts for total rewards denomination in post-FastexPhase1 forks.
-	ProposerWeight       uint64 `yaml:"PROPOSER_WEIGHT" spec:"true"`        // ProposerWeight is the factor of how much proposer rewards receives.
+	TimelySourceWeight uint64 `yaml:"TIMELY_SOURCE_WEIGHT" spec:"true"` // TimelySourceWeight is the factor of how much source rewards receives.
+	TimelyTargetWeight uint64 `yaml:"TIMELY_TARGET_WEIGHT" spec:"true"` // TimelyTargetWeight is the factor of how much target rewards receives.
+	TimelyHeadWeight   uint64 `yaml:"TIMELY_HEAD_WEIGHT" spec:"true"`   // TimelyHeadWeight is the factor of how much head rewards receives.
+	SyncRewardWeight   uint64 `yaml:"SYNC_REWARD_WEIGHT" spec:"true"`   // SyncRewardWeight is the factor of how much sync committee rewards receives.
+	WeightDenominator  uint64 `yaml:"WEIGHT_DENOMINATOR" spec:"true"`   // WeightDenominator accounts for total rewards denomination.
+	ProposerWeight     uint64 `yaml:"PROPOSER_WEIGHT" spec:"true"`      // ProposerWeight is the factor of how much proposer rewards receives.
 
 	// Validator related.
 	TargetAggregatorsPerSyncSubcommittee uint64 `yaml:"TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE" spec:"true"` // TargetAggregatorsPerSyncSubcommittee for aggregating in sync committee.
@@ -218,6 +213,7 @@ type BeaconChainConfig struct {
 	// Mev-boost circuit breaker
 	MaxBuilderConsecutiveMissedSlots primitives.Slot // MaxBuilderConsecutiveMissedSlots defines the number of consecutive skip slot to fallback from using relay/builder to local execution engine for block construction.
 	MaxBuilderEpochMissedSlots       primitives.Slot // MaxBuilderEpochMissedSlots is defines the number of total skip slot (per epoch rolling windows) to fallback from using relay/builder to local execution engine for block construction.
+	LocalBlockValueBoost             uint64          // LocalBlockValueBoost is the value boost for local block construction. This is used to prioritize local block construction over relay/builder block construction.
 
 	// Execution engine timeout value
 	ExecutionEngineTimeoutValue uint64 // ExecutionEngineTimeoutValue defines the seconds to wait before timing out engine endpoints with execution payload execution semantics (newPayload, forkchoiceUpdated).
@@ -235,7 +231,6 @@ func configForkSchedule(b *BeaconChainConfig) map[[fieldparams.VersionLength]byt
 	fvs[bytesutil.ToBytes4(b.GenesisForkVersion)] = b.GenesisEpoch
 	fvs[bytesutil.ToBytes4(b.AltairForkVersion)] = b.AltairForkEpoch
 	fvs[bytesutil.ToBytes4(b.BellatrixForkVersion)] = b.BellatrixForkEpoch
-	fvs[bytesutil.ToBytes4(b.FastexPhase1ForkVersion)] = b.FastexPhase1ForkEpoch
 	fvs[bytesutil.ToBytes4(b.CapellaForkVersion)] = b.CapellaForkEpoch
 	return fvs
 }
@@ -245,7 +240,6 @@ func configForkNames(b *BeaconChainConfig) map[[fieldparams.VersionLength]byte]s
 	fvn[bytesutil.ToBytes4(b.GenesisForkVersion)] = "phase0"
 	fvn[bytesutil.ToBytes4(b.AltairForkVersion)] = "altair"
 	fvn[bytesutil.ToBytes4(b.BellatrixForkVersion)] = "bellatrix"
-	fvn[bytesutil.ToBytes4(b.FastexPhase1ForkVersion)] = "fastex-phase1"
 	fvn[bytesutil.ToBytes4(b.CapellaForkVersion)] = "capella"
 	return fvn
 }

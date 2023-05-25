@@ -3,14 +3,14 @@ package capella_test
 import (
 	"testing"
 
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/capella"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
-	"github.com/prysmaticlabs/prysm/v3/testing/util"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/capella"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/testing/util"
 )
 
 func TestUpgradeToCapella(t *testing.T) {
@@ -28,8 +28,11 @@ func TestUpgradeToCapella(t *testing.T) {
 	require.DeepSSZEqual(t, preForkState.Eth1Data(), mSt.Eth1Data())
 	require.DeepSSZEqual(t, preForkState.Eth1DataVotes(), mSt.Eth1DataVotes())
 	require.DeepSSZEqual(t, preForkState.Eth1DepositIndex(), mSt.Eth1DepositIndex())
+	require.DeepSSZEqual(t, preForkState.SharedActivity(), mSt.SharedActivity())
+	require.DeepSSZEqual(t, preForkState.ExecutionHeight(), mSt.ExecutionHeight())
 	require.DeepSSZEqual(t, preForkState.Validators(), mSt.Validators())
 	require.DeepSSZEqual(t, preForkState.Balances(), mSt.Balances())
+	require.DeepSSZEqual(t, preForkState.Activities(), mSt.Activities())
 	require.DeepSSZEqual(t, preForkState.RandaoMixes(), mSt.RandaoMixes())
 	require.DeepSSZEqual(t, preForkState.Slashings(), mSt.Slashings())
 	require.DeepSSZEqual(t, preForkState.JustificationBits(), mSt.JustificationBits())

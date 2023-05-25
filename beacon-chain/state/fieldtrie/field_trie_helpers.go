@@ -6,14 +6,13 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
-	customtypes "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/custom-types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
-	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	pmath "github.com/prysmaticlabs/prysm/v3/math"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	customtypes "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/custom-types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	pmath "github.com/prysmaticlabs/prysm/v4/math"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
 
 // ProofFromMerkleLayers creates a proof starting at the leaf index of the state Merkle layers.
@@ -80,8 +79,6 @@ func fieldConverters(field types.FieldIndex, indices []uint64, elements interfac
 		return convertAttestations(indices, elements, convertAll)
 	case types.Balances:
 		return convertBalances(indices, elements, convertAll)
-	case types.Contracts:
-		return convertContracts(indices, elements, convertAll)
 	case types.Activities:
 		return convertActivities(indices, elements, convertAll)
 	default:
@@ -157,19 +154,9 @@ func convertBalances(indices []uint64, elements interface{}, convertAll bool) ([
 func convertActivities(indices []uint64, elements interface{}, convertAll bool) ([][32]byte, error) {
 	val, ok := elements.([]uint64)
 	if !ok {
-		return nil, errors.Errorf("Wanted type of %v but got %v",
-			reflect.TypeOf([]uint64{}).Name(), reflect.TypeOf(elements).Name())
+		return nil, errors.Errorf("Wanted type of %T but got %T", []uint64{}, elements)
 	}
 	return handleActivitiesSlice(val, indices, convertAll)
-}
-
-func convertContracts(indices []uint64, elements interface{}, convertAll bool) ([][32]byte, error) {
-	val, ok := elements.([]*ethpb.ContractsContainer)
-	if !ok {
-		return nil, errors.Errorf("Wanted type of %v but got %v",
-			reflect.TypeOf([]*ethpb.ContractsContainer{}).Name(), reflect.TypeOf(elements).Name())
-	}
-	return handleContractsSlice(val, indices, convertAll)
 }
 
 // handleByteArrays computes and returns byte arrays in a slice of root format.
@@ -234,9 +221,8 @@ func handleValidatorSlice(val []*ethpb.Validator, indices []uint64, convertAll b
 		length = len(val)
 	}
 	roots := make([][32]byte, 0, length)
-	hasher := hash.CustomSHA256Hasher()
 	rootCreator := func(input *ethpb.Validator) error {
-		newRoot, err := stateutil.ValidatorRootWithHasher(hasher, input)
+		newRoot, err := stateutil.ValidatorRootWithHasher(input)
 		if err != nil {
 			return err
 		}
@@ -273,9 +259,8 @@ func handleEth1DataSlice(val []*ethpb.Eth1Data, indices []uint64, convertAll boo
 		length = len(val)
 	}
 	roots := make([][32]byte, 0, length)
-	hasher := hash.CustomSHA256Hasher()
 	rootCreator := func(input *ethpb.Eth1Data) error {
-		newRoot, err := stateutil.Eth1DataRootWithHasher(hasher, input)
+		newRoot, err := stateutil.Eth1DataRootWithHasher(input)
 		if err != nil {
 			return err
 		}
@@ -312,9 +297,8 @@ func handlePendingAttestationSlice(val []*ethpb.PendingAttestation, indices []ui
 		length = len(val)
 	}
 	roots := make([][32]byte, 0, length)
-	hasher := hash.CustomSHA256Hasher()
 	rootCreator := func(input *ethpb.PendingAttestation) error {
-		newRoot, err := stateutil.PendingAttRootWithHasher(hasher, input)
+		newRoot, err := stateutil.PendingAttRootWithHasher(input)
 		if err != nil {
 			return err
 		}
@@ -384,7 +368,7 @@ func handleBalanceSlice(val, indices []uint64, convertAll bool) ([][32]byte, err
 	return [][32]byte{}, nil
 }
 
-// handleActivitiesSlice returns the root of a slice of validator activities.
+// handleBalanceSlice returns the root of a slice of validator balances.
 func handleActivitiesSlice(val, indices []uint64, convertAll bool) ([][32]byte, error) {
 	if convertAll {
 		return stateutil.PackUint64IntoChunks(val)
@@ -404,7 +388,7 @@ func handleActivitiesSlice(val, indices []uint64, convertAll bool) ([][32]byte, 
 			// are compressed according to 4 values -> 1 chunk.
 			startIdx := idx / numOfElems
 			startGroup := startIdx * numOfElems
-			chunk := [32]byte{}
+			var chunk [32]byte
 			sizeOfElem := len(chunk) / iNumOfElems
 			for i, j := 0, startGroup; j < startGroup+numOfElems; i, j = i+sizeOfElem, j+1 {
 				wantedVal := uint64(0)
@@ -422,42 +406,4 @@ func handleActivitiesSlice(val, indices []uint64, convertAll bool) ([][32]byte, 
 		return roots, nil
 	}
 	return [][32]byte{}, nil
-}
-
-func handleContractsSlice(val []*ethpb.ContractsContainer, indices []uint64, convertAll bool) ([][32]byte, error) {
-	length := len(indices)
-	if convertAll {
-		length = len(val)
-	}
-	roots := make([][32]byte, 0, length)
-	hasher := hash.CustomSHA256Hasher()
-	rootCreator := func(input *ethpb.ContractsContainer) error {
-		newRoot, err := stateutil.ContractsRootWithHasher(hasher, input)
-		if err != nil {
-			return err
-		}
-		roots = append(roots, newRoot)
-		return nil
-	}
-	if convertAll {
-		for i := range val {
-			err := rootCreator(val[i])
-			if err != nil {
-				return nil, err
-			}
-		}
-		return roots, nil
-	}
-	if len(val) > 0 {
-		for _, idx := range indices {
-			if idx > uint64(len(val))-1 {
-				return nil, fmt.Errorf("index %d greater than number of validators %d", idx, len(val))
-			}
-			err := rootCreator(val[idx])
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-	return roots, nil
 }

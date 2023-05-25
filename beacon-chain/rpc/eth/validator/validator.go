@@ -12,22 +12,22 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/builder"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/db/kv"
-	rpchelpers "github.com/prysmaticlabs/prysm/v3/beacon-chain/rpc/eth/helpers"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	state_native "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpbv1 "github.com/prysmaticlabs/prysm/v3/proto/eth/v1"
-	ethpbv2 "github.com/prysmaticlabs/prysm/v3/proto/eth/v2"
-	"github.com/prysmaticlabs/prysm/v3/proto/migration"
-	ethpbalpha "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/builder"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db/kv"
+	rpchelpers "github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/helpers"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	state_native "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpbv1 "github.com/prysmaticlabs/prysm/v4/proto/eth/v1"
+	ethpbv2 "github.com/prysmaticlabs/prysm/v4/proto/eth/v2"
+	"github.com/prysmaticlabs/prysm/v4/proto/migration"
+	ethpbalpha "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	log "github.com/sirupsen/logrus"
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc/codes"
@@ -70,7 +70,7 @@ func (vs *Server) GetAttesterDuties(ctx context.Context, req *ethpbv1.AttesterDu
 		return nil, status.Errorf(codes.Internal, "Could not get start slot from epoch %d: %v", req.Epoch, err)
 	}
 
-	s, err := vs.StateFetcher.StateBySlot(ctx, startSlot)
+	s, err := vs.Stater.StateBySlot(ctx, startSlot)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not get state: %v", err)
 	}
@@ -159,7 +159,7 @@ func (vs *Server) GetProposerDuties(ctx context.Context, req *ethpbv1.ProposerDu
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not get start slot from epoch %d: %v", req.Epoch, err)
 	}
-	s, err := vs.StateFetcher.StateBySlot(ctx, startSlot)
+	s, err := vs.Stater.StateBySlot(ctx, startSlot)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not get state: %v", err)
 	}
@@ -243,7 +243,7 @@ func (vs *Server) GetSyncCommitteeDuties(ctx context.Context, req *ethpbv2.SyncC
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not get sync committee slot: %v", err)
 	}
-	st, err := vs.StateFetcher.State(ctx, []byte(strconv.FormatUint(uint64(slot), 10)))
+	st, err := vs.Stater.State(ctx, []byte(strconv.FormatUint(uint64(slot), 10)))
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not get sync committee state: %v", err)
 	}
@@ -278,7 +278,14 @@ func (vs *Server) GetSyncCommitteeDuties(ctx context.Context, req *ethpbv2.SyncC
 		return nil, status.Errorf(codes.Internal, "Could not get duties: %v", err)
 	}
 
-	isOptimistic, err := rpchelpers.IsOptimistic(ctx, st, vs.OptimisticModeFetcher)
+	isOptimistic, err := rpchelpers.IsOptimistic(
+		ctx,
+		[]byte(strconv.FormatUint(uint64(slot), 10)),
+		vs.OptimisticModeFetcher,
+		vs.Stater,
+		vs.ChainInfoFetcher,
+		vs.BeaconDB,
+	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not check if slot's block is optimistic: %v", err)
 	}
@@ -352,19 +359,6 @@ func (vs *Server) ProduceBlockV2(ctx context.Context, req *ethpbv1.ProduceBlockR
 			Version: ethpbv2.Version_BELLATRIX,
 			Data: &ethpbv2.BeaconBlockContainerV2{
 				Block: &ethpbv2.BeaconBlockContainerV2_BellatrixBlock{BellatrixBlock: block},
-			},
-		}, nil
-	}
-	fastexPhase1Block, ok := v1alpha1resp.Block.(*ethpbalpha.GenericBeaconBlock_FastexPhase1)
-	if ok {
-		block, err := migration.V1Alpha1BeaconBlockFastexPhase1ToV2(fastexPhase1Block.FastexPhase1)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not prepare beacon block: %v", err)
-		}
-		return &ethpbv2.ProduceBlockResponseV2{
-			Version: ethpbv2.Version_FASTEX_PHASE1,
-			Data: &ethpbv2.BeaconBlockContainerV2{
-				Block: &ethpbv2.BeaconBlockContainerV2_FastexPhase1Block{FastexPhase1Block: block},
 			},
 		}, nil
 	}
@@ -455,21 +449,6 @@ func (vs *Server) ProduceBlockV2SSZ(ctx context.Context, req *ethpbv1.ProduceBlo
 		}
 		return &ethpbv2.SSZContainer{
 			Version: ethpbv2.Version_BELLATRIX,
-			Data:    sszBlock,
-		}, nil
-	}
-	fastexPhase1Block, ok := v1alpha1resp.Block.(*ethpbalpha.GenericBeaconBlock_FastexPhase1)
-	if ok {
-		block, err := migration.V1Alpha1BeaconBlockFastexPhase1ToV2(fastexPhase1Block.FastexPhase1)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not prepare beacon block: %v", err)
-		}
-		sszBlock, err := block.MarshalSSZ()
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not marshal block into SSZ format: %v", err)
-		}
-		return &ethpbv2.SSZContainer{
-			Version: ethpbv2.Version_FASTEX_PHASE1,
 			Data:    sszBlock,
 		}, nil
 	}
@@ -567,19 +546,6 @@ func (vs *Server) ProduceBlindedBlock(ctx context.Context, req *ethpbv1.ProduceB
 			},
 		}, nil
 	}
-	fastexPhase1Block, ok := v1alpha1resp.Block.(*ethpbalpha.GenericBeaconBlock_BlindedFastexPhase1)
-	if ok {
-		blk, err := migration.V1Alpha1BeaconBlockBlindedFastexPhase1ToV2Blinded(fastexPhase1Block.BlindedFastexPhase1)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not prepare beacon block: %v", err)
-		}
-		return &ethpbv2.ProduceBlindedBlockResponse{
-			Version: ethpbv2.Version_FASTEX_PHASE1,
-			Data: &ethpbv2.BlindedBeaconBlockContainer{
-				Block: &ethpbv2.BlindedBeaconBlockContainer_FastexPhase1Block{FastexPhase1Block: blk},
-			},
-		}, nil
-	}
 	capellaBlock, ok := v1alpha1resp.Block.(*ethpbalpha.GenericBeaconBlock_BlindedCapella)
 	if ok {
 		blk, err := migration.V1Alpha1BeaconBlockBlindedCapellaToV2Blinded(capellaBlock.BlindedCapella)
@@ -663,21 +629,6 @@ func (vs *Server) ProduceBlindedBlockSSZ(ctx context.Context, req *ethpbv1.Produ
 		}
 		return &ethpbv2.SSZContainer{
 			Version: ethpbv2.Version_BELLATRIX,
-			Data:    sszBlock,
-		}, nil
-	}
-	fastexPhase1Block, ok := v1alpha1resp.Block.(*ethpbalpha.GenericBeaconBlock_FastexPhase1)
-	if ok {
-		block, err := migration.V1Alpha1BeaconBlockFastexPhase1ToV2Blinded(fastexPhase1Block.FastexPhase1)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not prepare beacon block: %v", err)
-		}
-		sszBlock, err := block.MarshalSSZ()
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not marshal block into SSZ format: %v", err)
-		}
-		return &ethpbv2.SSZContainer{
-			Version: ethpbv2.Version_FASTEX_PHASE1,
 			Data:    sszBlock,
 		}, nil
 	}
@@ -1130,7 +1081,7 @@ func (vs *Server) GetLiveness(ctx context.Context, req *ethpbv2.GetLivenessReque
 		if err != nil {
 			return nil, status.Error(codes.Internal, "Could not get requested epoch's end slot")
 		}
-		st, err = vs.StateFetcher.StateBySlot(ctx, epochEnd)
+		st, err = vs.Stater.StateBySlot(ctx, epochEnd)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "Could not get slot for requested epoch")
 		}

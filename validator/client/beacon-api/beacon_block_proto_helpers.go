@@ -5,10 +5,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/rpc/apimiddleware"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/apimiddleware"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 func convertProposerSlashingsToProto(jsonProposerSlashings []*apimiddleware.ProposerSlashingJson) ([]*ethpb.ProposerSlashing, error) {
@@ -401,33 +401,6 @@ func convertWithdrawalsToProto(jsonWithdrawals []*apimiddleware.WithdrawalJson) 
 	}
 
 	return withdrawals, nil
-}
-
-func convertActivityChangesToProto(jsonActivityChanges []*apimiddleware.ActivityChangeJson) ([]*ethpb.ActivityChange, error) {
-	activityChanges := make([]*ethpb.ActivityChange, len(jsonActivityChanges))
-
-	for index, jsonActivityChange := range jsonActivityChanges {
-		if jsonActivityChange == nil {
-			return nil, errors.Errorf("activity change at index `%d` is nil", index)
-		}
-
-		contractAddress, err := hexutil.Decode(jsonActivityChange.ContractAddress)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to decode contract address `%s`", jsonActivityChange.ContractAddress)
-		}
-
-		deltaActivity, err := strconv.ParseUint(jsonActivityChange.DeltaActivity, 10, 64)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to decode activity delta `%s`", jsonActivityChange.DeltaActivity)
-		}
-
-		activityChanges[index] = &ethpb.ActivityChange{
-			ContractAddress: contractAddress,
-			DeltaActivity:   deltaActivity,
-		}
-	}
-
-	return activityChanges, nil
 }
 
 func convertBlsToExecutionChangesToProto(jsonSignedBlsToExecutionChanges []*apimiddleware.SignedBLSToExecutionChangeJson) ([]*ethpb.SignedBLSToExecutionChange, error) {

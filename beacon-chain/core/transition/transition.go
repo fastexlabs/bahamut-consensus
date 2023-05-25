@@ -9,23 +9,22 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/altair"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/capella"
-	e "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/epoch"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/epoch/precompute"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/execution"
-	fastexphase1 "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/fastex-phase1"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/config/features"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/math"
-	"github.com/prysmaticlabs/prysm/v3/monitoring/tracing"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/altair"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/capella"
+	e "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/epoch"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/epoch/precompute"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/execution"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/config/features"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/math"
+	"github.com/prysmaticlabs/prysm/v4/monitoring/tracing"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 	"go.opencensus.io/trace"
 )
 
@@ -68,6 +67,7 @@ func ExecuteStateTransition(
 	if err != nil {
 		return nil, errors.Wrap(err, "could not execute state transition")
 	}
+
 	var valid bool
 	if features.Get().EnableVerboseSigVerification {
 		valid, err = set.VerifyVerbosely()
@@ -143,30 +143,19 @@ func ProcessSlotsUsingNextSlotCache(
 	ctx context.Context,
 	parentState state.BeaconState,
 	parentRoot []byte,
-	slot primitives.Slot,
-) (state.BeaconState, error) {
+	slot primitives.Slot) (state.BeaconState, error) {
 	ctx, span := trace.StartSpan(ctx, "core.state.ProcessSlotsUsingNextSlotCache")
 	defer span.End()
 
-	// Check whether the parent state has been advanced by 1 slot in next slot cache.
-	nextSlotState, err := NextSlotState(ctx, parentRoot)
-	if err != nil {
-		return nil, err
-	}
-	cachedStateExists := nextSlotState != nil && !nextSlotState.IsNil()
-	// If the next slot state is not nil (i.e. cache hit).
-	// We replace next slot state with parent state.
-	if cachedStateExists {
+	nextSlotState := NextSlotState(parentRoot, slot)
+	if nextSlotState != nil {
 		parentState = nextSlotState
 	}
-
-	// In the event our cached state has advanced our
-	// state to the desired slot, we exit early.
-	if cachedStateExists && parentState.Slot() == slot {
+	if parentState.Slot() == slot {
 		return parentState, nil
 	}
-	// Since next slot cache only advances state by 1 slot,
-	// we check if there's more slots that need to process.
+
+	var err error
 	parentState, err = ProcessSlots(ctx, parentState, slot)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process slots")
@@ -265,12 +254,6 @@ func ProcessSlots(ctx context.Context, state state.BeaconState, slot primitives.
 					tracing.AnnotateError(span, err)
 					return nil, errors.Wrap(err, "could not process epoch with optimizations")
 				}
-			} else if state.Version() >= version.FastexPhase1 {
-				state, err = fastexphase1.ProcessEpoch(ctx, state)
-				if err != nil {
-					tracing.AnnotateError(span, err)
-					return nil, errors.Wrap(err, "could not process epoch")
-				}
 			} else if state.Version() >= version.Altair {
 				state, err = altair.ProcessEpoch(ctx, state)
 				if err != nil {
@@ -296,14 +279,6 @@ func ProcessSlots(ctx context.Context, state state.BeaconState, slot primitives.
 
 		if time.CanUpgradeToBellatrix(state.Slot()) {
 			state, err = execution.UpgradeToBellatrix(state)
-			if err != nil {
-				tracing.AnnotateError(span, err)
-				return nil, err
-			}
-		}
-
-		if time.CanUpgradeToFastexPhase1(state.Slot()) {
-			state, err = fastexphase1.UpgradeToFastexPhase1(state)
 			if err != nil {
 				tracing.AnnotateError(span, err)
 				return nil, err

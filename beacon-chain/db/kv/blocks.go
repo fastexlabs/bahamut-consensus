@@ -9,16 +9,16 @@ import (
 	"github.com/golang/snappy"
 	"github.com/pkg/errors"
 	ssz "github.com/prysmaticlabs/fastssz"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/db/filters"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/container/slice"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db/filters"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/container/slice"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	bolt "go.etcd.io/bbolt"
 	"go.opencensus.io/trace"
 )
@@ -808,16 +808,6 @@ func unmarshalBlock(_ context.Context, enc []byte) (interfaces.ReadOnlySignedBea
 		if err := rawBlock.UnmarshalSSZ(enc[len(bellatrixBlindKey):]); err != nil {
 			return nil, errors.Wrap(err, "could not unmarshal blinded Bellatrix block")
 		}
-	case hasFastexPhase1Key(enc):
-		rawBlock = &ethpb.SignedBeaconBlockFastexPhase1{}
-		if err := rawBlock.UnmarshalSSZ(enc[len(fastexPhase1Key):]); err != nil {
-			return nil, errors.Wrap(err, "could not unmarshal FastexPhase1 block")
-		}
-	case hasFastexPhase1BlindKey(enc):
-		rawBlock = &ethpb.SignedBlindedBeaconBlockFastexPhase1{}
-		if err := rawBlock.UnmarshalSSZ(enc[len(fastexPhase1BlindKey):]); err != nil {
-			return nil, errors.Wrap(err, "could not unmarshal blinded FastexPhase1 block")
-		}
 	case hasCapellaKey(enc):
 		rawBlock = &ethpb.SignedBeaconBlockCapella{}
 		if err := rawBlock.UnmarshalSSZ(enc[len(capellaKey):]); err != nil {
@@ -866,8 +856,6 @@ func marshalBlockFull(
 	switch blk.Version() {
 	case version.Capella:
 		return snappy.Encode(nil, append(capellaKey, encodedBlock...)), nil
-	case version.FastexPhase1:
-		return snappy.Encode(nil, append(fastexPhase1Key, encodedBlock...)), nil
 	case version.Bellatrix:
 		return snappy.Encode(nil, append(bellatrixKey, encodedBlock...)), nil
 	case version.Altair:
@@ -902,8 +890,6 @@ func marshalBlockBlinded(
 	switch blk.Version() {
 	case version.Capella:
 		return snappy.Encode(nil, append(capellaBlindKey, encodedBlock...)), nil
-	case version.FastexPhase1:
-		return snappy.Encode(nil, append(fastexPhase1BlindKey, encodedBlock...)), nil
 	case version.Bellatrix:
 		return snappy.Encode(nil, append(bellatrixBlindKey, encodedBlock...)), nil
 	default:

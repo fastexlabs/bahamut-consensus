@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	field_params "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	eth "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	field_params "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	eth "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
 
 var (
@@ -53,12 +53,12 @@ type BeaconBlockBody struct {
 	deposits               []*eth.Deposit
 	voluntaryExits         []*eth.SignedVoluntaryExit
 	activityChanges        []*eth.ActivityChange
-	latestProcessedBlock   uint64
 	transactionsCount      uint64
+	baseFee                uint64
+	executionHeight        uint64
 	syncAggregate          *eth.SyncAggregate
 	executionPayload       interfaces.ExecutionData
 	executionPayloadHeader interfaces.ExecutionData
-	baseFee                uint64
 	blsToExecutionChanges  []*eth.SignedBLSToExecutionChange
 }
 

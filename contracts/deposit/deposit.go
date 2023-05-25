@@ -4,11 +4,11 @@ package deposit
 
 import (
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/signing"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/crypto/bls"
-	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/signing"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
+	"github.com/prysmaticlabs/prysm/v4/crypto/hash"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 // DepositInput for a given key. This input data can be used to when making a
@@ -26,13 +26,11 @@ import (
 //	- Send a transaction on the Ethereum 1.0 chain to DEPOSIT_CONTRACT_ADDRESS executing `deposit(pubkey: bytes[48], withdrawal_credentials: bytes[32], signature: bytes[96])` along with a deposit of amount Gwei.
 //
 // See: https://github.com/ethereum/consensus-specs/blob/master/specs/validator/0_beacon-chain-validator.md#submit-deposit
-func DepositInput(depositKey, withdrawalKey bls.SecretKey, amountInGwei uint64, contract []byte, nonce uint64) (*ethpb.Deposit_Data, [32]byte, error) {
+func DepositInput(depositKey, withdrawalKey bls.SecretKey, amountInGwei uint64) (*ethpb.Deposit_Data, [32]byte, error) {
 	depositMessage := &ethpb.DepositMessage{
 		PublicKey:             depositKey.PublicKey().Marshal(),
 		WithdrawalCredentials: WithdrawalCredentialsHash(withdrawalKey),
 		Amount:                amountInGwei,
-		DeployedContract:      contract,
-		DeploymentNonce:       nonce,
 	}
 
 	sr, err := depositMessage.HashTreeRoot()
@@ -57,8 +55,6 @@ func DepositInput(depositKey, withdrawalKey bls.SecretKey, amountInGwei uint64, 
 		WithdrawalCredentials: depositMessage.WithdrawalCredentials,
 		Amount:                depositMessage.Amount,
 		Signature:             depositKey.Sign(root[:]).Marshal(),
-		DeployedContract:      depositMessage.DeployedContract,
-		DeploymentNonce:       depositMessage.DeploymentNonce,
 	}
 
 	dr, err := di.HashTreeRoot()
@@ -96,10 +92,9 @@ func VerifyDepositSignature(dd *ethpb.Deposit_Data, domain []byte) error {
 	}
 	di := &ethpb.DepositMessage{
 		PublicKey:             ddCopy.PublicKey,
+		Contract:              ddCopy.Contract,
 		WithdrawalCredentials: ddCopy.WithdrawalCredentials,
 		Amount:                ddCopy.Amount,
-		DeployedContract:      ddCopy.DeployedContract,
-		DeploymentNonce:       ddCopy.DeploymentNonce,
 	}
 	root, err := di.HashTreeRoot()
 	if err != nil {

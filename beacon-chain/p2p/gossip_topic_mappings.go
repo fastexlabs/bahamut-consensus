@@ -3,9 +3,9 @@ package p2p
 import (
 	"reflect"
 
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -29,9 +29,6 @@ func GossipTopicMappings(topic string, epoch primitives.Epoch) proto.Message {
 	if topic == BlockSubnetTopicFormat {
 		if epoch >= params.BeaconConfig().CapellaForkEpoch {
 			return &ethpb.SignedBeaconBlockCapella{}
-		}
-		if epoch >= params.BeaconConfig().FastexPhase1ForkEpoch {
-			return &ethpb.SignedBeaconBlockFastexPhase1{}
 		}
 		if epoch >= params.BeaconConfig().BellatrixForkEpoch {
 			return &ethpb.SignedBeaconBlockBellatrix{}
@@ -65,8 +62,6 @@ func init() {
 	GossipTypeMapping[reflect.TypeOf(&ethpb.SignedBeaconBlockAltair{})] = BlockSubnetTopicFormat
 	// Specially handle Bellatrix objects.
 	GossipTypeMapping[reflect.TypeOf(&ethpb.SignedBeaconBlockBellatrix{})] = BlockSubnetTopicFormat
-	// Specially handle FastexPhase1 objects.
-	GossipTypeMapping[reflect.TypeOf(&ethpb.SignedBeaconBlockFastexPhase1{})] = BlockSubnetTopicFormat
 	// Specially handle Capella objects
 	GossipTypeMapping[reflect.TypeOf(&ethpb.SignedBeaconBlockCapella{})] = BlockSubnetTopicFormat
 }

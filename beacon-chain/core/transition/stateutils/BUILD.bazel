@@ -3,16 +3,17 @@ load("@prysm//tools/go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "contracts_index_map.go",
+        "contract_index_map.go",
         "validator_index_map.go",
     ],
-    importpath = "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition/stateutils",
+    importpath = "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition/stateutils",
     visibility = [
         "//beacon-chain:__subpackages__",
         "//testing/util:__pkg__",
     ],
     deps = [
         "//config/fieldparams:go_default_library",
+        "//config/params:go_default_library",
         "//consensus-types/primitives:go_default_library",
         "//encoding/bytesutil:go_default_library",
         "//proto/prysm/v1alpha1:go_default_library",
@@ -23,7 +24,7 @@ go_test(
     name = "go_default_test",
     size = "small",
     srcs = [
-        "contracts_index_map_test.go",
+        "contract_index_map_test.go",
         "validator_index_map_test.go",
     ],
     deps = [

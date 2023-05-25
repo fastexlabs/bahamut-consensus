@@ -5,10 +5,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/network/forks"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/network/forks"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
 
 // MapForkInfo maps the eth2.ForkInfo proto to the Web3Signer spec.
@@ -111,14 +111,12 @@ func MapBeaconBlockBody(body *ethpb.BeaconBlockBody) (*BeaconBlockBody, error) {
 			DepositCount: fmt.Sprint(body.Eth1Data.DepositCount),
 			BlockHash:    body.Eth1Data.BlockHash,
 		},
-		Graffiti:             body.Graffiti,
-		ProposerSlashings:    make([]*ProposerSlashing, len(body.ProposerSlashings)),
-		AttesterSlashings:    make([]*AttesterSlashing, len(body.AttesterSlashings)),
-		Attestations:         make([]*Attestation, len(body.Attestations)),
-		Deposits:             make([]*Deposit, len(body.Deposits)),
-		VoluntaryExits:       make([]*SignedVoluntaryExit, len(body.VoluntaryExits)),
-		ActivityChanges:      make([]*ActivityChange, len(body.ActivityChanges)),
-		LatestProcessedBlock: body.LatestProcessedBlock,
+		Graffiti:          body.Graffiti,
+		ProposerSlashings: make([]*ProposerSlashing, len(body.ProposerSlashings)),
+		AttesterSlashings: make([]*AttesterSlashing, len(body.AttesterSlashings)),
+		Attestations:      make([]*Attestation, len(body.Attestations)),
+		Deposits:          make([]*Deposit, len(body.Deposits)),
+		VoluntaryExits:    make([]*SignedVoluntaryExit, len(body.VoluntaryExits)),
 	}
 	for i, slashing := range body.ProposerSlashings {
 		slashing, err := MapProposerSlashing(slashing)
@@ -155,14 +153,6 @@ func MapBeaconBlockBody(body *ethpb.BeaconBlockBody) (*BeaconBlockBody, error) {
 		}
 		block.VoluntaryExits[i] = signedVoluntaryExit
 	}
-	for i, change := range body.ActivityChanges {
-		activityChange, err := MapActivityChange(change)
-		if err != nil {
-			return nil, fmt.Errorf("could not map activity changes at index %v: %v", i, err)
-		}
-		block.ActivityChanges[i] = activityChange
-	}
-
 	return block, nil
 }
 
@@ -260,8 +250,6 @@ func MapDeposit(deposit *ethpb.Deposit) (*Deposit, error) {
 			WithdrawalCredentials: deposit.Data.WithdrawalCredentials,
 			Amount:                fmt.Sprint(deposit.Data.Amount),
 			Signature:             deposit.Data.Signature,
-			DeployedContract:     deposit.Data.DeployedContract,
-			DeploymentNonce:       fmt.Sprint(deposit.Data.DeploymentNonce),
 		},
 	}, nil
 }
@@ -280,13 +268,6 @@ func MapSignedVoluntaryExit(signedVoluntaryExit *ethpb.SignedVoluntaryExit) (*Si
 			ValidatorIndex: fmt.Sprint(signedVoluntaryExit.Exit.ValidatorIndex),
 		},
 		Signature: signedVoluntaryExit.Signature,
-	}, nil
-}
-
-func MapActivityChange(change *ethpb.ActivityChange) (*ActivityChange, error) {
-	return &ActivityChange{
-		ContractAddres: change.ContractAddress,
-		DeltaActivity:  change.DeltaActivity,
 	}, nil
 }
 
@@ -327,14 +308,12 @@ func MapBeaconBlockBodyAltair(body *ethpb.BeaconBlockBodyAltair) (*BeaconBlockBo
 			DepositCount: fmt.Sprint(body.Eth1Data.DepositCount),
 			BlockHash:    body.Eth1Data.BlockHash,
 		},
-		Graffiti:             body.Graffiti,
-		ProposerSlashings:    make([]*ProposerSlashing, len(body.ProposerSlashings)),
-		AttesterSlashings:    make([]*AttesterSlashing, len(body.AttesterSlashings)),
-		Attestations:         make([]*Attestation, len(body.Attestations)),
-		Deposits:             make([]*Deposit, len(body.Deposits)),
-		VoluntaryExits:       make([]*SignedVoluntaryExit, len(body.VoluntaryExits)),
-		ActivityChanges:      make([]*ActivityChange, len(body.ActivityChanges)),
-		LatestProcessedBlock: body.LatestProcessedBlock,
+		Graffiti:          body.Graffiti,
+		ProposerSlashings: make([]*ProposerSlashing, len(body.ProposerSlashings)),
+		AttesterSlashings: make([]*AttesterSlashing, len(body.AttesterSlashings)),
+		Attestations:      make([]*Attestation, len(body.Attestations)),
+		Deposits:          make([]*Deposit, len(body.Deposits)),
+		VoluntaryExits:    make([]*SignedVoluntaryExit, len(body.VoluntaryExits)),
 		SyncAggregate: &SyncAggregate{
 			SyncCommitteeBits:      []byte(body.SyncAggregate.SyncCommitteeBits),
 			SyncCommitteeSignature: body.SyncAggregate.SyncCommitteeSignature,
@@ -376,14 +355,6 @@ func MapBeaconBlockBodyAltair(body *ethpb.BeaconBlockBodyAltair) (*BeaconBlockBo
 		}
 		block.VoluntaryExits[i] = exit
 	}
-	for i, change := range body.ActivityChanges {
-		activityChange, err := MapActivityChange(change)
-		if err != nil {
-			return nil, fmt.Errorf("could not map activity changes at index %v: %v", i, err)
-		}
-		block.ActivityChanges[i] = activityChange
-	}
-
 	return block, nil
 }
 

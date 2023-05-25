@@ -2,31 +2,29 @@ package util
 
 import (
 	"context"
-	"math/big"
 	"sync"
 	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/signing"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/container/trie"
-	"github.com/prysmaticlabs/prysm/v3/crypto/bls"
-	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/interop"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/signing"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/container/trie"
+	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
+	"github.com/prysmaticlabs/prysm/v4/crypto/hash"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/interop"
 )
 
 var lock sync.Mutex
 
 // Caches
-var cachedDeposits []*ethpb.Deposit
-
 var (
-	privKeys []bls.SecretKey
-	t        *trie.SparseMerkleTrie
+	cachedDeposits []*ethpb.Deposit
+	privKeys       []bls.SecretKey
+	t              *trie.SparseMerkleTrie
 )
 
 // DeterministicDepositsAndKeys returns the entered amount of deposits and secret keys.
@@ -62,7 +60,8 @@ func DeterministicDepositsAndKeys(numDeposits uint64) ([]*ethpb.Deposit, []bls.S
 		// Create the new deposits and add them to the trie.
 		for i := uint64(0); i < numRequired; i++ {
 			balance := params.BeaconConfig().MaxEffectiveBalance
-			deposit, err := signedDeposit(secretKeys[i], publicKeys[i].Marshal(), publicKeys[i+1].Marshal(), balance, make([]byte, 20), 0)
+			contract := params.BeaconConfig().ZeroContract
+			deposit, err := signedDeposit(secretKeys[i], publicKeys[i].Marshal(), publicKeys[i+1].Marshal(), balance, contract[:])
 			if err != nil {
 				return nil, nil, errors.Wrap(err, "could not create signed deposit")
 			}
@@ -95,7 +94,13 @@ func DeterministicDepositsAndKeys(numDeposits uint64) ([]*ethpb.Deposit, []bls.S
 	return requestedDeposits, privKeys[0:numDeposits], nil
 }
 
-func DeterministicDepositsAndKeysWithContracts(numDeposits uint64, change bool, contract []byte) ([]*ethpb.Deposit, []bls.SecretKey, error) {
+// DeterministicDepositsAndKeysWithContracts returns the entered amount
+// of deposits (made with contracts) and secret keys.
+// The deposits are configured such that for deposit n the validator
+// account is key n and the withdrawal account is key n+1.  As such,
+// if all secret keys for n validators are required then numDeposits
+// should be n+1.
+func DeterministicDepositsAndKeysWithContract(numDeposits uint64, contracts [][]byte) ([]*ethpb.Deposit, []bls.SecretKey, error) {
 	resetCache()
 	lock.Lock()
 	defer lock.Unlock()
@@ -123,11 +128,11 @@ func DeterministicDepositsAndKeysWithContracts(numDeposits uint64, change bool, 
 		// Create the new deposits and add them to the trie.
 		for i := uint64(0); i < numRequired; i++ {
 			balance := params.BeaconConfig().MaxEffectiveBalance
-			if change {
-				// Generate the contract address like 0x0100000000000000000000000000000000000000
-				contract = bytesutil.PadTo(big.NewInt(int64(i) + 1).Bytes(), 20)
+			contract := params.BeaconConfig().ZeroContract
+			if i < uint64(len(contracts)) {
+				contract = bytesutil.ToBytes20(contracts[i])
 			}
-			deposit, err := signedDeposit(secretKeys[i], publicKeys[i].Marshal(), publicKeys[i+1].Marshal(), balance, contract, 0)
+			deposit, err := signedDeposit(secretKeys[i], publicKeys[i].Marshal(), publicKeys[i+1].Marshal(), balance, contract[:])
 			if err != nil {
 				return nil, nil, errors.Wrap(err, "could not create signed deposit")
 			}
@@ -199,7 +204,8 @@ func DepositsWithBalance(balances []uint64) ([]*ethpb.Deposit, *trie.SparseMerkl
 		if len(balances) == int(numDeposits) {
 			balance = balances[i]
 		}
-		deposit, err := signedDeposit(secretKeys[i], publicKeys[i].Marshal(), publicKeys[i+1].Marshal(), balance, make([]byte, 20), 0)
+		contract := params.BeaconConfig().ZeroContract
+		deposit, err := signedDeposit(secretKeys[i], publicKeys[i].Marshal(), publicKeys[i+1].Marshal(), balance, contract[:])
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "could not create signed deposit")
 		}
@@ -237,16 +243,14 @@ func signedDeposit(
 	withdrawalKey []byte,
 	balance uint64,
 	contract []byte,
-	nonce uint64,
 ) (*ethpb.Deposit, error) {
 	withdrawalCreds := hash.Hash(withdrawalKey)
 	withdrawalCreds[0] = params.BeaconConfig().BLSWithdrawalPrefixByte
 	depositMessage := &ethpb.DepositMessage{
 		PublicKey:             publicKey,
+		Contract:              contract,
 		Amount:                balance,
 		WithdrawalCredentials: withdrawalCreds[:],
-		DeployedContract:	   contract, 
-		DeploymentNonce:       nonce,
 	}
 
 	domain, err := signing.ComputeDomain(params.BeaconConfig().DomainDeposit, nil, nil)
@@ -264,11 +268,10 @@ func signedDeposit(
 	}
 	depositData := &ethpb.Deposit_Data{
 		PublicKey:             publicKey,
+		Contract:              contract,
 		Amount:                balance,
 		WithdrawalCredentials: withdrawalCreds[:],
 		Signature:             secretKey.Sign(sigRoot[:]).Marshal(),
-		DeployedContract:      contract,
-		DeploymentNonce:       nonce,
 	}
 
 	deposit := &ethpb.Deposit{
@@ -347,6 +350,24 @@ func DeterministicGenesisState(t testing.TB, numValidators uint64) (state.Beacon
 	return beaconState, privKeys
 }
 
+// DeterministicGenesisState returns a genesis state made using the deterministic deposits.
+func DeterministicGenesisStateWithContracts(t testing.TB, numValidators uint64, contracts [][]byte) (state.BeaconState, []bls.SecretKey) {
+	deposits, privKeys, err := DeterministicDepositsAndKeysWithContract(numValidators, contracts)
+	if err != nil {
+		t.Fatal(errors.Wrapf(err, "failed to get %d deposits", numValidators))
+	}
+	eth1Data, err := DeterministicEth1Data(len(deposits))
+	if err != nil {
+		t.Fatal(errors.Wrapf(err, "failed to get eth1data for %d deposits", numValidators))
+	}
+	beaconState, err := transition.GenesisBeaconState(context.Background(), deposits, uint64(0), eth1Data)
+	if err != nil {
+		t.Fatal(errors.Wrapf(err, "failed to get genesis beacon state of %d validators", numValidators))
+	}
+
+	return beaconState, privKeys
+}
+
 // DepositTrieFromDeposits takes an array of deposits and returns the deposit trie.
 func DepositTrieFromDeposits(deposits []*ethpb.Deposit) (*trie.SparseMerkleTrie, [][32]byte, error) {
 	encodedDeposits := make([][]byte, len(deposits))
@@ -409,12 +430,13 @@ func DeterministicDepositsAndKeysSameValidator(numDeposits uint64) ([]*ethpb.Dep
 		for i := uint64(0); i < numRequired; i++ {
 			withdrawalCreds := hash.Hash(publicKeys[1].Marshal())
 			withdrawalCreds[0] = params.BeaconConfig().BLSWithdrawalPrefixByte
+			contractAddress := params.BeaconConfig().ZeroContract
 
 			depositMessage := &ethpb.DepositMessage{
 				PublicKey:             publicKeys[1].Marshal(),
-				WithdrawalCredentials: withdrawalCreds[:],
+				Contract:              contractAddress[:],
 				Amount:                params.BeaconConfig().MaxEffectiveBalance,
-				DeployedContract:      make([]byte, 20),
+				WithdrawalCredentials: withdrawalCreds[:],
 			}
 
 			domain, err := signing.ComputeDomain(params.BeaconConfig().DomainDeposit, nil, nil)
@@ -432,11 +454,10 @@ func DeterministicDepositsAndKeysSameValidator(numDeposits uint64) ([]*ethpb.Dep
 			// Always use the same validator to sign
 			depositData := &ethpb.Deposit_Data{
 				PublicKey:             depositMessage.PublicKey,
-				WithdrawalCredentials: depositMessage.WithdrawalCredentials,
+				Contract:              depositMessage.Contract,
 				Amount:                depositMessage.Amount,
+				WithdrawalCredentials: depositMessage.WithdrawalCredentials,
 				Signature:             secretKeys[1].Sign(sigRoot[:]).Marshal(),
-				DeployedContract:      depositMessage.DeployedContract,
-				DeploymentNonce:       depositMessage.DeploymentNonce,
 			}
 			deposit := &ethpb.Deposit{
 				Data: depositData,

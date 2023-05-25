@@ -7,15 +7,15 @@ import (
 	"testing"
 
 	"github.com/prysmaticlabs/go-bitfield"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
 )
 
 func TestValidatorMap_DistinctCopy(t *testing.T) {
@@ -24,12 +24,16 @@ func TestValidatorMap_DistinctCopy(t *testing.T) {
 	for i := uint64(1); i < count; i++ {
 		var someRoot [32]byte
 		var someKey [fieldparams.BLSPubkeyLength]byte
+		var contract [fieldparams.ContractAddressLength]byte
 		copy(someRoot[:], strconv.Itoa(int(i)))
 		copy(someKey[:], strconv.Itoa(int(i)))
+		copy(contract[:], strconv.Itoa(int(i)))
 		vals = append(vals, &ethpb.Validator{
 			PublicKey:                  someKey[:],
 			WithdrawalCredentials:      someRoot[:],
+			Contract:                   contract[:],
 			EffectiveBalance:           params.BeaconConfig().MaxEffectiveBalance,
+			EffectiveActivity:          424242,
 			Slashed:                    false,
 			ActivationEligibilityEpoch: 1,
 			ActivationEpoch:            1,
@@ -43,6 +47,38 @@ func TestValidatorMap_DistinctCopy(t *testing.T) {
 	handler.Set(bytesutil.ToBytes48([]byte(wantedPubkey)), 27)
 	val1, _ := handler.Get(bytesutil.ToBytes48([]byte(wantedPubkey)))
 	val2, _ := newHandler.Get(bytesutil.ToBytes48([]byte(wantedPubkey)))
+	assert.NotEqual(t, val1, val2, "Values are supposed to be unequal due to copy")
+}
+
+func TestContractMap_DistinctCopy(t *testing.T) {
+	count := uint64(100)
+	vals := make([]*ethpb.Validator, 0, count)
+	for i := uint64(1); i < count; i++ {
+		var someRoot [32]byte
+		var someKey [fieldparams.BLSPubkeyLength]byte
+		var contract [fieldparams.ContractAddressLength]byte
+		copy(someRoot[:], strconv.Itoa(int(i)))
+		copy(someKey[:], strconv.Itoa(int(i)))
+		copy(contract[:], strconv.Itoa(int(i)))
+		vals = append(vals, &ethpb.Validator{
+			PublicKey:                  someKey[:],
+			WithdrawalCredentials:      someRoot[:],
+			Contract:                   contract[:],
+			EffectiveBalance:           params.BeaconConfig().MaxEffectiveBalance,
+			EffectiveActivity:          424242,
+			Slashed:                    false,
+			ActivationEligibilityEpoch: 1,
+			ActivationEpoch:            1,
+			ExitEpoch:                  1,
+			WithdrawableEpoch:          1,
+		})
+	}
+	handler := stateutil.NewContractMapHandler(vals)
+	newHandler := handler.Copy()
+	wantedContract := strconv.Itoa(22)
+	handler.Set(bytesutil.ToBytes20([]byte(wantedContract)), 27)
+	val1, _ := handler.Get(bytesutil.ToBytes20([]byte(wantedContract)))
+	val2, _ := newHandler.Get(bytesutil.ToBytes20([]byte(wantedContract)))
 	assert.NotEqual(t, val1, val2, "Values are supposed to be unequal due to copy")
 }
 
@@ -317,6 +353,12 @@ func TestBeaconState_AppendBalanceWithTrie(t *testing.T) {
 			ParentRoot: make([]byte, fieldparams.RootLength),
 			StateRoot:  make([]byte, fieldparams.RootLength),
 			BodyRoot:   make([]byte, fieldparams.RootLength),
+		},
+		SharedActivity: &ethpb.SharedActivity{
+			TransactionsGasPerPeriod: 0,
+			TransactionsGasPerEpoch:  0,
+			BaseFeePerPeriod:         0,
+			BaseFeePerEpoch:          0,
 		},
 		Validators: vals,
 		Balances:   bals,

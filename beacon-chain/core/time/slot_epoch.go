@@ -1,11 +1,11 @@
 package time
 
 import (
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
 
 // CurrentEpoch returns the current epoch number calculated from
@@ -70,13 +70,6 @@ func CanUpgradeToBellatrix(slot primitives.Slot) bool {
 	epochStart := slots.IsEpochStart(slot)
 	bellatrixEpoch := slots.ToEpoch(slot) == params.BeaconConfig().BellatrixForkEpoch
 	return epochStart && bellatrixEpoch
-}
-
-// CanUpgradeToFastexPhase1 returns true if the input `slot` can upgrade to FastexPhase1 fork.
-func CanUpgradeToFastexPhase1(slot primitives.Slot) bool {
-	epochStart := slots.IsEpochStart(slot)
-	fastexPhase1Epoch := slots.ToEpoch(slot) == params.BeaconConfig().FastexPhase1ForkEpoch
-	return epochStart && fastexPhase1Epoch
 }
 
 // CanUpgradeToCapella returns true if the input `slot` can upgrade to Capella.

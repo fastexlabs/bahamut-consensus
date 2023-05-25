@@ -7,18 +7,18 @@ import (
 
 	"github.com/golang/snappy"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/genesis"
-	statenative "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	"github.com/prysmaticlabs/prysm/v3/config/features"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	"github.com/prysmaticlabs/prysm/v3/monitoring/tracing"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/time"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/genesis"
+	statenative "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	"github.com/prysmaticlabs/prysm/v4/config/features"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/monitoring/tracing"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/time"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	bolt "go.etcd.io/bbolt"
 	"go.opencensus.io/trace"
 )
@@ -294,28 +294,6 @@ func (s *Store) saveStatesEfficientInternal(ctx context.Context, tx *bolt.Tx, bl
 			if err := valIdxBkt.Put(rt[:], validatorKeys[i]); err != nil {
 				return err
 			}
-		case *ethpb.BeaconStateFastexPhase1:
-			pbState, err := statenative.ProtobufBeaconStateFastexPhase1(rawType)
-			if err != nil {
-				return err
-			}
-			if pbState == nil {
-				return errors.New("nil state")
-			}
-			valEntries := pbState.Validators
-			pbState.Validators = make([]*ethpb.Validator, 0)
-			rawObj, err := pbState.MarshalSSZ()
-			if err != nil {
-				return err
-			}
-			encodedState := snappy.Encode(nil, append(fastexPhase1Key, rawObj...))
-			if err := bucket.Put(rt[:], encodedState); err != nil {
-				return err
-			}
-			pbState.Validators = valEntries
-			if err := valIdxBkt.Put(rt[:], validatorKeys[i]); err != nil {
-				return err
-			}
 		case *ethpb.BeaconStateCapella:
 			pbState, err := statenative.ProtobufBeaconStateCapella(rawType)
 			if err != nil {
@@ -509,20 +487,6 @@ func (s *Store) unmarshalState(_ context.Context, enc []byte, validatorEntries [
 			protoState.Validators = validatorEntries
 		}
 		return statenative.InitializeFromProtoUnsafeCapella(protoState)
-	case hasFastexPhase1Key(enc):
-		// Marshal state bytes to fastex-phase1 beacon state.
-		protoState := &ethpb.BeaconStateFastexPhase1{}
-		if err := protoState.UnmarshalSSZ(enc[len(fastexPhase1Key):]); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal encoding for bellatrix")
-		}
-		ok, err := s.isStateValidatorMigrationOver()
-		if err != nil {
-			return nil, err
-		}
-		if ok {
-			protoState.Validators = validatorEntries
-		}
-		return statenative.InitializeFromProtoUnsafeFastexPhase1(protoState)
 	case hasBellatrixKey(enc):
 		// Marshal state bytes to bellatrix beacon state.
 		protoState := &ethpb.BeaconStateBellatrix{}
@@ -603,19 +567,6 @@ func marshalState(ctx context.Context, st state.ReadOnlyBeaconState) ([]byte, er
 			return nil, err
 		}
 		return snappy.Encode(nil, append(bellatrixKey, rawObj...)), nil
-	case *ethpb.BeaconStateFastexPhase1:
-		rState, ok := st.ToProtoUnsafe().(*ethpb.BeaconStateFastexPhase1)
-		if !ok {
-			return nil, errors.New("non valid inner state")
-		}
-		if rState == nil {
-			return nil, errors.New("nil state")
-		}
-		rawObj, err := rState.MarshalSSZ()
-		if err != nil {
-			return nil, err
-		}
-		return snappy.Encode(nil, append(fastexPhase1Key, rawObj...)), nil
 	case *ethpb.BeaconStateCapella:
 		rState, ok := st.ToProtoUnsafe().(*ethpb.BeaconStateCapella)
 		if !ok {

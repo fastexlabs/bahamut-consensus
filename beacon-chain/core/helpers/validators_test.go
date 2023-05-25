@@ -5,17 +5,17 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
-	state_native "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
+	state_native "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/crypto/hash"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
 )
 
 func TestIsActiveValidator_OK(t *testing.T) {
@@ -264,59 +264,6 @@ func TestBeaconProposerIndex_BadState(t *testing.T) {
 	assert.Equal(t, 0, proposerIndicesCache.Len())
 }
 
-func TestSumPowers_Compatibility(t *testing.T) {
-	validators := make([]*ethpb.Validator, params.BeaconConfig().MinGenesisActiveValidatorCount)
-	for i := 0; i < len(validators); i++ {
-		validators[i] = &ethpb.Validator{
-			ExitEpoch: params.BeaconConfig().FarFutureEpoch,
-		}
-	}
-
-	state, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
-		Validators:  validators,
-		RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
-	})
-	require.NoError(t, err)
-
-	indices, err := ActiveValidatorIndices(context.Background(), state, 0)
-	require.NoError(t, err)
-
-	totalBalance, err := TotalActiveBalance(state)
-	require.NoError(t, err)
-
-	sumPower, err := SumPowers(state, indices, totalBalance, 0)
-	require.NoError(t, err)
-
-	s, _ := sumPower.Float64()
-	assert.Equal(t, float64(0), s)
-
-	validators = make([]*ethpb.Validator, params.BeaconConfig().MinGenesisActiveValidatorCount)
-	for i := 0; i < len(validators); i++ {
-		validators[i] = &ethpb.Validator{
-			EffectiveBalance:  32 * 1e9,
-			ExitEpoch:         params.BeaconConfig().FarFutureEpoch,
-			EffectiveActivity: 150,
-		}
-	}
-
-	state, err = state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
-		Validators:  validators,
-		RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
-	})
-	require.NoError(t, err)
-
-	indices, err = ActiveValidatorIndices(context.Background(), state, 0)
-	require.NoError(t, err)
-
-	totalBalance = TotalBalance(state, indices)
-
-	sumPower, err = SumPowers(state, indices, totalBalance, 3_000_000)
-	require.NoError(t, err)
-
-	s, _ = sumPower.Float64()
-	assert.Equal(t, float64(3_000_000+150*len(validators)), s)
-}
-
 func TestComputeProposerIndex_Compatibility(t *testing.T) {
 	validators := make([]*ethpb.Validator, params.BeaconConfig().MinGenesisActiveValidatorCount)
 	for i := 0; i < len(validators); i++ {
@@ -356,61 +303,6 @@ func TestComputeProposerIndex_Compatibility(t *testing.T) {
 		wantedProposerIndices = append(wantedProposerIndices, index)
 	}
 	assert.DeepEqual(t, wantedProposerIndices, proposerIndices, "Wanted proposer indices from ComputeProposerIndexWithValidators does not match")
-}
-
-func TestComputeProposerIndexFastexPhase1_Compatibility(t *testing.T) {
-	// validators := make([]*ethpb.Validator, params.BeaconConfig().MinGenesisActiveValidatorCount)
-	validators := make([]*ethpb.Validator, 4096)
-	for i := 0; i < len(validators); i++ {
-		validators[i] = &ethpb.Validator{
-			EffectiveBalance:  32 * 1e9,
-			ExitEpoch:         params.BeaconConfig().FarFutureEpoch,
-		}
-	}
-
-	// validators[0].EffectiveActivity = 15005465
-
-	state, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
-		Validators:               validators,
-		RandaoMixes:              make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
-		//TransactionsGasPerPeriod: 3_000_000,
-	})
-	require.NoError(t, err)
-
-	indices, err := ActiveValidatorIndices(context.Background(), state, 0)
-	require.NoError(t, err)
-
-	totalBalance := TotalBalance(state, indices)
-
-	sumPower, err := SumPowers(state, indices, totalBalance, 0)
-	require.NoError(t, err)
-	t.Log(sumPower)
-
-	var proposerIndices []primitives.ValidatorIndex
-	seed, err := Seed(state, 0, params.BeaconConfig().DomainBeaconProposer)
-	require.NoError(t, err)
-	for i := uint64(0); i < uint64(params.BeaconConfig().SlotsPerEpoch); i++ {
-		err := state.SetSlot(primitives.Slot(i))
-		require.NoError(t, err)
-		seedWithSlot := append(seed[:], bytesutil.Bytes8(i)...)
-		seedWithSlotHash := hash.Hash(seedWithSlot)
-		index, err := ComputeProposerIndexFastexPhase1(state, indices, seedWithSlotHash)
-		require.NoError(t, err)
-		proposerIndices = append(proposerIndices, index)
-	}
-
-	var wantedProposerIndices []primitives.ValidatorIndex
-	seed, err = Seed(state, 0, params.BeaconConfig().DomainBeaconProposer)
-	require.NoError(t, err)
-	for i := uint64(0); i < uint64(params.BeaconConfig().SlotsPerEpoch); i++ {
-		seedWithSlot := append(seed[:], bytesutil.Bytes8(i)...)
-		seed := hash.Hash(seedWithSlot)
-		index, err := ComputeShuffledIndex(primitives.ValidatorIndex(0), uint64(len(indices)), seed, true /* shuffle */)
-		require.NoError(t, err)
-		wantedProposerIndices = append(wantedProposerIndices, index)
-	}
-
-	assert.DeepNotEqual(t, wantedProposerIndices, proposerIndices, "Wanted proposer indices from ComputeProposerIndexWithValidators does match to first shuffled indicies")
 }
 
 func TestDelayedActivationExitEpoch_OK(t *testing.T) {
@@ -840,5 +732,93 @@ func computeProposerIndexWithValidators(validators []*ethpb.Validator, activeInd
 		if effectiveBal*maxRandomByte >= params.BeaconConfig().MaxEffectiveBalance*uint64(randomByte) {
 			return candidateIndex, nil
 		}
+	}
+}
+
+func TestPowers(t *testing.T) {
+	tests := []struct {
+		name           string
+		validators     []*ethpb.Validator
+		txGas          uint64
+		power          uint64
+		effectivePower uint64
+	}{
+		{
+			name: "only one active validator",
+			validators: []*ethpb.Validator{
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         2,
+					EffectiveBalance:  32 * 1e9,
+					EffectiveActivity: 128,
+				},
+				{
+					ActivationEpoch:   10,
+					ExitEpoch:         1000,
+					EffectiveBalance:  16 * 1e9,
+					EffectiveActivity: 128,
+				},
+			},
+			txGas:          128,
+			power:          128 * 2,
+			effectivePower: 128 * 2,
+		},
+		{
+			name: "equal power and effective power",
+			validators: []*ethpb.Validator{
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         1000,
+					EffectiveBalance:  32 * 1e9,
+					EffectiveActivity: 128,
+				},
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         1000,
+					EffectiveBalance:  32 * 1e9,
+					EffectiveActivity: 128,
+				},
+			},
+			txGas:          128,
+			power:          128 * 3,
+			effectivePower: 128 * 3,
+		},
+		{
+			name: "one validator has slashing",
+			validators: []*ethpb.Validator{
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         1000,
+					EffectiveBalance:  32 * 1e9,
+					EffectiveActivity: 128,
+				},
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         1000,
+					EffectiveBalance:  16 * 1e9,
+					EffectiveActivity: 128,
+				},
+			},
+			txGas:          128,
+			power:          128 * 3,
+			effectivePower: (128+128/2)/2 + 128 + 128/2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			committeeCache = cache.NewCommitteesCache()
+			state := &ethpb.BeaconState{
+				Validators: tt.validators,
+				SharedActivity: &ethpb.SharedActivity{
+					TransactionsGasPerPeriod: tt.txGas,
+				},
+			}
+			s, err := state_native.InitializeFromProtoPhase0(state)
+			require.NoError(t, err)
+			power, effectivePower, err := Powers(context.Background(), s)
+			require.NoError(t, err)
+			assert.Equal(t, tt.power, power)
+			assert.Equal(t, tt.effectivePower, effectivePower)
+		})
 	}
 }

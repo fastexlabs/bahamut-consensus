@@ -4,15 +4,15 @@ import (
 	"testing"
 
 	"github.com/prysmaticlabs/go-bitfield"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	ethpbv1 "github.com/prysmaticlabs/prysm/v3/proto/eth/v1"
-	ethpbv2 "github.com/prysmaticlabs/prysm/v3/proto/eth/v2"
-	ethpbalpha "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
-	"github.com/prysmaticlabs/prysm/v3/testing/util"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpbv1 "github.com/prysmaticlabs/prysm/v4/proto/eth/v1"
+	ethpbv2 "github.com/prysmaticlabs/prysm/v4/proto/eth/v2"
+	ethpbalpha "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/testing/util"
 )
 
 func TestV1Alpha1SignedContributionAndProofToV2(t *testing.T) {
@@ -279,6 +279,7 @@ func Test_V1Alpha1BeaconBlockCapellaToV2Blinded(t *testing.T) {
 	assert.DeepEqual(t, alphaRoot, v2Root)
 }
 
+// TODO(fastex-chain): test BeaconStateAltairToProto function.
 func TestBeaconStateAltairToProto(t *testing.T) {
 	source, err := util.NewBeaconStateAltair(util.FillRootsNaturalOptAltair, func(state *ethpbalpha.BeaconStateAltair) error {
 		state.GenesisTime = 1
@@ -309,6 +310,7 @@ func TestBeaconStateAltairToProto(t *testing.T) {
 			DepositCount: 7,
 			BlockHash:    bytesutil.PadTo([]byte("e1dvblockhash"), 32),
 		}}
+		state.SharedActivity = &ethpbalpha.SharedActivity{}
 		state.Eth1DepositIndex = 8
 		state.Validators = []*ethpbalpha.Validator{{
 			PublicKey:                  bytesutil.PadTo([]byte("publickey"), 48),
@@ -426,6 +428,7 @@ func TestBeaconStateAltairToProto(t *testing.T) {
 	assert.DeepEqual(t, bytesutil.PadTo([]byte("nscaggregatepubkey"), 48), result.NextSyncCommittee.AggregatePubkey)
 }
 
+// TODO(fastex-chain): test BeaconStateBellatrixToProto function.
 func TestBeaconStateBellatrixToProto(t *testing.T) {
 	source, err := util.NewBeaconStateBellatrix(util.FillRootsNaturalOptBellatrix, func(state *ethpbalpha.BeaconStateBellatrix) error {
 		state.GenesisTime = 1
@@ -456,6 +459,7 @@ func TestBeaconStateBellatrixToProto(t *testing.T) {
 			DepositCount: 7,
 			BlockHash:    bytesutil.PadTo([]byte("e1dvblockhash"), 32),
 		}}
+		state.SharedActivity = &ethpbalpha.SharedActivity{}
 		state.Eth1DepositIndex = 8
 		state.Validators = []*ethpbalpha.Validator{{
 			PublicKey:                  bytesutil.PadTo([]byte("publickey"), 48),
@@ -605,6 +609,7 @@ func TestBeaconStateBellatrixToProto(t *testing.T) {
 	assert.DeepEqual(t, bytesutil.PadTo([]byte("transactionsroot"), 32), resultLatestExecutionPayloadHeader.TransactionsRoot)
 }
 
+// TODO(fastex-chain): test BeaconStateCapellaToProto function.
 func TestBeaconStateCapellaToProto(t *testing.T) {
 	source, err := util.NewBeaconStateCapella(util.FillRootsNaturalOptCapella, func(state *ethpbalpha.BeaconStateCapella) error {
 		state.GenesisTime = 1
@@ -635,6 +640,7 @@ func TestBeaconStateCapellaToProto(t *testing.T) {
 			DepositCount: 7,
 			BlockHash:    bytesutil.PadTo([]byte("e1dvblockhash"), 32),
 		}}
+		state.SharedActivity = &ethpbalpha.SharedActivity{}
 		state.Eth1DepositIndex = 8
 		state.Validators = []*ethpbalpha.Validator{{
 			PublicKey:                  bytesutil.PadTo([]byte("publickey"), 48),

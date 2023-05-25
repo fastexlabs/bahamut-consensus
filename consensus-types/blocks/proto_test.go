@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	"github.com/prysmaticlabs/go-bitfield"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	eth "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	eth "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
 )
 
 type fields struct {
@@ -26,6 +26,7 @@ type fields struct {
 	execPayloadCapella       *enginev1.ExecutionPayloadCapella
 	execPayloadHeaderCapella *enginev1.ExecutionPayloadHeaderCapella
 	blsToExecutionChanges    []*eth.SignedBLSToExecutionChange
+	activityChanges          []*eth.ActivityChange
 }
 
 func Test_SignedBeaconBlock_Proto(t *testing.T) {
@@ -831,6 +832,10 @@ func bodyPbPhase0() *eth.BeaconBlockBody {
 		Attestations:      f.atts,
 		Deposits:          f.deposits,
 		VoluntaryExits:    f.voluntaryExits,
+		ActivityChanges:   f.activityChanges,
+		TransactionsCount: 128,
+		BaseFee:           128,
+		ExecutionHeight:   128,
 	}
 }
 
@@ -849,6 +854,10 @@ func bodyPbAltair() *eth.BeaconBlockBodyAltair {
 		Attestations:      f.atts,
 		Deposits:          f.deposits,
 		VoluntaryExits:    f.voluntaryExits,
+		ActivityChanges:   f.activityChanges,
+		TransactionsCount: 128,
+		BaseFee:           128,
+		ExecutionHeight:   128,
 		SyncAggregate:     f.syncAggregate,
 	}
 }
@@ -868,6 +877,10 @@ func bodyPbBellatrix() *eth.BeaconBlockBodyBellatrix {
 		Attestations:      f.atts,
 		Deposits:          f.deposits,
 		VoluntaryExits:    f.voluntaryExits,
+		ActivityChanges:   f.activityChanges,
+		TransactionsCount: 128,
+		BaseFee:           128,
+		ExecutionHeight:   128,
 		SyncAggregate:     f.syncAggregate,
 		ExecutionPayload:  f.execPayload,
 	}
@@ -888,6 +901,10 @@ func bodyPbBlindedBellatrix() *eth.BlindedBeaconBlockBodyBellatrix {
 		Attestations:           f.atts,
 		Deposits:               f.deposits,
 		VoluntaryExits:         f.voluntaryExits,
+		ActivityChanges:        f.activityChanges,
+		TransactionsCount:      128,
+		BaseFee:                128,
+		ExecutionHeight:        128,
 		SyncAggregate:          f.syncAggregate,
 		ExecutionPayloadHeader: f.execPayloadHeader,
 	}
@@ -908,6 +925,10 @@ func bodyPbCapella() *eth.BeaconBlockBodyCapella {
 		Attestations:          f.atts,
 		Deposits:              f.deposits,
 		VoluntaryExits:        f.voluntaryExits,
+		ActivityChanges:       f.activityChanges,
+		TransactionsCount:     128,
+		BaseFee:               128,
+		ExecutionHeight:       128,
 		SyncAggregate:         f.syncAggregate,
 		ExecutionPayload:      f.execPayloadCapella,
 		BlsToExecutionChanges: f.blsToExecutionChanges,
@@ -929,6 +950,10 @@ func bodyPbBlindedCapella() *eth.BlindedBeaconBlockBodyCapella {
 		Attestations:           f.atts,
 		Deposits:               f.deposits,
 		VoluntaryExits:         f.voluntaryExits,
+		ActivityChanges:        f.activityChanges,
+		TransactionsCount:      128,
+		BaseFee:                128,
+		ExecutionHeight:        128,
 		SyncAggregate:          f.syncAggregate,
 		ExecutionPayloadHeader: f.execPayloadHeaderCapella,
 		BlsToExecutionChanges:  f.blsToExecutionChanges,
@@ -951,6 +976,10 @@ func bodyPhase0() *BeaconBlockBody {
 		attestations:      f.atts,
 		deposits:          f.deposits,
 		voluntaryExits:    f.voluntaryExits,
+		activityChanges:   f.activityChanges,
+		transactionsCount: 128,
+		baseFee:           128,
+		executionHeight:   128,
 	}
 }
 
@@ -970,6 +999,10 @@ func bodyAltair() *BeaconBlockBody {
 		attestations:      f.atts,
 		deposits:          f.deposits,
 		voluntaryExits:    f.voluntaryExits,
+		activityChanges:   f.activityChanges,
+		transactionsCount: 128,
+		baseFee:           128,
+		executionHeight:   128,
 		syncAggregate:     f.syncAggregate,
 	}
 }
@@ -992,6 +1025,10 @@ func bodyBellatrix(t *testing.T) *BeaconBlockBody {
 		attestations:      f.atts,
 		deposits:          f.deposits,
 		voluntaryExits:    f.voluntaryExits,
+		activityChanges:   f.activityChanges,
+		transactionsCount: 128,
+		baseFee:           128,
+		executionHeight:   128,
 		syncAggregate:     f.syncAggregate,
 		executionPayload:  p,
 	}
@@ -1016,6 +1053,10 @@ func bodyBlindedBellatrix(t *testing.T) *BeaconBlockBody {
 		attestations:           f.atts,
 		deposits:               f.deposits,
 		voluntaryExits:         f.voluntaryExits,
+		activityChanges:        f.activityChanges,
+		transactionsCount:      128,
+		baseFee:                128,
+		executionHeight:        128,
 		syncAggregate:          f.syncAggregate,
 		executionPayloadHeader: ph,
 	}
@@ -1039,6 +1080,10 @@ func bodyCapella(t *testing.T) *BeaconBlockBody {
 		attestations:          f.atts,
 		deposits:              f.deposits,
 		voluntaryExits:        f.voluntaryExits,
+		activityChanges:       f.activityChanges,
+		transactionsCount:     128,
+		baseFee:               128,
+		executionHeight:       128,
 		syncAggregate:         f.syncAggregate,
 		executionPayload:      p,
 		blsToExecutionChanges: f.blsToExecutionChanges,
@@ -1064,6 +1109,10 @@ func bodyBlindedCapella(t *testing.T) *BeaconBlockBody {
 		attestations:           f.atts,
 		deposits:               f.deposits,
 		voluntaryExits:         f.voluntaryExits,
+		activityChanges:        f.activityChanges,
+		transactionsCount:      128,
+		baseFee:                128,
+		executionHeight:        128,
 		syncAggregate:          f.syncAggregate,
 		executionPayloadHeader: ph,
 		blsToExecutionChanges:  f.blsToExecutionChanges,
@@ -1090,6 +1139,7 @@ func getFields() fields {
 		}
 		deposits[i].Data = &eth.Deposit_Data{
 			PublicKey:             b48,
+			Contract:              b20,
 			WithdrawalCredentials: root[:],
 			Amount:                128,
 			Signature:             sig[:],
@@ -1178,6 +1228,12 @@ func getFields() fields {
 			ValidatorIndex: 128,
 		},
 		Signature: sig[:],
+	}
+	activityChanges := []*eth.ActivityChange{
+		{
+			ContractAddress: b20,
+			DeltaActivity:   128,
+		},
 	}
 	syncCommitteeBits := bitfield.NewBitvector512()
 	syncCommitteeBits.SetBitAt(1, true)
@@ -1284,6 +1340,7 @@ func getFields() fields {
 		proposerSlashings:        []*eth.ProposerSlashing{proposerSlashing},
 		attesterSlashings:        []*eth.AttesterSlashing{attesterSlashing},
 		voluntaryExits:           []*eth.SignedVoluntaryExit{voluntaryExit},
+		activityChanges:          activityChanges,
 		syncAggregate:            syncAggregate,
 		execPayload:              execPayload,
 		execPayloadHeader:        execPayloadHeader,

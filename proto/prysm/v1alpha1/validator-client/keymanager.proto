@@ -10,7 +10,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 
 option csharp_namespace = "Ethereum.Validator.Accounts.V2";
-option go_package = "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1/validator-client;validatorpb";
+option go_package = "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1/validator-client;validatorpb";
 option java_multiple_files = true;
 option java_outer_classname = "KeymanagerProto";
 option java_package = "org.ethereum.validator.accounts.v2";
@@ -66,8 +66,8 @@ message SignRequest {
         ethereum.eth.v1alpha1.AttestationData attestation_data = 102;
         ethereum.eth.v1alpha1.AggregateAttestationAndProof aggregate_attestation_and_proof = 103;
         ethereum.eth.v1alpha1.VoluntaryExit exit = 104;
-        uint64 slot = 105 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
-        uint64 epoch = 106 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Epoch"];
+        uint64 slot = 105 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Slot"];
+        uint64 epoch = 106 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Epoch"];
 
         // Altair objects.
         ethereum.eth.v1alpha1.BeaconBlockAltair block_altair = 107;
@@ -79,19 +79,15 @@ message SignRequest {
         ethereum.eth.v1alpha1.BeaconBlockBellatrix block_bellatrix = 111;
         ethereum.eth.v1alpha1.BlindedBeaconBlockBellatrix blinded_block_bellatrix = 112;
 
-        // FastexPhase1 objects.
-        ethereum.eth.v1alpha1.BeaconBlockFastexPhase1 block_fastex_phase1 = 113;
-        ethereum.eth.v1alpha1.BlindedBeaconBlockFastexPhase1 blinded_block_fastex_phase1 = 114;
-
         // Builder objects.
-        ethereum.eth.v1alpha1.ValidatorRegistrationV1 registration = 115;
+        ethereum.eth.v1alpha1.ValidatorRegistrationV1 registration = 113;
 
         // Capella objects.
-        ethereum.eth.v1alpha1.BeaconBlockCapella block_capella = 116;
-        ethereum.eth.v1alpha1.BlindedBeaconBlockCapella blinded_block_capella = 117;
+        ethereum.eth.v1alpha1.BeaconBlockCapella block_capella = 114;
+        ethereum.eth.v1alpha1.BlindedBeaconBlockCapella blinded_block_capella = 115;
     }
     reserved 4, 5; // Reserving old, deleted fields.
-    uint64 signing_slot = 6 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
+    uint64 signing_slot = 6 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Slot"];
 }
 
 // SignResponse returned by a RemoteSigner gRPC service.

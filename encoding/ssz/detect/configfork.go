@@ -3,21 +3,21 @@ package detect
 import (
 	"fmt"
 
-	state_native "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	"github.com/prysmaticlabs/prysm/v3/network/forks"
+	state_native "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/network/forks"
 
 	"github.com/pkg/errors"
 	ssz "github.com/prysmaticlabs/fastssz"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
 
 // VersionedUnmarshaler represents the intersection of Configuration (eg mainnet, testnet) and Fork (eg phase0, altair).
@@ -66,8 +66,6 @@ func FromForkVersion(cv [fieldparams.VersionLength]byte) (*VersionedUnmarshaler,
 		fork = version.Altair
 	case bytesutil.ToBytes4(cfg.BellatrixForkVersion):
 		fork = version.Bellatrix
-	case bytesutil.ToBytes4(cfg.FastexPhase1ForkVersion):
-		fork = version.FastexPhase1
 	case bytesutil.ToBytes4(cfg.CapellaForkVersion):
 		fork = version.Capella
 	default:
@@ -112,16 +110,6 @@ func (cf *VersionedUnmarshaler) UnmarshalBeaconState(marshaled []byte) (s state.
 			return nil, errors.Wrapf(err, "failed to unmarshal state, detected fork=%s", forkName)
 		}
 		s, err = state_native.InitializeFromProtoUnsafeBellatrix(st)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to init state trie from state, detected fork=%s", forkName)
-		}
-	case version.FastexPhase1:
-		st := &ethpb.BeaconStateFastexPhase1{}
-		err = st.UnmarshalSSZ(marshaled)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to unmarshal state, detected fork=%s", forkName)
-		}
-		s, err = state_native.InitializeFromProtoUnsafeFastexPhase1(st)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to init state trie from state, detected fork=%s", forkName)
 		}
@@ -179,8 +167,6 @@ func (cf *VersionedUnmarshaler) UnmarshalBeaconBlock(marshaled []byte) (interfac
 		blk = &ethpb.SignedBeaconBlockAltair{}
 	case version.Bellatrix:
 		blk = &ethpb.SignedBeaconBlockBellatrix{}
-	case version.FastexPhase1:
-		blk = &ethpb.SignedBeaconBlockFastexPhase1{}
 	case version.Capella:
 		blk = &ethpb.SignedBeaconBlockCapella{}
 	default:
@@ -214,8 +200,6 @@ func (cf *VersionedUnmarshaler) UnmarshalBlindedBeaconBlock(marshaled []byte) (i
 		blk = &ethpb.SignedBeaconBlockAltair{}
 	case version.Bellatrix:
 		blk = &ethpb.SignedBlindedBeaconBlockBellatrix{}
-	case version.FastexPhase1:
-		blk = &ethpb.SignedBlindedBeaconBlockFastexPhase1{}
 	case version.Capella:
 		blk = &ethpb.SignedBlindedBeaconBlockCapella{}
 	default:

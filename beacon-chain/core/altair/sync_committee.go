@@ -3,27 +3,24 @@ package altair
 import (
 	"context"
 	"fmt"
-	m "math"
-	"math/big"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
-	coreTime "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/crypto/bls"
-	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	"github.com/prysmaticlabs/prysm/v3/math"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
+	coreTime "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
+	"github.com/prysmaticlabs/prysm/v4/crypto/hash"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/math"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
 
-const maxRandomByte = uint64(1<<16 - 1)
+const maxRandomByte = uint64(1<<8 - 1)
 
 // ValidateNilSyncContribution validates the following fields are not nil:
 // -the contribution and proof itself
@@ -59,13 +56,7 @@ func ValidateNilSyncContribution(s *ethpb.SignedContributionAndProof) error {
 //	aggregate_pubkey = bls.AggregatePKs(pubkeys)
 //	return SyncCommittee(pubkeys=pubkeys, aggregate_pubkey=aggregate_pubkey)
 func NextSyncCommittee(ctx context.Context, s state.BeaconState) (*ethpb.SyncCommittee, error) {
-	var indices []primitives.ValidatorIndex
-	var err error
-	if s.Version() < version.FastexPhase1 {
-		indices, err = NextSyncCommitteeIndices(ctx, s)
-	} else {
-		indices, err = NextSyncCommitteeIndicesFastexPhase1(ctx, s)
-	}
+	indices, err := NextSyncCommitteeIndices(ctx, s)
 	if err != nil {
 		return nil, err
 	}
@@ -85,93 +76,31 @@ func NextSyncCommittee(ctx context.Context, s state.BeaconState) (*ethpb.SyncCom
 }
 
 // NextSyncCommitteeIndices returns the next sync committee indices for a given state.
+//
+// Spec code:
+// def get_next_sync_committee_indices(state: BeaconState) -> Sequence[ValidatorIndex]:
+//
+//	"""
+//	Return the sync committee indices, with possible duplicates, for the next sync committee.
+//	"""
+//	epoch = Epoch(get_current_epoch(state) + 1)
+//
+//	MAX_RANDOM_BYTE = 2**8 - 1
+//	active_validator_indices = get_active_validator_indices(state, epoch)
+//	active_validator_count = uint64(len(active_validator_indices))
+//	seed = get_seed(state, epoch, DOMAIN_SYNC_COMMITTEE)
+//	i = 0
+//	sync_committee_indices: List[ValidatorIndex] = []
+//	while len(sync_committee_indices) < SYNC_COMMITTEE_SIZE:
+//	    shuffled_index = compute_shuffled_index(uint64(i % active_validator_count), active_validator_count, seed)
+//	    candidate_index = active_validator_indices[shuffled_index]
+//	    random_byte = hash(seed + uint_to_bytes(uint64(i // 32)))[i % 32]
+//	    effective_balance = state.validators[candidate_index].effective_balance
+//	    if effective_balance * MAX_RANDOM_BYTE >= MAX_EFFECTIVE_BALANCE * random_byte:
+//	        sync_committee_indices.append(candidate_index)
+//	    i += 1
+//	return sync_committee_indices
 func NextSyncCommitteeIndices(ctx context.Context, s state.BeaconState) ([]primitives.ValidatorIndex, error) {
-	epoch := coreTime.NextEpoch(s)
-	indices, err := helpers.ActiveValidatorIndices(ctx, s, epoch)
-	if err != nil {
-		return nil, err
-	}
-	seed, err := helpers.Seed(s, epoch, params.BeaconConfig().DomainSyncCommittee)
-	if err != nil {
-		return nil, err
-	}
-	count := uint64(len(indices))
-	cfg := params.BeaconConfig()
-	syncCommitteeSize := cfg.SyncCommitteeSize
-	cIndices := make([]primitives.ValidatorIndex, 0, syncCommitteeSize)
-	hashFunc := hash.CustomSHA256Hasher()
-
-	txGasPerPeriod := s.TransactionsGasPerPeriod()
-	var nonStakersGasPerPeriod uint64
-	// Ignore nonStakersGasPerPeriod in post-FastexPhase1 forks.
-	if s.Version() < version.FastexPhase1 {
-		nonStakersGasPerPeriod = s.NonStakersGasPerPeriod()
-	}
-	totalBalance := helpers.TotalBalance(s, indices)
-	maxPower, err := helpers.MaxPower(s, indices, totalBalance, txGasPerPeriod, nonStakersGasPerPeriod)
-	if err != nil {
-		return nil, err
-	}
-	maxPowerFloat := new(big.Float).SetInt(maxPower)
-
-	for i := primitives.ValidatorIndex(0); uint64(len(cIndices)) < params.BeaconConfig().SyncCommitteeSize; i++ {
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-
-		sIndex, err := helpers.ComputeShuffledIndex(i.Mod(count), count, seed, true)
-		if err != nil {
-			return nil, err
-		}
-
-		b := append(seed[:], bytesutil.Bytes8(uint64(i.Div(16)))...)
-		hash := hashFunc(b)
-		bytes2 := append([]byte{}, hash[i%16], hash[16+i%16])
-		randomBytes := new(big.Float).SetUint64(uint64(bytesutil.FromBytes2(bytes2)))
-		cIndex := indices[sIndex]
-		v, err := s.ValidatorAtIndexReadOnly(cIndex)
-		if err != nil {
-			return nil, err
-		}
-
-		totalBalanceBig := new(big.Int).SetUint64(totalBalance / params.BeaconConfig().EffectiveBalanceIncrement)
-		effectiveBalanceBig := new(big.Int).SetUint64(v.EffectiveBalance() / params.BeaconConfig().EffectiveBalanceIncrement)
-		effectiveActivityBig := new(big.Int).SetUint64(v.EffectiveActivity())
-		txGasBig := new(big.Int).SetUint64(txGasPerPeriod)
-		nonStakersGasBig := new(big.Int).SetUint64(nonStakersGasPerPeriod)
-
-		var power *big.Int
-		power = new(big.Int).Add(txGasBig, nonStakersGasBig)
-		power = new(big.Int).Mul(power, effectiveBalanceBig)
-		power = new(big.Int).Div(power, totalBalanceBig)
-		power = new(big.Int).Add(power, effectiveActivityBig)
-
-		powerFloat := new(big.Float).SetInt(power)
-		powerProportion := new(big.Float).Quo(powerFloat, maxPowerFloat)
-		p, _ := powerProportion.Float64()
-		if p == 0 {
-			p = 1
-		}
-
-		powerSigmoid := (1 / (1 + m.Exp(params.BeaconConfig().SigmoidExpCoefficient*p)))
-
-		var left *big.Float
-		left = new(big.Float).Quo(randomBytes, new(big.Float).SetUint64(maxRandomByte))
-		left = new(big.Float).Mul(left, new(big.Float).SetFloat64(params.BeaconConfig().SigmoidLimit))
-
-		right := new(big.Float).SetFloat64((2*powerSigmoid - 1) * float64(v.EffectiveBalance()) / float64(params.BeaconConfig().MaxEffectiveBalance))
-
-		if right.Cmp(left) >= 0 {
-			cIndices = append(cIndices, cIndex)
-		}
-	}
-
-	return cIndices, nil
-}
-
-// NextSyncCommitteeIndicesFastexPhase1 returns the next sync committee indices for a given state
-// based on validators' effective balances.
-func NextSyncCommitteeIndicesFastexPhase1(ctx context.Context, s state.BeaconState) ([]primitives.ValidatorIndex, error) {
 	epoch := coreTime.NextEpoch(s)
 	indices, err := helpers.ActiveValidatorIndices(ctx, s, epoch)
 	if err != nil {

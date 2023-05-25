@@ -6,22 +6,21 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/prysmaticlabs/prysm/v3/api/pagination"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/altair"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/epoch/precompute"
-	fastexphase1 "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/fastex-phase1"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
-	coreTime "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/validators"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/cmd"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/api/pagination"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/altair"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/epoch/precompute"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
+	coreTime "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/validators"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/cmd"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -504,7 +503,7 @@ func (bs *Server) GetValidatorParticipation(
 	if err != nil {
 		return nil, err
 	}
-	// Get as close as we can to the end of the current epoch without going past the curent slot.
+	// Get as close as we can to the end of the current epoch without going past the current slot.
 	// The above check ensures a future *epoch* isn't requested, but the end slot of the requested epoch could still
 	// be past the current slot. In that case, use the current slot as the best approximation of the requested epoch.
 	// Replayer will make sure the slot ultimately used is canonical.
@@ -690,24 +689,6 @@ func (bs *Server) GetValidatorPerformance(
 			return nil, err
 		}
 		headState, err = precompute.ProcessRewardsAndPenaltiesPrecompute(headState, bp, vp, precompute.AttestationsDelta, precompute.ProposersDelta)
-		if err != nil {
-			return nil, err
-		}
-		validatorSummary = vp
-	} else if headState.Version() >= version.FastexPhase1 {
-		vp, bp, err := altair.InitializePrecomputeValidators(ctx, headState)
-		if err != nil {
-			return nil, err
-		}
-		vp, bp, err = altair.ProcessEpochParticipation(ctx, headState, bp, vp)
-		if err != nil {
-			return nil, err
-		}
-		headState, vp, err = altair.ProcessInactivityScores(ctx, headState, vp)
-		if err != nil {
-			return nil, err
-		}
-		headState, err = fastexphase1.ProcessRewardsAndPenaltiesPrecompute(headState, bp, vp)
 		if err != nil {
 			return nil, err
 		}

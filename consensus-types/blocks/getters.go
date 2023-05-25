@@ -6,13 +6,13 @@ import (
 
 	"github.com/pkg/errors"
 	ssz "github.com/prysmaticlabs/fastssz"
-	field_params "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	eth "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	validatorpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1/validator-client"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	field_params "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	eth "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	validatorpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1/validator-client"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
 
 // BeaconBlockIsNil checks if any composite field of input signed beacon block is nil.
@@ -64,13 +64,6 @@ func (b *SignedBeaconBlock) Copy() (interfaces.ReadOnlySignedBeaconBlock, error)
 		}
 		cp := eth.CopySignedBeaconBlockBellatrix(pb.(*eth.SignedBeaconBlockBellatrix))
 		return initSignedBlockFromProtoBellatrix(cp)
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			cp := eth.CopySignedBlindedBeaconBlockFastexPhase1(pb.(*eth.SignedBlindedBeaconBlockFastexPhase1))
-			return initBlindedSignedBlockFromProtoFastexPhase1(cp)
-		}
-		cp := eth.CopySignedBeaconBlockFastexPhase1(pb.(*eth.SignedBeaconBlockFastexPhase1))
-		return initSignedBlockFromProtoFastexPhase1(cp)
 	case version.Capella:
 		if b.IsBlinded() {
 			cp := eth.CopySignedBlindedBeaconBlockCapella(pb.(*eth.SignedBlindedBeaconBlockCapella))
@@ -106,15 +99,6 @@ func (b *SignedBeaconBlock) PbGenericBlock() (*eth.GenericSignedBeaconBlock, err
 		}
 		return &eth.GenericSignedBeaconBlock{
 			Block: &eth.GenericSignedBeaconBlock_Bellatrix{Bellatrix: pb.(*eth.SignedBeaconBlockBellatrix)},
-		}, nil
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			return &eth.GenericSignedBeaconBlock{
-				Block: &eth.GenericSignedBeaconBlock_BlindedFastexPhase1{BlindedFastexPhase1: pb.(*eth.SignedBlindedBeaconBlockFastexPhase1)},
-			}, nil
-		}
-		return &eth.GenericSignedBeaconBlock{
-			Block: &eth.GenericSignedBeaconBlock_FastexPhase1{FastexPhase1: pb.(*eth.SignedBeaconBlockFastexPhase1)},
 		}, nil
 	case version.Capella:
 		if b.IsBlinded() {
@@ -178,30 +162,6 @@ func (b *SignedBeaconBlock) PbBlindedBellatrixBlock() (*eth.SignedBlindedBeaconB
 	return pb.(*eth.SignedBlindedBeaconBlockBellatrix), nil
 }
 
-// PbFastexPhase1Block returns the underlying protobuf object.
-func (b *SignedBeaconBlock) PbFastexPhase1Block() (*eth.SignedBeaconBlockFastexPhase1, error) {
-	if b.version != version.FastexPhase1 || b.IsBlinded() {
-		return nil, ErrNotSupported("PbFastexPhase1Block", b.version)
-	}
-	pb, err := b.Proto()
-	if err != nil {
-		return nil, err
-	}
-	return pb.(*eth.SignedBeaconBlockFastexPhase1), nil
-}
-
-// PbBlindedFastexPhase1Block returns the underlying protobuf object.
-func (b *SignedBeaconBlock) PbBlindedFastexPhase1Block() (*eth.SignedBlindedBeaconBlockFastexPhase1, error) {
-	if b.version != version.FastexPhase1 || !b.IsBlinded() {
-		return nil, ErrNotSupported("PbBlindedFastexPhase1Block", b.version)
-	}
-	pb, err := b.Proto()
-	if err != nil {
-		return nil, err
-	}
-	return pb.(*eth.SignedBlindedBeaconBlockFastexPhase1), nil
-}
-
 // PbCapellaBlock returns the underlying protobuf object.
 func (b *SignedBeaconBlock) PbCapellaBlock() (*eth.SignedBeaconBlockCapella, error) {
 	if b.version != version.Capella || b.IsBlinded() {
@@ -248,34 +208,6 @@ func (b *SignedBeaconBlock) ToBlinded() (interfaces.ReadOnlySignedBeaconBlock, e
 		if err != nil {
 			return nil, err
 		}
-		if b.version == version.FastexPhase1 {
-			return initBlindedSignedBlockFromProtoFastexPhase1(
-				&eth.SignedBlindedBeaconBlockFastexPhase1{
-					Block: &eth.BlindedBeaconBlockFastexPhase1{
-						Slot:          b.block.slot,
-						ProposerIndex: b.block.proposerIndex,
-						ParentRoot:    b.block.parentRoot[:],
-						StateRoot:     b.block.stateRoot[:],
-						Body: &eth.BlindedBeaconBlockBodyFastexPhase1{
-							RandaoReveal:           b.block.body.randaoReveal[:],
-							Eth1Data:               b.block.body.eth1Data,
-							Graffiti:               b.block.body.graffiti[:],
-							ProposerSlashings:      b.block.body.proposerSlashings,
-							AttesterSlashings:      b.block.body.attesterSlashings,
-							Attestations:           b.block.body.attestations,
-							Deposits:               b.block.body.deposits,
-							ActivityChanges:        b.block.body.activityChanges,
-							LatestProcessedBlock:   b.block.body.latestProcessedBlock,
-							TransactionsCount:      b.block.body.transactionsCount,
-							VoluntaryExits:         b.block.body.voluntaryExits,
-							SyncAggregate:          b.block.body.syncAggregate,
-							ExecutionPayloadHeader: header,
-							BaseFee:                b.block.body.baseFee,
-						},
-					},
-					Signature: b.signature[:],
-				})
-		}
 		return initBlindedSignedBlockFromProtoBellatrix(
 			&eth.SignedBlindedBeaconBlockBellatrix{
 				Block: &eth.BlindedBeaconBlockBellatrix{
@@ -293,8 +225,9 @@ func (b *SignedBeaconBlock) ToBlinded() (interfaces.ReadOnlySignedBeaconBlock, e
 						Deposits:               b.block.body.deposits,
 						VoluntaryExits:         b.block.body.voluntaryExits,
 						ActivityChanges:        b.block.body.activityChanges,
-						LatestProcessedBlock:   b.block.body.latestProcessedBlock,
 						TransactionsCount:      b.block.body.transactionsCount,
+						BaseFee:                b.block.body.baseFee,
+						ExecutionHeight:        b.block.body.executionHeight,
 						SyncAggregate:          b.block.body.syncAggregate,
 						ExecutionPayloadHeader: header,
 					},
@@ -323,11 +256,11 @@ func (b *SignedBeaconBlock) ToBlinded() (interfaces.ReadOnlySignedBeaconBlock, e
 						Deposits:               b.block.body.deposits,
 						VoluntaryExits:         b.block.body.voluntaryExits,
 						ActivityChanges:        b.block.body.activityChanges,
-						LatestProcessedBlock:   b.block.body.latestProcessedBlock,
 						TransactionsCount:      b.block.body.transactionsCount,
+						BaseFee:                b.block.body.baseFee,
+						ExecutionHeight:        b.block.body.executionHeight,
 						SyncAggregate:          b.block.body.syncAggregate,
 						ExecutionPayloadHeader: header,
-						BaseFee:                b.block.body.baseFee,
 						BlsToExecutionChanges:  b.block.body.blsToExecutionChanges,
 					},
 				},
@@ -385,11 +318,6 @@ func (b *SignedBeaconBlock) MarshalSSZ() ([]byte, error) {
 			return pb.(*eth.SignedBlindedBeaconBlockBellatrix).MarshalSSZ()
 		}
 		return pb.(*eth.SignedBeaconBlockBellatrix).MarshalSSZ()
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			return pb.(*eth.SignedBlindedBeaconBlockFastexPhase1).MarshalSSZ()
-		}
-		return pb.(*eth.SignedBeaconBlockFastexPhase1).MarshalSSZ()
 	case version.Capella:
 		if b.IsBlinded() {
 			return pb.(*eth.SignedBlindedBeaconBlockCapella).MarshalSSZ()
@@ -417,11 +345,6 @@ func (b *SignedBeaconBlock) MarshalSSZTo(dst []byte) ([]byte, error) {
 			return pb.(*eth.SignedBlindedBeaconBlockBellatrix).MarshalSSZTo(dst)
 		}
 		return pb.(*eth.SignedBeaconBlockBellatrix).MarshalSSZTo(dst)
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			return pb.(*eth.SignedBlindedBeaconBlockFastexPhase1).MarshalSSZTo(dst)
-		}
-		return pb.(*eth.SignedBeaconBlockFastexPhase1).MarshalSSZTo(dst)
 	case version.Capella:
 		if b.IsBlinded() {
 			return pb.(*eth.SignedBlindedBeaconBlockCapella).MarshalSSZTo(dst)
@@ -453,11 +376,6 @@ func (b *SignedBeaconBlock) SizeSSZ() int {
 			return pb.(*eth.SignedBlindedBeaconBlockBellatrix).SizeSSZ()
 		}
 		return pb.(*eth.SignedBeaconBlockBellatrix).SizeSSZ()
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			return pb.(*eth.SignedBlindedBeaconBlockFastexPhase1).SizeSSZ()
-		}
-		return pb.(*eth.SignedBeaconBlockFastexPhase1).SizeSSZ()
 	case version.Capella:
 		if b.IsBlinded() {
 			return pb.(*eth.SignedBlindedBeaconBlockCapella).SizeSSZ()
@@ -510,28 +428,6 @@ func (b *SignedBeaconBlock) UnmarshalSSZ(buf []byte) error {
 			}
 			var err error
 			newBlock, err = initSignedBlockFromProtoBellatrix(pb)
-			if err != nil {
-				return err
-			}
-		}
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			pb := &eth.SignedBlindedBeaconBlockFastexPhase1{}
-			if err := pb.UnmarshalSSZ(buf); err != nil {
-				return err
-			}
-			var err error
-			newBlock, err = initBlindedSignedBlockFromProtoFastexPhase1(pb)
-			if err != nil {
-				return err
-			}
-		} else {
-			pb := &eth.SignedBeaconBlockFastexPhase1{}
-			if err := pb.UnmarshalSSZ(buf); err != nil {
-				return err
-			}
-			var err error
-			newBlock, err = initSignedBlockFromProtoFastexPhase1(pb)
 			if err != nil {
 				return err
 			}
@@ -621,11 +517,6 @@ func (b *BeaconBlock) HashTreeRoot() ([field_params.RootLength]byte, error) {
 			return pb.(*eth.BlindedBeaconBlockBellatrix).HashTreeRoot()
 		}
 		return pb.(*eth.BeaconBlockBellatrix).HashTreeRoot()
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			return pb.(*eth.BlindedBeaconBlockFastexPhase1).HashTreeRoot()
-		}
-		return pb.(*eth.BeaconBlockFastexPhase1).HashTreeRoot()
 	case version.Capella:
 		if b.IsBlinded() {
 			return pb.(*eth.BlindedBeaconBlockCapella).HashTreeRoot()
@@ -652,11 +543,6 @@ func (b *BeaconBlock) HashTreeRootWith(h *ssz.Hasher) error {
 			return pb.(*eth.BlindedBeaconBlockBellatrix).HashTreeRootWith(h)
 		}
 		return pb.(*eth.BeaconBlockBellatrix).HashTreeRootWith(h)
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			return pb.(*eth.BlindedBeaconBlockFastexPhase1).HashTreeRootWith(h)
-		}
-		return pb.(*eth.BeaconBlockFastexPhase1).HashTreeRootWith(h)
 	case version.Capella:
 		if b.IsBlinded() {
 			return pb.(*eth.BlindedBeaconBlockCapella).HashTreeRootWith(h)
@@ -684,11 +570,6 @@ func (b *BeaconBlock) MarshalSSZ() ([]byte, error) {
 			return pb.(*eth.BlindedBeaconBlockBellatrix).MarshalSSZ()
 		}
 		return pb.(*eth.BeaconBlockBellatrix).MarshalSSZ()
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			return pb.(*eth.BlindedBeaconBlockFastexPhase1).MarshalSSZ()
-		}
-		return pb.(*eth.BeaconBlockFastexPhase1).MarshalSSZ()
 	case version.Capella:
 		if b.IsBlinded() {
 			return pb.(*eth.BlindedBeaconBlockCapella).MarshalSSZ()
@@ -716,11 +597,6 @@ func (b *BeaconBlock) MarshalSSZTo(dst []byte) ([]byte, error) {
 			return pb.(*eth.BlindedBeaconBlockBellatrix).MarshalSSZTo(dst)
 		}
 		return pb.(*eth.BeaconBlockBellatrix).MarshalSSZTo(dst)
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			return pb.(*eth.BlindedBeaconBlockFastexPhase1).MarshalSSZTo(dst)
-		}
-		return pb.(*eth.BeaconBlockFastexPhase1).MarshalSSZTo(dst)
 	case version.Capella:
 		if b.IsBlinded() {
 			return pb.(*eth.BlindedBeaconBlockCapella).MarshalSSZTo(dst)
@@ -752,11 +628,6 @@ func (b *BeaconBlock) SizeSSZ() int {
 			return pb.(*eth.BlindedBeaconBlockBellatrix).SizeSSZ()
 		}
 		return pb.(*eth.BeaconBlockBellatrix).SizeSSZ()
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			return pb.(*eth.BlindedBeaconBlockFastexPhase1).SizeSSZ()
-		}
-		return pb.(*eth.BeaconBlockFastexPhase1).SizeSSZ()
 	case version.Capella:
 		if b.IsBlinded() {
 			return pb.(*eth.BlindedBeaconBlockCapella).SizeSSZ()
@@ -813,28 +684,6 @@ func (b *BeaconBlock) UnmarshalSSZ(buf []byte) error {
 				return err
 			}
 		}
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			pb := &eth.BlindedBeaconBlockFastexPhase1{}
-			if err := pb.UnmarshalSSZ(buf); err != nil {
-				return err
-			}
-			var err error
-			newBlock, err = initBlindedBlockFromProtoFastexPhase1(pb)
-			if err != nil {
-				return err
-			}
-		} else {
-			pb := &eth.BeaconBlockFastexPhase1{}
-			if err := pb.UnmarshalSSZ(buf); err != nil {
-				return err
-			}
-			var err error
-			newBlock, err = initBlockFromProtoFastexPhase1(pb)
-			if err != nil {
-				return err
-			}
-		}
 	case version.Capella:
 		if b.IsBlinded() {
 			pb := &eth.BlindedBeaconBlockCapella{}
@@ -880,11 +729,6 @@ func (b *BeaconBlock) AsSignRequestObject() (validatorpb.SignRequestObject, erro
 			return &validatorpb.SignRequest_BlindedBlockBellatrix{BlindedBlockBellatrix: pb.(*eth.BlindedBeaconBlockBellatrix)}, nil
 		}
 		return &validatorpb.SignRequest_BlockBellatrix{BlockBellatrix: pb.(*eth.BeaconBlockBellatrix)}, nil
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			return &validatorpb.SignRequest_BlindedBlockFastexPhase1{BlindedBlockFastexPhase1: pb.(*eth.BlindedBeaconBlockFastexPhase1)}, nil
-		}
-		return &validatorpb.SignRequest_BlockFastexPhase1{BlockFastexPhase1: pb.(*eth.BeaconBlockFastexPhase1)}, nil
 	case version.Capella:
 		if b.IsBlinded() {
 			return &validatorpb.SignRequest_BlindedBlockCapella{BlindedBlockCapella: pb.(*eth.BlindedBeaconBlockCapella)}, nil
@@ -918,13 +762,6 @@ func (b *BeaconBlock) Copy() (interfaces.ReadOnlyBeaconBlock, error) {
 		}
 		cp := eth.CopyBeaconBlockBellatrix(pb.(*eth.BeaconBlockBellatrix))
 		return initBlockFromProtoBellatrix(cp)
-	case version.FastexPhase1:
-		if b.IsBlinded() {
-			cp := eth.CopyBlindedBeaconBlockFastexPhase1(pb.(*eth.BlindedBeaconBlockFastexPhase1))
-			return initBlindedBlockFromProtoFastexPhase1(cp)
-		}
-		cp := eth.CopyBeaconBlockFastexPhase1(pb.(*eth.BeaconBlockFastexPhase1))
-		return initBlockFromProtoFastexPhase1(cp)
 	case version.Capella:
 		if b.IsBlinded() {
 			cp := eth.CopyBlindedBeaconBlockCapella(pb.(*eth.BlindedBeaconBlockCapella))
@@ -982,19 +819,24 @@ func (b *BeaconBlockBody) VoluntaryExits() []*eth.SignedVoluntaryExit {
 	return b.voluntaryExits
 }
 
-// ActivityChanges returns activity changes in the block.
+// ActivityChanges returns the activity changes in the block.
 func (b *BeaconBlockBody) ActivityChanges() []*eth.ActivityChange {
 	return b.activityChanges
 }
 
-// LatestProcessedBlock returns the number of latest processed block.
-func (b *BeaconBlockBody) LatestProcessedBlock() uint64 {
-	return b.latestProcessedBlock
-}
-
-// TransactionsCount returns the number of transactions in latest processed block.
+// TransactionsCount returns the transactions in the block.
 func (b *BeaconBlockBody) TransactionsCount() uint64 {
 	return b.transactionsCount
+}
+
+// BaseFee returns the base fee in the block.
+func (b *BeaconBlockBody) BaseFee() uint64 {
+	return b.baseFee
+}
+
+// ExecutionHeight returns the base fee in the block.
+func (b *BeaconBlockBody) ExecutionHeight() uint64 {
+	return b.executionHeight
 }
 
 // SyncAggregate returns the sync aggregate in the block.
@@ -1010,7 +852,7 @@ func (b *BeaconBlockBody) Execution() (interfaces.ExecutionData, error) {
 	switch b.version {
 	case version.Phase0, version.Altair:
 		return nil, ErrNotSupported("Execution", b.version)
-	case version.Bellatrix, version.FastexPhase1:
+	case version.Bellatrix:
 		if b.isBlinded {
 			var ph *enginev1.ExecutionPayloadHeader
 			var ok bool
@@ -1057,13 +899,6 @@ func (b *BeaconBlockBody) Execution() (interfaces.ExecutionData, error) {
 	}
 }
 
-func (b *BeaconBlockBody) BaseFee() (uint64, error) {
-	if b.version < version.FastexPhase1 {
-		return 0, ErrNotSupported("BaseFee", b.version)
-	}
-	return b.baseFee, nil
-}
-
 func (b *BeaconBlockBody) BLSToExecutionChanges() ([]*eth.SignedBLSToExecutionChange, error) {
 	if b.version < version.Capella {
 		return nil, ErrNotSupported("BLSToExecutionChanges", b.version)
@@ -1087,11 +922,6 @@ func (b *BeaconBlockBody) HashTreeRoot() ([field_params.RootLength]byte, error) 
 			return pb.(*eth.BlindedBeaconBlockBodyBellatrix).HashTreeRoot()
 		}
 		return pb.(*eth.BeaconBlockBodyBellatrix).HashTreeRoot()
-	case version.FastexPhase1:
-		if b.isBlinded {
-			return pb.(*eth.BlindedBeaconBlockBodyFastexPhase1).HashTreeRoot()
-		}
-		return pb.(*eth.BeaconBlockBodyFastexPhase1).HashTreeRoot()
 	case version.Capella:
 		if b.isBlinded {
 			return pb.(*eth.BlindedBeaconBlockBodyCapella).HashTreeRoot()

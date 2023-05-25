@@ -5,15 +5,15 @@ import (
 	"testing"
 
 	"github.com/prysmaticlabs/go-bitfield"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/altair"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1/attestation"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
-	"github.com/prysmaticlabs/prysm/v3/testing/util"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/altair"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1/attestation"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/testing/util"
 )
 
 func TestTranslateParticipation(t *testing.T) {
@@ -90,8 +90,11 @@ func TestUpgradeToAltair(t *testing.T) {
 	require.DeepSSZEqual(t, preForkState.Eth1Data(), aState.Eth1Data())
 	require.DeepSSZEqual(t, preForkState.Eth1DataVotes(), aState.Eth1DataVotes())
 	require.DeepSSZEqual(t, preForkState.Eth1DepositIndex(), aState.Eth1DepositIndex())
+	require.DeepSSZEqual(t, preForkState.SharedActivity(), aState.SharedActivity())
+	require.DeepSSZEqual(t, preForkState.ExecutionHeight(), aState.ExecutionHeight())
 	require.DeepSSZEqual(t, preForkState.Validators(), aState.Validators())
 	require.DeepSSZEqual(t, preForkState.Balances(), aState.Balances())
+	require.DeepSSZEqual(t, preForkState.Activities(), aState.Activities())
 	require.DeepSSZEqual(t, preForkState.RandaoMixes(), aState.RandaoMixes())
 	require.DeepSSZEqual(t, preForkState.Slashings(), aState.Slashings())
 	require.DeepSSZEqual(t, preForkState.JustificationBits(), aState.JustificationBits())

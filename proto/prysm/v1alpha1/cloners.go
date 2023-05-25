@@ -1,8 +1,8 @@
 package eth
 
 import (
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
 )
 
 // CopyETH1Data copies the provided eth1data object.
@@ -14,6 +14,19 @@ func CopyETH1Data(data *Eth1Data) *Eth1Data {
 		DepositRoot:  bytesutil.SafeCopyBytes(data.DepositRoot),
 		DepositCount: data.DepositCount,
 		BlockHash:    bytesutil.SafeCopyBytes(data.BlockHash),
+	}
+}
+
+// CopySharedActivity copies provided sharedActivity object.
+func CopySharedActivity(data *SharedActivity) *SharedActivity {
+	if data == nil {
+		return nil
+	}
+	return &SharedActivity{
+		TransactionsGasPerPeriod: data.TransactionsGasPerPeriod,
+		TransactionsGasPerEpoch:  data.TransactionsGasPerEpoch,
+		BaseFeePerPeriod:         data.BaseFeePerPeriod,
+		BaseFeePerEpoch:          data.BaseFeePerEpoch,
 	}
 }
 
@@ -42,27 +55,6 @@ func CopyPendingAttestation(att *PendingAttestation) *PendingAttestation {
 		InclusionDelay:  att.InclusionDelay,
 		ProposerIndex:   att.ProposerIndex,
 	}
-}
-
-func CopyActivityChange(change *ActivityChange) *ActivityChange {
-	if change == nil {
-		return nil
-	}
-	return &ActivityChange{
-		ContractAddress: change.ContractAddress,
-		DeltaActivity:   change.DeltaActivity,
-	}
-}
-
-func CopyActivityChanges(changes []*ActivityChange) []*ActivityChange {
-	if changes == nil {
-		return nil
-	}
-	newChanges := make([]*ActivityChange, len(changes))
-	for i, change := range changes {
-		newChanges[i] = CopyActivityChange(change)
-	}
-	return newChanges
 }
 
 // CopyAttestation copies the provided attestation object.
@@ -133,17 +125,18 @@ func CopyBeaconBlockBody(body *BeaconBlockBody) *BeaconBlockBody {
 		return nil
 	}
 	return &BeaconBlockBody{
-		RandaoReveal:         bytesutil.SafeCopyBytes(body.RandaoReveal),
-		Eth1Data:             CopyETH1Data(body.Eth1Data),
-		Graffiti:             bytesutil.SafeCopyBytes(body.Graffiti),
-		ProposerSlashings:    CopyProposerSlashings(body.ProposerSlashings),
-		AttesterSlashings:    CopyAttesterSlashings(body.AttesterSlashings),
-		Attestations:         CopyAttestations(body.Attestations),
-		Deposits:             CopyDeposits(body.Deposits),
-		VoluntaryExits:       CopySignedVoluntaryExits(body.VoluntaryExits),
-		ActivityChanges:      CopyActivityChanges(body.ActivityChanges),
-		LatestProcessedBlock: body.LatestProcessedBlock,
-		TransactionsCount:    body.TransactionsCount,
+		RandaoReveal:      bytesutil.SafeCopyBytes(body.RandaoReveal),
+		Eth1Data:          CopyETH1Data(body.Eth1Data),
+		Graffiti:          bytesutil.SafeCopyBytes(body.Graffiti),
+		ProposerSlashings: CopyProposerSlashings(body.ProposerSlashings),
+		AttesterSlashings: CopyAttesterSlashings(body.AttesterSlashings),
+		Attestations:      CopyAttestations(body.Attestations),
+		Deposits:          CopyDeposits(body.Deposits),
+		VoluntaryExits:    CopySignedVoluntaryExits(body.VoluntaryExits),
+		ActivityChanges:   CopyActivityChanges(body.ActivityChanges),
+		TransactionsCount: body.TransactionsCount,
+		BaseFee:           body.BaseFee,
+		ExecutionHeight:   body.ExecutionHeight,
 	}
 }
 
@@ -178,18 +171,19 @@ func CopyBeaconBlockBodyAltair(body *BeaconBlockBodyAltair) *BeaconBlockBodyAlta
 		return nil
 	}
 	return &BeaconBlockBodyAltair{
-		RandaoReveal:         bytesutil.SafeCopyBytes(body.RandaoReveal),
-		Eth1Data:             CopyETH1Data(body.Eth1Data),
-		Graffiti:             bytesutil.SafeCopyBytes(body.Graffiti),
-		ProposerSlashings:    CopyProposerSlashings(body.ProposerSlashings),
-		AttesterSlashings:    CopyAttesterSlashings(body.AttesterSlashings),
-		Attestations:         CopyAttestations(body.Attestations),
-		Deposits:             CopyDeposits(body.Deposits),
-		VoluntaryExits:       CopySignedVoluntaryExits(body.VoluntaryExits),
-		ActivityChanges:      CopyActivityChanges(body.ActivityChanges),
-		LatestProcessedBlock: body.LatestProcessedBlock,
-		TransactionsCount:    body.TransactionsCount,
-		SyncAggregate:        CopySyncAggregate(body.SyncAggregate),
+		RandaoReveal:      bytesutil.SafeCopyBytes(body.RandaoReveal),
+		Eth1Data:          CopyETH1Data(body.Eth1Data),
+		Graffiti:          bytesutil.SafeCopyBytes(body.Graffiti),
+		ProposerSlashings: CopyProposerSlashings(body.ProposerSlashings),
+		AttesterSlashings: CopyAttesterSlashings(body.AttesterSlashings),
+		Attestations:      CopyAttestations(body.Attestations),
+		Deposits:          CopyDeposits(body.Deposits),
+		VoluntaryExits:    CopySignedVoluntaryExits(body.VoluntaryExits),
+		ActivityChanges:   CopyActivityChanges(body.ActivityChanges),
+		TransactionsCount: body.TransactionsCount,
+		BaseFee:           body.BaseFee,
+		ExecutionHeight:   body.ExecutionHeight,
+		SyncAggregate:     CopySyncAggregate(body.SyncAggregate),
 	}
 }
 
@@ -317,11 +311,10 @@ func CopyDepositData(depData *Deposit_Data) *Deposit_Data {
 	}
 	return &Deposit_Data{
 		PublicKey:             bytesutil.SafeCopyBytes(depData.PublicKey),
+		Contract:              bytesutil.SafeCopyBytes(depData.Contract),
 		WithdrawalCredentials: bytesutil.SafeCopyBytes(depData.WithdrawalCredentials),
 		Amount:                depData.Amount,
 		Signature:             bytesutil.SafeCopyBytes(depData.Signature),
-		DeployedContract:      bytesutil.SafeCopyBytes(depData.DeployedContract),
-		DeploymentNonce:       depData.DeploymentNonce,
 	}
 }
 
@@ -351,15 +344,43 @@ func CopySignedVoluntaryExit(exit *SignedVoluntaryExit) *SignedVoluntaryExit {
 	}
 }
 
+// CopyActivityChanges copies the provided ActivityChanges array.
+func CopyActivityChanges(activityChanges []*ActivityChange) []*ActivityChange {
+	if activityChanges == nil {
+		return nil
+	}
+	newActivityChanges := make([]*ActivityChange, len(activityChanges))
+	for i, activityChange := range activityChanges {
+		newActivityChanges[i] = CopyActivityChange(activityChange)
+	}
+	return newActivityChanges
+}
+
+// CopyActivityChange copies the provided ActivityChange.
+func CopyActivityChange(activityChange *ActivityChange) *ActivityChange {
+	if activityChange == nil {
+		return nil
+	}
+	contractAddress := make([]byte, len(activityChange.ContractAddress))
+	copy(contractAddress, activityChange.ContractAddress)
+	return &ActivityChange{
+		ContractAddress: contractAddress,
+		DeltaActivity:   activityChange.DeltaActivity,
+	}
+}
+
 // CopyValidator copies the provided validator.
 func CopyValidator(val *Validator) *Validator {
 	pubKey := make([]byte, len(val.PublicKey))
 	copy(pubKey, val.PublicKey)
 	withdrawalCreds := make([]byte, len(val.WithdrawalCredentials))
 	copy(withdrawalCreds, val.WithdrawalCredentials)
+	contract := make([]byte, len(val.Contract))
+	copy(contract, val.Contract)
 	return &Validator{
 		PublicKey:                  pubKey,
 		WithdrawalCredentials:      withdrawalCreds,
+		Contract:                   contract,
 		EffectiveBalance:           val.EffectiveBalance,
 		EffectiveActivity:          val.EffectiveActivity,
 		Slashed:                    val.Slashed,
@@ -367,14 +388,6 @@ func CopyValidator(val *Validator) *Validator {
 		ActivationEpoch:            val.ActivationEpoch,
 		ExitEpoch:                  val.ExitEpoch,
 		WithdrawableEpoch:          val.WithdrawableEpoch,
-	}
-}
-
-func CopyContractsContainer(cc *ContractsContainer) *ContractsContainer {
-	contracts := make([][]byte, len(cc.Contracts))
-	copy(contracts, cc.Contracts)
-	return &ContractsContainer{
-		Contracts: contracts,
 	}
 }
 
@@ -447,115 +460,20 @@ func CopyBeaconBlockBodyBellatrix(body *BeaconBlockBodyBellatrix) *BeaconBlockBo
 		return nil
 	}
 	return &BeaconBlockBodyBellatrix{
-		RandaoReveal:         bytesutil.SafeCopyBytes(body.RandaoReveal),
-		Eth1Data:             CopyETH1Data(body.Eth1Data),
-		Graffiti:             bytesutil.SafeCopyBytes(body.Graffiti),
-		ProposerSlashings:    CopyProposerSlashings(body.ProposerSlashings),
-		AttesterSlashings:    CopyAttesterSlashings(body.AttesterSlashings),
-		Attestations:         CopyAttestations(body.Attestations),
-		Deposits:             CopyDeposits(body.Deposits),
-		VoluntaryExits:       CopySignedVoluntaryExits(body.VoluntaryExits),
-		ActivityChanges:      CopyActivityChanges(body.ActivityChanges),
-		LatestProcessedBlock: body.LatestProcessedBlock,
-		TransactionsCount:    body.TransactionsCount,
-		SyncAggregate:        CopySyncAggregate(body.SyncAggregate),
-		ExecutionPayload:     CopyExecutionPayload(body.ExecutionPayload),
-	}
-}
-
-// CopySignedBeaconBlockFastexPhase1 copies the provided SignedBeaconBlockFastexPhase1.
-func CopySignedBeaconBlockFastexPhase1(sigBlock *SignedBeaconBlockFastexPhase1) *SignedBeaconBlockFastexPhase1 {
-	if sigBlock == nil {
-		return nil
-	}
-	return &SignedBeaconBlockFastexPhase1{
-		Block:     CopyBeaconBlockFastexPhase1(sigBlock.Block),
-		Signature: bytesutil.SafeCopyBytes(sigBlock.Signature),
-	}
-}
-
-// CopyBeaconBlockFastexPhase1 copies the provided BeaconBlockFastexPhase1.
-func CopyBeaconBlockFastexPhase1(block *BeaconBlockFastexPhase1) *BeaconBlockFastexPhase1 {
-	if block == nil {
-		return nil
-	}
-	return &BeaconBlockFastexPhase1{
-		Slot:          block.Slot,
-		ProposerIndex: block.ProposerIndex,
-		ParentRoot:    bytesutil.SafeCopyBytes(block.ParentRoot),
-		StateRoot:     bytesutil.SafeCopyBytes(block.StateRoot),
-		Body:          CopyBeaconBlockBodyFastexPhase1(block.Body),
-	}
-}
-
-// CopyBeaconBlockBodyFastexPhase1 copies the provided BeaconBlockBodyFastexPhase1.
-func CopyBeaconBlockBodyFastexPhase1(body *BeaconBlockBodyFastexPhase1) *BeaconBlockBodyFastexPhase1 {
-	if body == nil {
-		return nil
-	}
-	return &BeaconBlockBodyFastexPhase1{
-		RandaoReveal:         bytesutil.SafeCopyBytes(body.RandaoReveal),
-		Eth1Data:             CopyETH1Data(body.Eth1Data),
-		Graffiti:             bytesutil.SafeCopyBytes(body.Graffiti),
-		ProposerSlashings:    CopyProposerSlashings(body.ProposerSlashings),
-		AttesterSlashings:    CopyAttesterSlashings(body.AttesterSlashings),
-		Attestations:         CopyAttestations(body.Attestations),
-		Deposits:             CopyDeposits(body.Deposits),
-		VoluntaryExits:       CopySignedVoluntaryExits(body.VoluntaryExits),
-		ActivityChanges:      CopyActivityChanges(body.ActivityChanges),
-		LatestProcessedBlock: body.LatestProcessedBlock,
-		TransactionsCount:    body.TransactionsCount,
-		SyncAggregate:        CopySyncAggregate(body.SyncAggregate),
-		ExecutionPayload:     CopyExecutionPayload(body.ExecutionPayload),
-		BaseFee:              body.BaseFee,
-	}
-}
-
-// CopySignedBlindedBeaconBlockFastexPhase1 copies the provided SignedBlindedBeaconBlockFastexPhase1.
-func CopySignedBlindedBeaconBlockFastexPhase1(sigBlock *SignedBlindedBeaconBlockFastexPhase1) *SignedBlindedBeaconBlockFastexPhase1 {
-	if sigBlock == nil {
-		return nil
-	}
-	return &SignedBlindedBeaconBlockFastexPhase1{
-		Block:     CopyBlindedBeaconBlockFastexPhase1(sigBlock.Block),
-		Signature: bytesutil.SafeCopyBytes(sigBlock.Signature),
-	}
-}
-
-// CopyBlindedBeaconBlockFastexPhase1 copies the provided BlindedBeaconBlockFastexPhase1.
-func CopyBlindedBeaconBlockFastexPhase1(block *BlindedBeaconBlockFastexPhase1) *BlindedBeaconBlockFastexPhase1 {
-	if block == nil {
-		return nil
-	}
-	return &BlindedBeaconBlockFastexPhase1{
-		Slot:          block.Slot,
-		ProposerIndex: block.ProposerIndex,
-		ParentRoot:    bytesutil.SafeCopyBytes(block.ParentRoot),
-		StateRoot:     bytesutil.SafeCopyBytes(block.StateRoot),
-		Body:          CopyBlindedBeaconBlockBodyFastexPhase1(block.Body),
-	}
-}
-
-// CopyBlindedBeaconBlockBodyFastexPhase1 copies the provided BlindedBeaconBlockBodyBellatrix.
-func CopyBlindedBeaconBlockBodyFastexPhase1(body *BlindedBeaconBlockBodyFastexPhase1) *BlindedBeaconBlockBodyFastexPhase1 {
-	if body == nil {
-		return nil
-	}
-	return &BlindedBeaconBlockBodyFastexPhase1{
-		RandaoReveal:           bytesutil.SafeCopyBytes(body.RandaoReveal),
-		Eth1Data:               CopyETH1Data(body.Eth1Data),
-		Graffiti:               bytesutil.SafeCopyBytes(body.Graffiti),
-		ProposerSlashings:      CopyProposerSlashings(body.ProposerSlashings),
-		AttesterSlashings:      CopyAttesterSlashings(body.AttesterSlashings),
-		Attestations:           CopyAttestations(body.Attestations),
-		Deposits:               CopyDeposits(body.Deposits),
-		VoluntaryExits:         CopySignedVoluntaryExits(body.VoluntaryExits),
-		ActivityChanges:        CopyActivityChanges(body.ActivityChanges),
-		LatestProcessedBlock:   body.LatestProcessedBlock,
-		TransactionsCount:      body.TransactionsCount,
-		SyncAggregate:          CopySyncAggregate(body.SyncAggregate),
-		ExecutionPayloadHeader: CopyExecutionPayloadHeader(body.ExecutionPayloadHeader),
-		BaseFee:                body.BaseFee,
+		RandaoReveal:      bytesutil.SafeCopyBytes(body.RandaoReveal),
+		Eth1Data:          CopyETH1Data(body.Eth1Data),
+		Graffiti:          bytesutil.SafeCopyBytes(body.Graffiti),
+		ProposerSlashings: CopyProposerSlashings(body.ProposerSlashings),
+		AttesterSlashings: CopyAttesterSlashings(body.AttesterSlashings),
+		Attestations:      CopyAttestations(body.Attestations),
+		Deposits:          CopyDeposits(body.Deposits),
+		VoluntaryExits:    CopySignedVoluntaryExits(body.VoluntaryExits),
+		ActivityChanges:   CopyActivityChanges(body.ActivityChanges),
+		TransactionsCount: body.TransactionsCount,
+		BaseFee:           body.BaseFee,
+		ExecutionHeight:   body.ExecutionHeight,
+		SyncAggregate:     CopySyncAggregate(body.SyncAggregate),
+		ExecutionPayload:  CopyExecutionPayload(body.ExecutionPayload),
 	}
 }
 
@@ -599,11 +517,11 @@ func CopyBeaconBlockBodyCapella(body *BeaconBlockBodyCapella) *BeaconBlockBodyCa
 		Deposits:              CopyDeposits(body.Deposits),
 		VoluntaryExits:        CopySignedVoluntaryExits(body.VoluntaryExits),
 		ActivityChanges:       CopyActivityChanges(body.ActivityChanges),
-		LatestProcessedBlock:  body.LatestProcessedBlock,
 		TransactionsCount:     body.TransactionsCount,
+		BaseFee:               body.BaseFee,
+		ExecutionHeight:       body.ExecutionHeight,
 		SyncAggregate:         CopySyncAggregate(body.SyncAggregate),
 		ExecutionPayload:      CopyExecutionPayloadCapella(body.ExecutionPayload),
-		BaseFee:               body.BaseFee,
 		BlsToExecutionChanges: CopyBLSToExecutionChanges(body.BlsToExecutionChanges),
 	}
 }
@@ -648,11 +566,11 @@ func CopyBlindedBeaconBlockBodyCapella(body *BlindedBeaconBlockBodyCapella) *Bli
 		Deposits:               CopyDeposits(body.Deposits),
 		VoluntaryExits:         CopySignedVoluntaryExits(body.VoluntaryExits),
 		ActivityChanges:        CopyActivityChanges(body.ActivityChanges),
-		LatestProcessedBlock:   body.LatestProcessedBlock,
 		TransactionsCount:      body.TransactionsCount,
+		BaseFee:                body.BaseFee,
+		ExecutionHeight:        body.ExecutionHeight,
 		SyncAggregate:          CopySyncAggregate(body.SyncAggregate),
 		ExecutionPayloadHeader: CopyExecutionPayloadHeaderCapella(body.ExecutionPayloadHeader),
-		BaseFee:                body.BaseFee,
 		BlsToExecutionChanges:  CopyBLSToExecutionChanges(body.BlsToExecutionChanges),
 	}
 }
@@ -793,8 +711,9 @@ func CopyBlindedBeaconBlockBodyBellatrix(body *BlindedBeaconBlockBodyBellatrix) 
 		Deposits:               CopyDeposits(body.Deposits),
 		VoluntaryExits:         CopySignedVoluntaryExits(body.VoluntaryExits),
 		ActivityChanges:        CopyActivityChanges(body.ActivityChanges),
-		LatestProcessedBlock:   body.LatestProcessedBlock,
 		TransactionsCount:      body.TransactionsCount,
+		BaseFee:                body.BaseFee,
+		ExecutionHeight:        body.ExecutionHeight,
 		SyncAggregate:          CopySyncAggregate(body.SyncAggregate),
 		ExecutionPayloadHeader: CopyExecutionPayloadHeader(body.ExecutionPayloadHeader),
 	}

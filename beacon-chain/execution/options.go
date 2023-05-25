@@ -2,14 +2,12 @@ package execution
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache/activitycache"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache/basefeecache"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache/depositcache"
-	statefeed "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/feed/state"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/db"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stategen"
-	"github.com/prysmaticlabs/prysm/v3/network/authorization"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache/depositcache"
+	statefeed "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/state"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stategen"
+	"github.com/prysmaticlabs/prysm/v4/network/authorization"
 )
 
 type Option func(s *Service) error
@@ -66,22 +64,6 @@ func WithDatabase(database db.HeadAccessDatabase) Option {
 func WithDepositCache(cache *depositcache.DepositCache) Option {
 	return func(s *Service) error {
 		s.cfg.depositCache = cache
-		return nil
-	}
-}
-
-// WithActivityChangesCache for caching activity changes.
-func WithActivityChangesCache(cache *activitycache.ActivityChangesCache) Option {
-	return func(s *Service) error {
-		s.cfg.activityChangesCache = cache
-		return nil
-	}
-}
-
-// WithBaseFeeCache for caching base fee.
-func WithBaseFeeCache(cache *basefeecache.BaseFeeCache) Option {
-	return func(s *Service) error {
-		s.cfg.baseFeeCache = cache
 		return nil
 	}
 }

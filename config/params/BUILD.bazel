@@ -15,14 +15,13 @@ go_library(
         "minimal_config.go",
         "network_config.go",
         "testnet_e2e_config.go",
-        "testnet_fastex_chain_config.go",
         "testnet_prater_config.go",
         "testnet_sepolia_config.go",
         "testutils.go",
         "testutils_develop.go",  # keep
         "values.go",
     ],
-    importpath = "github.com/prysmaticlabs/prysm/v3/config/params",
+    importpath = "github.com/prysmaticlabs/prysm/v4/config/params",
     visibility = ["//visibility:public"],
     deps = [
         "//config/fieldparams:go_default_library",

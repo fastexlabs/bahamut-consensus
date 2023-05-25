@@ -2,15 +2,14 @@ package migration
 
 import (
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	"github.com/prysmaticlabs/prysm/v3/encoding/ssz"
-	enginev1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	ethpbv1 "github.com/prysmaticlabs/prysm/v3/proto/eth/v1"
-	ethpbv2 "github.com/prysmaticlabs/prysm/v3/proto/eth/v2"
-	ethpbalpha "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/encoding/ssz"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	ethpbv1 "github.com/prysmaticlabs/prysm/v4/proto/eth/v1"
+	ethpbv2 "github.com/prysmaticlabs/prysm/v4/proto/eth/v2"
+	ethpbalpha "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -251,10 +250,9 @@ func V1Alpha1BeaconBlockBellatrixToV2Blinded(v1alpha1Block *ethpbalpha.BeaconBlo
 			Data: &ethpbv1.Deposit_Data{
 				Pubkey:                bytesutil.SafeCopyBytes(d.Data.PublicKey),
 				WithdrawalCredentials: bytesutil.SafeCopyBytes(d.Data.WithdrawalCredentials),
+				Contract:              bytesutil.SafeCopyBytes(d.Data.Contract),
 				Amount:                d.Data.Amount,
 				Signature:             bytesutil.SafeCopyBytes(d.Data.Signature),
-				DeployedContract:      bytesutil.SafeCopyBytes(d.Data.DeployedContract),
-				DeploymentNonce:       d.Data.DeploymentNonce,
 			},
 		}
 	}
@@ -292,16 +290,16 @@ func V1Alpha1BeaconBlockBellatrixToV2Blinded(v1alpha1Block *ethpbalpha.BeaconBlo
 			DepositCount: v1alpha1Block.Body.Eth1Data.DepositCount,
 			BlockHash:    bytesutil.SafeCopyBytes(v1alpha1Block.Body.Eth1Data.BlockHash),
 		},
-
-		Graffiti:             bytesutil.SafeCopyBytes(v1alpha1Block.Body.Graffiti),
-		ProposerSlashings:    resultProposerSlashings,
-		AttesterSlashings:    resultAttesterSlashings,
-		Attestations:         resultAttestations,
-		Deposits:             resultDeposits,
-		VoluntaryExits:       resultExits,
-		ActivityChanges:      resultActivityChanges,
-		LatestProcessedBlock: v1alpha1Block.Body.LatestProcessedBlock,
-		TransactionsCount:    v1alpha1Block.Body.TransactionsCount,
+		Graffiti:          bytesutil.SafeCopyBytes(v1alpha1Block.Body.Graffiti),
+		ProposerSlashings: resultProposerSlashings,
+		AttesterSlashings: resultAttesterSlashings,
+		Attestations:      resultAttestations,
+		Deposits:          resultDeposits,
+		VoluntaryExits:    resultExits,
+		ActivityChanges:   resultActivityChanges,
+		TransactionsCount: v1alpha1Block.Body.TransactionsCount,
+		BaseFee:           v1alpha1Block.Body.BaseFee,
+		ExecutionHeight:   v1alpha1Block.Body.ExecutionHeight,
 		SyncAggregate: &ethpbv1.SyncAggregate{
 			SyncCommitteeBits:      bytesutil.SafeCopyBytes(v1alpha1Block.Body.SyncAggregate.SyncCommitteeBits),
 			SyncCommitteeSignature: bytesutil.SafeCopyBytes(v1alpha1Block.Body.SyncAggregate.SyncCommitteeSignature),
@@ -438,6 +436,7 @@ func V1Alpha1BeaconBlockCapellaToV2Blinded(v1alpha1Block *ethpbalpha.BeaconBlock
 			Data: &ethpbv1.Deposit_Data{
 				Pubkey:                bytesutil.SafeCopyBytes(d.Data.PublicKey),
 				WithdrawalCredentials: bytesutil.SafeCopyBytes(d.Data.WithdrawalCredentials),
+				Contract:              bytesutil.SafeCopyBytes(d.Data.Contract),
 				Amount:                d.Data.Amount,
 				Signature:             bytesutil.SafeCopyBytes(d.Data.Signature),
 			},
@@ -456,16 +455,21 @@ func V1Alpha1BeaconBlockCapellaToV2Blinded(v1alpha1Block *ethpbalpha.BeaconBlock
 		}
 	}
 
+	sourceActivityChanges := v1alpha1Block.Body.ActivityChanges
+	resultActivityChanges := make([]*ethpbv1.ActivityChange, len(sourceActivityChanges))
+	for i, ac := range sourceActivityChanges {
+		resultActivityChanges[i] = &ethpbv1.ActivityChange{
+			ContractAddress: bytesutil.SafeCopyBytes(ac.ContractAddress),
+			DeltaActivity:   ac.DeltaActivity,
+		}
+	}
+
 	transactionsRoot, err := ssz.TransactionsRoot(v1alpha1Block.Body.ExecutionPayload.Transactions)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not calculate transactions root")
 	}
 
-	withdrawalsRoot, err := ssz.WithdrawalSliceRoot(
-		hash.CustomSHA256Hasher(),
-		v1alpha1Block.Body.ExecutionPayload.Withdrawals,
-		fieldparams.MaxWithdrawalsPerPayload,
-	)
+	withdrawalsRoot, err := ssz.WithdrawalSliceRoot(v1alpha1Block.Body.ExecutionPayload.Withdrawals, fieldparams.MaxWithdrawalsPerPayload)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not calculate transactions root")
 	}
@@ -495,6 +499,10 @@ func V1Alpha1BeaconBlockCapellaToV2Blinded(v1alpha1Block *ethpbalpha.BeaconBlock
 		Attestations:      resultAttestations,
 		Deposits:          resultDeposits,
 		VoluntaryExits:    resultExits,
+		ActivityChanges:   resultActivityChanges,
+		TransactionsCount: v1alpha1Block.Body.TransactionsCount,
+		BaseFee:           v1alpha1Block.Body.BaseFee,
+		ExecutionHeight:   v1alpha1Block.Body.ExecutionHeight,
 		SyncAggregate: &ethpbv1.SyncAggregate{
 			SyncCommitteeBits:      bytesutil.SafeCopyBytes(v1alpha1Block.Body.SyncAggregate.SyncCommitteeBits),
 			SyncCommitteeSignature: bytesutil.SafeCopyBytes(v1alpha1Block.Body.SyncAggregate.SyncCommitteeSignature),
@@ -534,8 +542,8 @@ func BeaconStateAltairToProto(altairState state.BeaconState) (*ethpbv2.BeaconSta
 	sourceLatestBlockHeader := altairState.LatestBlockHeader()
 	sourceEth1Data := altairState.Eth1Data()
 	sourceEth1DataVotes := altairState.Eth1DataVotes()
+	sourceSharedActivity := altairState.SharedActivity()
 	sourceValidators := altairState.Validators()
-	sourceContractsContainers := altairState.Contracts()
 	sourceJustificationBits := altairState.JustificationBits()
 	sourcePrevJustifiedCheckpoint := altairState.PreviousJustifiedCheckpoint()
 	sourceCurrJustifiedCheckpoint := altairState.CurrentJustifiedCheckpoint()
@@ -554,6 +562,7 @@ func BeaconStateAltairToProto(altairState state.BeaconState) (*ethpbv2.BeaconSta
 		resultValidators[i] = &ethpbv1.Validator{
 			Pubkey:                     bytesutil.SafeCopyBytes(validator.PublicKey),
 			WithdrawalCredentials:      bytesutil.SafeCopyBytes(validator.WithdrawalCredentials),
+			Contract:                   bytesutil.SafeCopyBytes(validator.Contract),
 			EffectiveBalance:           validator.EffectiveBalance,
 			EffectiveActivity:          validator.EffectiveActivity,
 			Slashed:                    validator.Slashed,
@@ -561,16 +570,6 @@ func BeaconStateAltairToProto(altairState state.BeaconState) (*ethpbv2.BeaconSta
 			ActivationEpoch:            validator.ActivationEpoch,
 			ExitEpoch:                  validator.ExitEpoch,
 			WithdrawableEpoch:          validator.WithdrawableEpoch,
-		}
-	}
-	resultContractsContainers := make([]*ethpbv1.ContractsContainer, len(sourceContractsContainers))
-	for i, cc := range sourceContractsContainers {
-		contracts := make([][]byte, len(cc.Contracts))
-		for j, c := range cc.Contracts {
-			contracts[j] = bytesutil.SafeCopyBytes(c)
-		}
-		resultContractsContainers[i] = &ethpbv1.ContractsContainer{
-			Contracts: contracts,
 		}
 	}
 
@@ -624,22 +623,22 @@ func BeaconStateAltairToProto(altairState state.BeaconState) (*ethpbv2.BeaconSta
 			DepositCount: sourceEth1Data.DepositCount,
 			BlockHash:    bytesutil.SafeCopyBytes(sourceEth1Data.BlockHash),
 		},
-		Eth1DataVotes:                  resultEth1DataVotes,
-		Eth1DepositIndex:               altairState.Eth1DepositIndex(),
-		LatestProcessedBlockActivities: altairState.LatestProcessedBlockActivities(),
-		TransactionsPerLatestEpoch:     altairState.TransactionsPerLatestEpoch(),
-		TransactionsGasPerPeriod:       altairState.TransactionsGasPerPeriod(),
-		NonStakersGasPerEpoch:          altairState.NonStakersGasPerEpoch(),
-		NonStakersGasPerPeriod:         altairState.NonStakersGasPerPeriod(),
-		Validators:                     resultValidators,
-		Balances:                       altairState.Balances(),
-		Contracts:                      resultContractsContainers,
-		Activities:                     altairState.Activities(),
-		RandaoMixes:                    bytesutil.SafeCopy2dBytes(altairState.RandaoMixes()),
-		Slashings:                      altairState.Slashings(),
-		PreviousEpochParticipation:     bytesutil.SafeCopyBytes(sourcePrevEpochParticipation),
-		CurrentEpochParticipation:      bytesutil.SafeCopyBytes(sourceCurrEpochParticipation),
-		JustificationBits:              bytesutil.SafeCopyBytes(sourceJustificationBits),
+		Eth1DataVotes:    resultEth1DataVotes,
+		Eth1DepositIndex: altairState.Eth1DepositIndex(),
+		SharedActivity: &ethpbv1.SharedActivity{
+			TransactionsGasPerPeriod: sourceSharedActivity.TransactionsGasPerPeriod,
+			TransactionsGasPerEpoch:  sourceSharedActivity.TransactionsGasPerEpoch,
+			BaseFeePerPeriod:         sourceSharedActivity.BaseFeePerPeriod,
+			BaseFeePerEpoch:          sourceSharedActivity.BaseFeePerEpoch,
+		},
+		Validators:                 resultValidators,
+		Balances:                   altairState.Balances(),
+		Activities:                 altairState.Activities(),
+		RandaoMixes:                bytesutil.SafeCopy2dBytes(altairState.RandaoMixes()),
+		Slashings:                  altairState.Slashings(),
+		PreviousEpochParticipation: bytesutil.SafeCopyBytes(sourcePrevEpochParticipation),
+		CurrentEpochParticipation:  bytesutil.SafeCopyBytes(sourceCurrEpochParticipation),
+		JustificationBits:          bytesutil.SafeCopyBytes(sourceJustificationBits),
 		PreviousJustifiedCheckpoint: &ethpbv1.Checkpoint{
 			Epoch: sourcePrevJustifiedCheckpoint.Epoch,
 			Root:  bytesutil.SafeCopyBytes(sourcePrevJustifiedCheckpoint.Root),
@@ -672,8 +671,8 @@ func BeaconStateBellatrixToProto(st state.BeaconState) (*ethpbv2.BeaconStateBell
 	sourceLatestBlockHeader := st.LatestBlockHeader()
 	sourceEth1Data := st.Eth1Data()
 	sourceEth1DataVotes := st.Eth1DataVotes()
+	sourceSharedActivity := st.SharedActivity()
 	sourceValidators := st.Validators()
-	sourceContractsContainers := st.Contracts()
 	sourceJustificationBits := st.JustificationBits()
 	sourcePrevJustifiedCheckpoint := st.PreviousJustifiedCheckpoint()
 	sourceCurrJustifiedCheckpoint := st.CurrentJustifiedCheckpoint()
@@ -692,6 +691,7 @@ func BeaconStateBellatrixToProto(st state.BeaconState) (*ethpbv2.BeaconStateBell
 		resultValidators[i] = &ethpbv1.Validator{
 			Pubkey:                     bytesutil.SafeCopyBytes(validator.PublicKey),
 			WithdrawalCredentials:      bytesutil.SafeCopyBytes(validator.WithdrawalCredentials),
+			Contract:                   bytesutil.SafeCopyBytes(validator.Contract),
 			EffectiveBalance:           validator.EffectiveBalance,
 			EffectiveActivity:          validator.EffectiveActivity,
 			Slashed:                    validator.Slashed,
@@ -699,16 +699,6 @@ func BeaconStateBellatrixToProto(st state.BeaconState) (*ethpbv2.BeaconStateBell
 			ActivationEpoch:            validator.ActivationEpoch,
 			ExitEpoch:                  validator.ExitEpoch,
 			WithdrawableEpoch:          validator.WithdrawableEpoch,
-		}
-	}
-	resultContractsContainers := make([]*ethpbv1.ContractsContainer, len(sourceContractsContainers))
-	for i, cc := range sourceContractsContainers {
-		contracts := make([][]byte, len(cc.Contracts))
-		for j, c := range cc.Contracts {
-			contracts[j] = bytesutil.SafeCopyBytes(c)
-		}
-		resultContractsContainers[i] = &ethpbv1.ContractsContainer{
-			Contracts: contracts,
 		}
 	}
 
@@ -770,22 +760,22 @@ func BeaconStateBellatrixToProto(st state.BeaconState) (*ethpbv2.BeaconStateBell
 			DepositCount: sourceEth1Data.DepositCount,
 			BlockHash:    bytesutil.SafeCopyBytes(sourceEth1Data.BlockHash),
 		},
-		Eth1DataVotes:                  resultEth1DataVotes,
-		Eth1DepositIndex:               st.Eth1DepositIndex(),
-		LatestProcessedBlockActivities: st.LatestProcessedBlockActivities(),
-		TransactionsPerLatestEpoch:     st.TransactionsPerLatestEpoch(),
-		TransactionsGasPerPeriod:       st.TransactionsGasPerPeriod(),
-		NonStakersGasPerEpoch:          st.NonStakersGasPerEpoch(),
-		NonStakersGasPerPeriod:         st.NonStakersGasPerPeriod(),
-		Validators:                     resultValidators,
-		Balances:                       st.Balances(),
-		Contracts:                      resultContractsContainers,
-		Activities:                     st.Activities(),
-		RandaoMixes:                    bytesutil.SafeCopy2dBytes(st.RandaoMixes()),
-		Slashings:                      st.Slashings(),
-		PreviousEpochParticipation:     bytesutil.SafeCopyBytes(sourcePrevEpochParticipation),
-		CurrentEpochParticipation:      bytesutil.SafeCopyBytes(sourceCurrEpochParticipation),
-		JustificationBits:              bytesutil.SafeCopyBytes(sourceJustificationBits),
+		Eth1DataVotes:    resultEth1DataVotes,
+		Eth1DepositIndex: st.Eth1DepositIndex(),
+		SharedActivity: &ethpbv1.SharedActivity{
+			TransactionsGasPerPeriod: sourceSharedActivity.TransactionsGasPerPeriod,
+			TransactionsGasPerEpoch:  sourceSharedActivity.TransactionsGasPerEpoch,
+			BaseFeePerPeriod:         sourceSharedActivity.BaseFeePerPeriod,
+			BaseFeePerEpoch:          sourceSharedActivity.BaseFeePerEpoch,
+		},
+		Validators:                 resultValidators,
+		Balances:                   st.Balances(),
+		Activities:                 st.Activities(),
+		RandaoMixes:                bytesutil.SafeCopy2dBytes(st.RandaoMixes()),
+		Slashings:                  st.Slashings(),
+		PreviousEpochParticipation: bytesutil.SafeCopyBytes(sourcePrevEpochParticipation),
+		CurrentEpochParticipation:  bytesutil.SafeCopyBytes(sourceCurrEpochParticipation),
+		JustificationBits:          bytesutil.SafeCopyBytes(sourceJustificationBits),
 		PreviousJustifiedCheckpoint: &ethpbv1.Checkpoint{
 			Epoch: sourcePrevJustifiedCheckpoint.Epoch,
 			Root:  bytesutil.SafeCopyBytes(sourcePrevJustifiedCheckpoint.Root),
@@ -834,8 +824,8 @@ func BeaconStateCapellaToProto(st state.BeaconState) (*ethpbv2.BeaconStateCapell
 	sourceLatestBlockHeader := st.LatestBlockHeader()
 	sourceEth1Data := st.Eth1Data()
 	sourceEth1DataVotes := st.Eth1DataVotes()
+	sourceSharedActivity := st.SharedActivity()
 	sourceValidators := st.Validators()
-	sourceContractsContainers := st.Contracts()
 	sourceJustificationBits := st.JustificationBits()
 	sourcePrevJustifiedCheckpoint := st.PreviousJustifiedCheckpoint()
 	sourceCurrJustifiedCheckpoint := st.CurrentJustifiedCheckpoint()
@@ -854,22 +844,14 @@ func BeaconStateCapellaToProto(st state.BeaconState) (*ethpbv2.BeaconStateCapell
 		resultValidators[i] = &ethpbv1.Validator{
 			Pubkey:                     bytesutil.SafeCopyBytes(validator.PublicKey),
 			WithdrawalCredentials:      bytesutil.SafeCopyBytes(validator.WithdrawalCredentials),
+			Contract:                   bytesutil.SafeCopyBytes(validator.Contract),
 			EffectiveBalance:           validator.EffectiveBalance,
+			EffectiveActivity:          validator.EffectiveActivity,
 			Slashed:                    validator.Slashed,
 			ActivationEligibilityEpoch: validator.ActivationEligibilityEpoch,
 			ActivationEpoch:            validator.ActivationEpoch,
 			ExitEpoch:                  validator.ExitEpoch,
 			WithdrawableEpoch:          validator.WithdrawableEpoch,
-		}
-	}
-	resultContractsContainers := make([]*ethpbv1.ContractsContainer, len(sourceContractsContainers))
-	for i, cc := range sourceContractsContainers {
-		contracts := make([][]byte, len(cc.Contracts))
-		for j, c := range cc.Contracts {
-			contracts[j] = bytesutil.SafeCopyBytes(c)
-		}
-		resultContractsContainers[i] = &ethpbv1.ContractsContainer{
-			Contracts: contracts,
 		}
 	}
 
@@ -900,14 +882,6 @@ func BeaconStateCapellaToProto(st state.BeaconState) (*ethpbv2.BeaconStateCapell
 	sourceLatestExecutionPayloadHeader, ok := executionPayloadHeaderInterface.Proto().(*enginev1.ExecutionPayloadHeaderCapella)
 	if !ok {
 		return nil, errors.New("execution payload header has incorrect type")
-	}
-	sourceBaseFeePerEpoch, err := st.BaseFeePerEpoch()
-	if err != nil {
-		return nil, errors.New("could not get base fee per epoch")
-	}
-	sourceBaseFeePerPeriod, err := st.BaseFeePerPeriod()
-	if err != nil {
-		return nil, errors.New("could not get base fee per period")
 	}
 	sourceNextWithdrawalIndex, err := st.NextWithdrawalIndex()
 	if err != nil {
@@ -952,22 +926,22 @@ func BeaconStateCapellaToProto(st state.BeaconState) (*ethpbv2.BeaconStateCapell
 			DepositCount: sourceEth1Data.DepositCount,
 			BlockHash:    bytesutil.SafeCopyBytes(sourceEth1Data.BlockHash),
 		},
-		Eth1DataVotes:                  resultEth1DataVotes,
-		Eth1DepositIndex:               st.Eth1DepositIndex(),
-		LatestProcessedBlockActivities: st.LatestProcessedBlockActivities(),
-		TransactionsPerLatestEpoch:     st.TransactionsPerLatestEpoch(),
-		TransactionsGasPerPeriod:       st.TransactionsGasPerPeriod(),
-		NonStakersGasPerEpoch:          st.NonStakersGasPerEpoch(),
-		NonStakersGasPerPeriod:         st.NonStakersGasPerPeriod(),
-		Validators:                     resultValidators,
-		Balances:                       st.Balances(),
-		Contracts:                      resultContractsContainers,
-		Activities:                     st.Activities(),
-		RandaoMixes:                    bytesutil.SafeCopy2dBytes(st.RandaoMixes()),
-		Slashings:                      st.Slashings(),
-		PreviousEpochParticipation:     bytesutil.SafeCopyBytes(sourcePrevEpochParticipation),
-		CurrentEpochParticipation:      bytesutil.SafeCopyBytes(sourceCurrEpochParticipation),
-		JustificationBits:              bytesutil.SafeCopyBytes(sourceJustificationBits),
+		Eth1DataVotes:    resultEth1DataVotes,
+		Eth1DepositIndex: st.Eth1DepositIndex(),
+		SharedActivity: &ethpbv1.SharedActivity{
+			TransactionsGasPerPeriod: sourceSharedActivity.TransactionsGasPerPeriod,
+			TransactionsGasPerEpoch:  sourceSharedActivity.TransactionsGasPerEpoch,
+			BaseFeePerPeriod:         sourceSharedActivity.BaseFeePerPeriod,
+			BaseFeePerEpoch:          sourceSharedActivity.BaseFeePerEpoch,
+		},
+		Validators:                 resultValidators,
+		Balances:                   st.Balances(),
+		Activities:                 st.Activities(),
+		RandaoMixes:                bytesutil.SafeCopy2dBytes(st.RandaoMixes()),
+		Slashings:                  st.Slashings(),
+		PreviousEpochParticipation: bytesutil.SafeCopyBytes(sourcePrevEpochParticipation),
+		CurrentEpochParticipation:  bytesutil.SafeCopyBytes(sourceCurrEpochParticipation),
+		JustificationBits:          bytesutil.SafeCopyBytes(sourceJustificationBits),
 		PreviousJustifiedCheckpoint: &ethpbv1.Checkpoint{
 			Epoch: sourcePrevJustifiedCheckpoint.Epoch,
 			Root:  bytesutil.SafeCopyBytes(sourcePrevJustifiedCheckpoint.Root),
@@ -1006,8 +980,6 @@ func BeaconStateCapellaToProto(st state.BeaconState) (*ethpbv2.BeaconStateCapell
 			TransactionsRoot: bytesutil.SafeCopyBytes(sourceLatestExecutionPayloadHeader.TransactionsRoot),
 			WithdrawalsRoot:  bytesutil.SafeCopyBytes(sourceLatestExecutionPayloadHeader.WithdrawalsRoot),
 		},
-		BaseFeePerEpoch:              sourceBaseFeePerEpoch,
-		BaseFeePerPeriod:             sourceBaseFeePerPeriod,
 		NextWithdrawalIndex:          sourceNextWithdrawalIndex,
 		NextWithdrawalValidatorIndex: sourceNextWithdrawalValIndex,
 		HistoricalSummaries:          sourceHistoricalSummaries,
@@ -1057,416 +1029,4 @@ func V1Alpha1SignedBLSToExecChangeToV2(alphaChange *ethpbalpha.SignedBLSToExecut
 		Signature: bytesutil.SafeCopyBytes(alphaChange.Signature),
 	}
 	return result
-}
-
-// FastexPhase1ToV1Alpha1SignedBlock converts a v2 SignedBeaconBlockFastexPhase1 proto to a v1alpha1 proto.
-func FastexPhase1ToV1Alpha1SignedBlock(fastexPhase1Blk *ethpbv2.SignedBeaconBlockFastexPhase1) (*ethpbalpha.SignedBeaconBlockFastexPhase1, error) {
-	marshaledBlk, err := proto.Marshal(fastexPhase1Blk)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not marshal block")
-	}
-	v1alpha1Block := &ethpbalpha.SignedBeaconBlockFastexPhase1{}
-	if err := proto.Unmarshal(marshaledBlk, v1alpha1Block); err != nil {
-		return nil, errors.Wrap(err, "could not unmarshal block")
-	}
-	return v1alpha1Block, nil
-}
-
-// BlindedFastexPhase1ToV1Alpha1SignedBlock converts a v2 SignedBlindedBeaconBlockFastexPhase1 proto to a v1alpha1 proto.
-func BlindedFastexPhase1ToV1Alpha1SignedBlock(fastexPhase1Blk *ethpbv2.SignedBlindedBeaconBlockFastexPhase1) (*ethpbalpha.SignedBlindedBeaconBlockFastexPhase1, error) {
-	marshaledBlk, err := proto.Marshal(fastexPhase1Blk)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not marshal block")
-	}
-	v1alpha1Block := &ethpbalpha.SignedBlindedBeaconBlockFastexPhase1{}
-	if err := proto.Unmarshal(marshaledBlk, v1alpha1Block); err != nil {
-		return nil, errors.Wrap(err, "could not unmarshal block")
-	}
-	return v1alpha1Block, nil
-}
-
-// V1Alpha1BeaconBlockFastexPhase1ToV2 converts a v1alpha1 FastexPhase1 beacon block to a v2
-// FastexPhase1 block.
-func V1Alpha1BeaconBlockFastexPhase1ToV2(v1alpha1Block *ethpbalpha.BeaconBlockFastexPhase1) (*ethpbv2.BeaconBlockFastexPhase1, error) {
-	marshaledBlk, err := proto.Marshal(v1alpha1Block)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not marshal block")
-	}
-	v2Block := &ethpbv2.BeaconBlockFastexPhase1{}
-	if err := proto.Unmarshal(marshaledBlk, v2Block); err != nil {
-		return nil, errors.Wrap(err, "could not unmarshal block")
-	}
-	return v2Block, nil
-}
-
-// V1Alpha1BeaconBlockBlindedFastexPhase1ToV2Blinded converts a v1alpha1 Blinded FastexPhase1 beacon block to a v2 Blinded FastexPhase1 block.
-func V1Alpha1BeaconBlockBlindedFastexPhase1ToV2Blinded(v1alpha1Block *ethpbalpha.BlindedBeaconBlockFastexPhase1) (*ethpbv2.BlindedBeaconBlockFastexPhase1, error) {
-	marshaledBlk, err := proto.Marshal(v1alpha1Block)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not marshal block")
-	}
-	v2Block := &ethpbv2.BlindedBeaconBlockFastexPhase1{}
-	if err := proto.Unmarshal(marshaledBlk, v2Block); err != nil {
-		return nil, errors.Wrap(err, "could not unmarshal block")
-	}
-	return v2Block, nil
-}
-
-// V1Alpha1BeaconBlockFastexPhase1ToV2Blinded converts a v1alpha1 FastexPhase1 beacon block to a v2
-// blinded FastexPhase1 block.
-func V1Alpha1BeaconBlockFastexPhase1ToV2Blinded(v1alpha1Block *ethpbalpha.BeaconBlockFastexPhase1) (*ethpbv2.BlindedBeaconBlockFastexPhase1, error) {
-	sourceProposerSlashings := v1alpha1Block.Body.ProposerSlashings
-	resultProposerSlashings := make([]*ethpbv1.ProposerSlashing, len(sourceProposerSlashings))
-	for i, s := range sourceProposerSlashings {
-		resultProposerSlashings[i] = &ethpbv1.ProposerSlashing{
-			SignedHeader_1: &ethpbv1.SignedBeaconBlockHeader{
-				Message: &ethpbv1.BeaconBlockHeader{
-					Slot:          s.Header_1.Header.Slot,
-					ProposerIndex: s.Header_1.Header.ProposerIndex,
-					ParentRoot:    bytesutil.SafeCopyBytes(s.Header_1.Header.ParentRoot),
-					StateRoot:     bytesutil.SafeCopyBytes(s.Header_1.Header.StateRoot),
-					BodyRoot:      bytesutil.SafeCopyBytes(s.Header_1.Header.BodyRoot),
-				},
-				Signature: bytesutil.SafeCopyBytes(s.Header_1.Signature),
-			},
-			SignedHeader_2: &ethpbv1.SignedBeaconBlockHeader{
-				Message: &ethpbv1.BeaconBlockHeader{
-					Slot:          s.Header_2.Header.Slot,
-					ProposerIndex: s.Header_2.Header.ProposerIndex,
-					ParentRoot:    bytesutil.SafeCopyBytes(s.Header_2.Header.ParentRoot),
-					StateRoot:     bytesutil.SafeCopyBytes(s.Header_2.Header.StateRoot),
-					BodyRoot:      bytesutil.SafeCopyBytes(s.Header_2.Header.BodyRoot),
-				},
-				Signature: bytesutil.SafeCopyBytes(s.Header_2.Signature),
-			},
-		}
-	}
-
-	sourceAttesterSlashings := v1alpha1Block.Body.AttesterSlashings
-	resultAttesterSlashings := make([]*ethpbv1.AttesterSlashing, len(sourceAttesterSlashings))
-	for i, s := range sourceAttesterSlashings {
-		att1Indices := make([]uint64, len(s.Attestation_1.AttestingIndices))
-		copy(att1Indices, s.Attestation_1.AttestingIndices)
-		att2Indices := make([]uint64, len(s.Attestation_2.AttestingIndices))
-		copy(att2Indices, s.Attestation_2.AttestingIndices)
-		resultAttesterSlashings[i] = &ethpbv1.AttesterSlashing{
-			Attestation_1: &ethpbv1.IndexedAttestation{
-				AttestingIndices: att1Indices,
-				Data: &ethpbv1.AttestationData{
-					Slot:            s.Attestation_1.Data.Slot,
-					Index:           s.Attestation_1.Data.CommitteeIndex,
-					BeaconBlockRoot: bytesutil.SafeCopyBytes(s.Attestation_1.Data.BeaconBlockRoot),
-					Source: &ethpbv1.Checkpoint{
-						Epoch: s.Attestation_1.Data.Source.Epoch,
-						Root:  bytesutil.SafeCopyBytes(s.Attestation_1.Data.Source.Root),
-					},
-					Target: &ethpbv1.Checkpoint{
-						Epoch: s.Attestation_1.Data.Target.Epoch,
-						Root:  bytesutil.SafeCopyBytes(s.Attestation_1.Data.Target.Root),
-					},
-				},
-				Signature: bytesutil.SafeCopyBytes(s.Attestation_1.Signature),
-			},
-			Attestation_2: &ethpbv1.IndexedAttestation{
-				AttestingIndices: att2Indices,
-				Data: &ethpbv1.AttestationData{
-					Slot:            s.Attestation_2.Data.Slot,
-					Index:           s.Attestation_2.Data.CommitteeIndex,
-					BeaconBlockRoot: bytesutil.SafeCopyBytes(s.Attestation_2.Data.BeaconBlockRoot),
-					Source: &ethpbv1.Checkpoint{
-						Epoch: s.Attestation_2.Data.Source.Epoch,
-						Root:  bytesutil.SafeCopyBytes(s.Attestation_2.Data.Source.Root),
-					},
-					Target: &ethpbv1.Checkpoint{
-						Epoch: s.Attestation_2.Data.Target.Epoch,
-						Root:  bytesutil.SafeCopyBytes(s.Attestation_2.Data.Target.Root),
-					},
-				},
-				Signature: bytesutil.SafeCopyBytes(s.Attestation_2.Signature),
-			},
-		}
-	}
-
-	sourceAttestations := v1alpha1Block.Body.Attestations
-	resultAttestations := make([]*ethpbv1.Attestation, len(sourceAttestations))
-	for i, a := range sourceAttestations {
-		resultAttestations[i] = &ethpbv1.Attestation{
-			AggregationBits: bytesutil.SafeCopyBytes(a.AggregationBits),
-			Data: &ethpbv1.AttestationData{
-				Slot:            a.Data.Slot,
-				Index:           a.Data.CommitteeIndex,
-				BeaconBlockRoot: bytesutil.SafeCopyBytes(a.Data.BeaconBlockRoot),
-				Source: &ethpbv1.Checkpoint{
-					Epoch: a.Data.Source.Epoch,
-					Root:  bytesutil.SafeCopyBytes(a.Data.Source.Root),
-				},
-				Target: &ethpbv1.Checkpoint{
-					Epoch: a.Data.Target.Epoch,
-					Root:  bytesutil.SafeCopyBytes(a.Data.Target.Root),
-				},
-			},
-			Signature: bytesutil.SafeCopyBytes(a.Signature),
-		}
-	}
-
-	sourceDeposits := v1alpha1Block.Body.Deposits
-	resultDeposits := make([]*ethpbv1.Deposit, len(sourceDeposits))
-	for i, d := range sourceDeposits {
-		resultDeposits[i] = &ethpbv1.Deposit{
-			Proof: bytesutil.SafeCopy2dBytes(d.Proof),
-			Data: &ethpbv1.Deposit_Data{
-				Pubkey:                bytesutil.SafeCopyBytes(d.Data.PublicKey),
-				WithdrawalCredentials: bytesutil.SafeCopyBytes(d.Data.WithdrawalCredentials),
-				Amount:                d.Data.Amount,
-				Signature:             bytesutil.SafeCopyBytes(d.Data.Signature),
-				DeployedContract:      bytesutil.SafeCopyBytes(d.Data.DeployedContract),
-				DeploymentNonce:       d.Data.DeploymentNonce,
-			},
-		}
-	}
-
-	sourceExits := v1alpha1Block.Body.VoluntaryExits
-	resultExits := make([]*ethpbv1.SignedVoluntaryExit, len(sourceExits))
-	for i, e := range sourceExits {
-		resultExits[i] = &ethpbv1.SignedVoluntaryExit{
-			Message: &ethpbv1.VoluntaryExit{
-				Epoch:          e.Exit.Epoch,
-				ValidatorIndex: e.Exit.ValidatorIndex,
-			},
-			Signature: bytesutil.SafeCopyBytes(e.Signature),
-		}
-	}
-
-	sourceActivityChanges := v1alpha1Block.Body.ActivityChanges
-	resultActivityChanges := make([]*ethpbv1.ActivityChange, len(sourceActivityChanges))
-	for i, ac := range sourceActivityChanges {
-		resultActivityChanges[i] = &ethpbv1.ActivityChange{
-			ContractAddress: bytesutil.SafeCopyBytes(ac.ContractAddress),
-			DeltaActivity:   ac.DeltaActivity,
-		}
-	}
-
-	transactionsRoot, err := ssz.TransactionsRoot(v1alpha1Block.Body.ExecutionPayload.Transactions)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not calculate transactions root")
-	}
-
-	resultBlockBody := &ethpbv2.BlindedBeaconBlockBodyFastexPhase1{
-		RandaoReveal: bytesutil.SafeCopyBytes(v1alpha1Block.Body.RandaoReveal),
-		Eth1Data: &ethpbv1.Eth1Data{
-			DepositRoot:  bytesutil.SafeCopyBytes(v1alpha1Block.Body.Eth1Data.DepositRoot),
-			DepositCount: v1alpha1Block.Body.Eth1Data.DepositCount,
-			BlockHash:    bytesutil.SafeCopyBytes(v1alpha1Block.Body.Eth1Data.BlockHash),
-		},
-
-		Graffiti:             bytesutil.SafeCopyBytes(v1alpha1Block.Body.Graffiti),
-		ProposerSlashings:    resultProposerSlashings,
-		AttesterSlashings:    resultAttesterSlashings,
-		Attestations:         resultAttestations,
-		Deposits:             resultDeposits,
-		VoluntaryExits:       resultExits,
-		ActivityChanges:      resultActivityChanges,
-		LatestProcessedBlock: v1alpha1Block.Body.LatestProcessedBlock,
-		TransactionsCount:    v1alpha1Block.Body.TransactionsCount,
-		SyncAggregate: &ethpbv1.SyncAggregate{
-			SyncCommitteeBits:      bytesutil.SafeCopyBytes(v1alpha1Block.Body.SyncAggregate.SyncCommitteeBits),
-			SyncCommitteeSignature: bytesutil.SafeCopyBytes(v1alpha1Block.Body.SyncAggregate.SyncCommitteeSignature),
-		},
-		ExecutionPayloadHeader: &enginev1.ExecutionPayloadHeader{
-			ParentHash:       bytesutil.SafeCopyBytes(v1alpha1Block.Body.ExecutionPayload.ParentHash),
-			FeeRecipient:     bytesutil.SafeCopyBytes(v1alpha1Block.Body.ExecutionPayload.FeeRecipient),
-			StateRoot:        bytesutil.SafeCopyBytes(v1alpha1Block.Body.ExecutionPayload.StateRoot),
-			ReceiptsRoot:     bytesutil.SafeCopyBytes(v1alpha1Block.Body.ExecutionPayload.ReceiptsRoot),
-			LogsBloom:        bytesutil.SafeCopyBytes(v1alpha1Block.Body.ExecutionPayload.LogsBloom),
-			PrevRandao:       bytesutil.SafeCopyBytes(v1alpha1Block.Body.ExecutionPayload.PrevRandao),
-			BlockNumber:      v1alpha1Block.Body.ExecutionPayload.BlockNumber,
-			GasLimit:         v1alpha1Block.Body.ExecutionPayload.GasLimit,
-			GasUsed:          v1alpha1Block.Body.ExecutionPayload.GasUsed,
-			Timestamp:        v1alpha1Block.Body.ExecutionPayload.Timestamp,
-			ExtraData:        bytesutil.SafeCopyBytes(v1alpha1Block.Body.ExecutionPayload.ExtraData),
-			BaseFeePerGas:    bytesutil.SafeCopyBytes(v1alpha1Block.Body.ExecutionPayload.BaseFeePerGas),
-			BlockHash:        bytesutil.SafeCopyBytes(v1alpha1Block.Body.ExecutionPayload.BlockHash),
-			TransactionsRoot: transactionsRoot[:],
-		},
-		BaseFee: v1alpha1Block.Body.BaseFee,
-	}
-	v2Block := &ethpbv2.BlindedBeaconBlockFastexPhase1{
-		Slot:          v1alpha1Block.Slot,
-		ProposerIndex: v1alpha1Block.ProposerIndex,
-		ParentRoot:    bytesutil.SafeCopyBytes(v1alpha1Block.ParentRoot),
-		StateRoot:     bytesutil.SafeCopyBytes(v1alpha1Block.StateRoot),
-		Body:          resultBlockBody,
-	}
-	return v2Block, nil
-}
-
-// BeaconStateFastexPhase1ToProto converts a state.BeaconState object to its protobuf equivalent.
-func BeaconStateFastexPhase1ToProto(st state.BeaconState) (*ethpbv2.BeaconStateFastexPhase1, error) {
-	sourceFork := st.Fork()
-	sourceLatestBlockHeader := st.LatestBlockHeader()
-	sourceEth1Data := st.Eth1Data()
-	sourceEth1DataVotes := st.Eth1DataVotes()
-	sourceValidators := st.Validators()
-	sourceContractsContainers := st.Contracts()
-	sourceJustificationBits := st.JustificationBits()
-	sourcePrevJustifiedCheckpoint := st.PreviousJustifiedCheckpoint()
-	sourceCurrJustifiedCheckpoint := st.CurrentJustifiedCheckpoint()
-	sourceFinalizedCheckpoint := st.FinalizedCheckpoint()
-
-	resultEth1DataVotes := make([]*ethpbv1.Eth1Data, len(sourceEth1DataVotes))
-	for i, vote := range sourceEth1DataVotes {
-		resultEth1DataVotes[i] = &ethpbv1.Eth1Data{
-			DepositRoot:  bytesutil.SafeCopyBytes(vote.DepositRoot),
-			DepositCount: vote.DepositCount,
-			BlockHash:    bytesutil.SafeCopyBytes(vote.BlockHash),
-		}
-	}
-	resultValidators := make([]*ethpbv1.Validator, len(sourceValidators))
-	for i, validator := range sourceValidators {
-		resultValidators[i] = &ethpbv1.Validator{
-			Pubkey:                     bytesutil.SafeCopyBytes(validator.PublicKey),
-			WithdrawalCredentials:      bytesutil.SafeCopyBytes(validator.WithdrawalCredentials),
-			EffectiveBalance:           validator.EffectiveBalance,
-			EffectiveActivity:          validator.EffectiveActivity,
-			Slashed:                    validator.Slashed,
-			ActivationEligibilityEpoch: validator.ActivationEligibilityEpoch,
-			ActivationEpoch:            validator.ActivationEpoch,
-			ExitEpoch:                  validator.ExitEpoch,
-			WithdrawableEpoch:          validator.WithdrawableEpoch,
-		}
-	}
-	resultContractsContainers := make([]*ethpbv1.ContractsContainer, len(sourceContractsContainers))
-	for i, cc := range sourceContractsContainers {
-		contracts := make([][]byte, len(cc.Contracts))
-		for j, c := range cc.Contracts {
-			contracts[j] = bytesutil.SafeCopyBytes(c)
-		}
-		resultContractsContainers[i] = &ethpbv1.ContractsContainer{
-			Contracts: contracts,
-		}
-	}
-
-	sourcePrevEpochParticipation, err := st.PreviousEpochParticipation()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get previous epoch participation")
-	}
-	sourceCurrEpochParticipation, err := st.CurrentEpochParticipation()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get current epoch participation")
-	}
-	sourceInactivityScores, err := st.InactivityScores()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get inactivity scores")
-	}
-	sourceCurrSyncCommittee, err := st.CurrentSyncCommittee()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get current sync committee")
-	}
-	sourceNextSyncCommittee, err := st.NextSyncCommittee()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get next sync committee")
-	}
-	executionPayloadHeaderInterface, err := st.LatestExecutionPayloadHeader()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get latest execution payload header")
-	}
-	sourceLatestExecutionPayloadHeader, ok := executionPayloadHeaderInterface.Proto().(*enginev1.ExecutionPayloadHeader)
-	if !ok {
-		return nil, errors.New("execution payload header has incorrect type")
-	}
-	sourceBaseFeePerEpoch, err := st.BaseFeePerEpoch()
-	if err != nil {
-		return nil, errors.New("could not get base fee per epoch")
-	}
-	sourceBaseFeePerPeriod, err := st.BaseFeePerPeriod()
-	if err != nil {
-		return nil, errors.New("could not get base fee per period")
-	}
-	hRoots, err := st.HistoricalRoots()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get historical roots")
-	}
-
-	result := &ethpbv2.BeaconStateFastexPhase1{
-		GenesisTime:           st.GenesisTime(),
-		GenesisValidatorsRoot: bytesutil.SafeCopyBytes(st.GenesisValidatorsRoot()),
-		Slot:                  st.Slot(),
-		Fork: &ethpbv1.Fork{
-			PreviousVersion: bytesutil.SafeCopyBytes(sourceFork.PreviousVersion),
-			CurrentVersion:  bytesutil.SafeCopyBytes(sourceFork.CurrentVersion),
-			Epoch:           sourceFork.Epoch,
-		},
-		LatestBlockHeader: &ethpbv1.BeaconBlockHeader{
-			Slot:          sourceLatestBlockHeader.Slot,
-			ProposerIndex: sourceLatestBlockHeader.ProposerIndex,
-			ParentRoot:    bytesutil.SafeCopyBytes(sourceLatestBlockHeader.ParentRoot),
-			StateRoot:     bytesutil.SafeCopyBytes(sourceLatestBlockHeader.StateRoot),
-			BodyRoot:      bytesutil.SafeCopyBytes(sourceLatestBlockHeader.BodyRoot),
-		},
-		BlockRoots:      bytesutil.SafeCopy2dBytes(st.BlockRoots()),
-		StateRoots:      bytesutil.SafeCopy2dBytes(st.StateRoots()),
-		HistoricalRoots: bytesutil.SafeCopy2dBytes(hRoots),
-		Eth1Data: &ethpbv1.Eth1Data{
-			DepositRoot:  bytesutil.SafeCopyBytes(sourceEth1Data.DepositRoot),
-			DepositCount: sourceEth1Data.DepositCount,
-			BlockHash:    bytesutil.SafeCopyBytes(sourceEth1Data.BlockHash),
-		},
-		Eth1DataVotes:                  resultEth1DataVotes,
-		Eth1DepositIndex:               st.Eth1DepositIndex(),
-		LatestProcessedBlockActivities: st.LatestProcessedBlockActivities(),
-		TransactionsGasPerPeriod:       st.TransactionsGasPerPeriod(),
-		TransactionsPerLatestEpoch:     st.TransactionsPerLatestEpoch(),
-		NonStakersGasPerPeriod:         st.NonStakersGasPerPeriod(),
-		NonStakersGasPerEpoch:          st.NonStakersGasPerEpoch(),
-		Validators:                     resultValidators,
-		Balances:                       st.Balances(),
-		Contracts:                      resultContractsContainers,
-		Activities:                     st.Activities(),
-		RandaoMixes:                    bytesutil.SafeCopy2dBytes(st.RandaoMixes()),
-		Slashings:                      st.Slashings(),
-		PreviousEpochParticipation:     bytesutil.SafeCopyBytes(sourcePrevEpochParticipation),
-		CurrentEpochParticipation:      bytesutil.SafeCopyBytes(sourceCurrEpochParticipation),
-		JustificationBits:              bytesutil.SafeCopyBytes(sourceJustificationBits),
-		PreviousJustifiedCheckpoint: &ethpbv1.Checkpoint{
-			Epoch: sourcePrevJustifiedCheckpoint.Epoch,
-			Root:  bytesutil.SafeCopyBytes(sourcePrevJustifiedCheckpoint.Root),
-		},
-		CurrentJustifiedCheckpoint: &ethpbv1.Checkpoint{
-			Epoch: sourceCurrJustifiedCheckpoint.Epoch,
-			Root:  bytesutil.SafeCopyBytes(sourceCurrJustifiedCheckpoint.Root),
-		},
-		FinalizedCheckpoint: &ethpbv1.Checkpoint{
-			Epoch: sourceFinalizedCheckpoint.Epoch,
-			Root:  bytesutil.SafeCopyBytes(sourceFinalizedCheckpoint.Root),
-		},
-		InactivityScores: sourceInactivityScores,
-		CurrentSyncCommittee: &ethpbv2.SyncCommittee{
-			Pubkeys:         bytesutil.SafeCopy2dBytes(sourceCurrSyncCommittee.Pubkeys),
-			AggregatePubkey: bytesutil.SafeCopyBytes(sourceCurrSyncCommittee.AggregatePubkey),
-		},
-		NextSyncCommittee: &ethpbv2.SyncCommittee{
-			Pubkeys:         bytesutil.SafeCopy2dBytes(sourceNextSyncCommittee.Pubkeys),
-			AggregatePubkey: bytesutil.SafeCopyBytes(sourceNextSyncCommittee.AggregatePubkey),
-		},
-		LatestExecutionPayloadHeader: &enginev1.ExecutionPayloadHeader{
-			ParentHash:       bytesutil.SafeCopyBytes(sourceLatestExecutionPayloadHeader.ParentHash),
-			FeeRecipient:     bytesutil.SafeCopyBytes(sourceLatestExecutionPayloadHeader.FeeRecipient),
-			StateRoot:        bytesutil.SafeCopyBytes(sourceLatestExecutionPayloadHeader.StateRoot),
-			ReceiptsRoot:     bytesutil.SafeCopyBytes(sourceLatestExecutionPayloadHeader.ReceiptsRoot),
-			LogsBloom:        bytesutil.SafeCopyBytes(sourceLatestExecutionPayloadHeader.LogsBloom),
-			PrevRandao:       bytesutil.SafeCopyBytes(sourceLatestExecutionPayloadHeader.PrevRandao),
-			BlockNumber:      sourceLatestExecutionPayloadHeader.BlockNumber,
-			GasLimit:         sourceLatestExecutionPayloadHeader.GasLimit,
-			GasUsed:          sourceLatestExecutionPayloadHeader.GasUsed,
-			Timestamp:        sourceLatestExecutionPayloadHeader.Timestamp,
-			ExtraData:        bytesutil.SafeCopyBytes(sourceLatestExecutionPayloadHeader.ExtraData),
-			BaseFeePerGas:    bytesutil.SafeCopyBytes(sourceLatestExecutionPayloadHeader.BaseFeePerGas),
-			BlockHash:        bytesutil.SafeCopyBytes(sourceLatestExecutionPayloadHeader.BlockHash),
-			TransactionsRoot: bytesutil.SafeCopyBytes(sourceLatestExecutionPayloadHeader.TransactionsRoot),
-		},
-		BaseFeePerEpoch:  sourceBaseFeePerEpoch,
-		BaseFeePerPeriod: sourceBaseFeePerPeriod,
-	}
-
-	return result, nil
 }

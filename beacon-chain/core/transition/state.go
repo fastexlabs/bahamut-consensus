@@ -4,14 +4,14 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	b "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/blocks"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	state_native "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/container/trie"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	b "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/blocks"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	state_native "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/container/trie"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 // GenesisBeaconState gets called when MinGenesisActiveValidatorCount count of
@@ -166,7 +166,6 @@ func OptimizedGenesisBeaconState(genesisTime uint64, preState state.BeaconState,
 		// Validator registry fields.
 		Validators: preState.Validators(),
 		Balances:   preState.Balances(),
-		Contracts:  preState.Contracts(),
 		Activities: preState.Activities(),
 
 		// Randomness and committees.
@@ -195,10 +194,11 @@ func OptimizedGenesisBeaconState(genesisTime uint64, preState state.BeaconState,
 		PreviousEpochAttestations: []*ethpb.PendingAttestation{},
 
 		// Eth1 data.
-		Eth1Data:                       eth1Data,
-		Eth1DataVotes:                  []*ethpb.Eth1Data{},
-		Eth1DepositIndex:               preState.Eth1DepositIndex(),
-		LatestProcessedBlockActivities: preState.LatestProcessedBlockActivities(),
+		Eth1Data:         eth1Data,
+		Eth1DataVotes:    []*ethpb.Eth1Data{},
+		Eth1DepositIndex: preState.Eth1DepositIndex(),
+		SharedActivity:   preState.SharedActivity(),
+		ExecutionHeight:  preState.ExecutionHeight(),
 	}
 
 	bodyRoot, err := (&ethpb.BeaconBlockBody{
@@ -235,7 +235,6 @@ func EmptyGenesisState() (state.BeaconState, error) {
 		// Validator registry fields.
 		Validators: []*ethpb.Validator{},
 		Balances:   []uint64{},
-		Contracts:  []*ethpb.ContractsContainer{},
 		Activities: []uint64{},
 
 		JustificationBits:         []byte{0},
@@ -247,6 +246,7 @@ func EmptyGenesisState() (state.BeaconState, error) {
 		Eth1Data:         &ethpb.Eth1Data{},
 		Eth1DataVotes:    []*ethpb.Eth1Data{},
 		Eth1DepositIndex: 0,
+		SharedActivity:   &ethpb.SharedActivity{},
 	}
 	return state_native.InitializeFromProtoPhase0(st)
 }

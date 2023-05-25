@@ -20,26 +20,24 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache/activitycache"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache/basefeecache"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/cache/depositcache"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/feed"
-	statefeed "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/feed/state"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/db"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/execution/types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	native "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stategen"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/container/trie"
-	contracts "github.com/prysmaticlabs/prysm/v3/contracts/deposit"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	"github.com/prysmaticlabs/prysm/v3/monitoring/clientstats"
-	"github.com/prysmaticlabs/prysm/v3/network"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	prysmTime "github.com/prysmaticlabs/prysm/v3/time"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache/depositcache"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed"
+	statefeed "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/state"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/execution/types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	native "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stategen"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/container/trie"
+	contracts "github.com/prysmaticlabs/prysm/v4/contracts/deposit"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/monitoring/clientstats"
+	"github.com/prysmaticlabs/prysm/v4/network"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	prysmTime "github.com/prysmaticlabs/prysm/v4/time"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	"github.com/sirupsen/logrus"
 )
 
@@ -66,10 +64,6 @@ var (
 	// period to log chainstart related information
 	logPeriod = 1 * time.Minute
 )
-
-type FollowedHeightFetcher interface {
-	FollowedBlockHeight(ctx context.Context) (uint64, error)
-}
 
 // ChainStartFetcher retrieves information pertaining to the chain start event
 // of the beacon chain for usage across various services.
@@ -100,7 +94,6 @@ type Chain interface {
 	ChainStartFetcher
 	ChainInfoFetcher
 	POWBlockFetcher
-	FollowedHeightFetcher
 }
 
 // RPCClient defines the rpc methods required to interact with the eth1 node.
@@ -110,7 +103,8 @@ type RPCClient interface {
 	CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error
 }
 
-type RPCClientEmpty struct{}
+type RPCClientEmpty struct {
+}
 
 func (RPCClientEmpty) Close() {}
 func (RPCClientEmpty) BatchCall([]gethRPC.BatchElem) error {
@@ -126,8 +120,6 @@ type config struct {
 	depositContractAddr     common.Address
 	beaconDB                db.HeadAccessDatabase
 	depositCache            *depositcache.DepositCache
-	activityChangesCache    *activitycache.ActivityChangesCache
-	baseFeeCache            *basefeecache.BaseFeeCache
 	stateNotifier           statefeed.Notifier
 	stateGen                *stategen.State
 	eth1HeaderReqLimit      uint64
@@ -318,10 +310,6 @@ func (s *Service) updateBeaconNodeStats() {
 func (s *Service) updateConnectedETH1(state bool) {
 	s.connectedETH1 = state
 	s.updateBeaconNodeStats()
-}
-
-func (s *Service) FollowedBlockHeight(ctx context.Context) (uint64, error) {
-	return s.followedBlockHeight(ctx)
 }
 
 // refers to the latest eth1 block which follows the condition: eth1_timestamp +
@@ -558,19 +546,6 @@ func (s *Service) initPOWService() {
 					errorLogger(err, "Unable to cache headers for execution client votes")
 				}
 				continue
-			}
-
-			if s.chainStartData.Chainstarted {
-				for i := s.chainStartData.GenesisBlock; i < s.latestEth1Data.LastRequestedBlock; i++ {
-					if err := s.ProcessBlockActivities(ctx, big.NewInt(0).SetUint64(i)); err != nil {
-						s.retryExecutionClientConnection(ctx, err)
-						errorLogger(
-							err,
-							"Unable to process past block activities, perhaps your execution client is not fully synced",
-						)
-						continue
-					}
-				}
 			}
 			// Handle edge case with embedded genesis state by fetching genesis header to determine
 			// its height.

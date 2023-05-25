@@ -5,14 +5,14 @@ import (
 	"testing"
 
 	fuzz "github.com/google/gofuzz"
-	v "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/validators"
-	state_native "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
+	v "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/validators"
+	state_native "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
 )
 
 func TestFuzzProcessAttestationNoVerify_10000(t *testing.T) {
@@ -393,6 +393,74 @@ func TestFuzzProcessVoluntaryExits_10000(t *testing.T) {
 		r, err := ProcessVoluntaryExits(ctx, s, []*ethpb.SignedVoluntaryExit{e})
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and exit: %v", r, err, state, e)
+		}
+	}
+}
+
+func TestFuzzProcessActivityChanges_10000(t *testing.T) {
+	fuzzer := fuzz.NewWithSeed(0)
+	state := &ethpb.BeaconState{}
+	ac := &ethpb.ActivityChange{}
+	ctx := context.Background()
+	for i := 0; i < 10000; i++ {
+		fuzzer.Fuzz(state)
+		fuzzer.Fuzz(ac)
+		s, err := state_native.InitializeFromProtoUnsafePhase0(state)
+		require.NoError(t, err)
+		r, err := ProcessActivityChanges(ctx, s, []*ethpb.ActivityChange{ac})
+		if err != nil && r != nil {
+			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and activity change: %v", r, err, state, ac)
+		}
+	}
+}
+
+func TestFuzzProcessTransactionsCount_10000(t *testing.T) {
+	fuzzer := fuzz.NewWithSeed(0)
+	state := &ethpb.BeaconState{}
+	tx := uint64(0)
+	ctx := context.Background()
+	for i := 0; i < 10000; i++ {
+		fuzzer.Fuzz(state)
+		fuzzer.Fuzz(&tx)
+		s, err := state_native.InitializeFromProtoUnsafePhase0(state)
+		require.NoError(t, err)
+		r, err := ProcessTransactionsCount(ctx, s, tx)
+		if err != nil && r != nil {
+			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and transactions count: %d", r, err, state, tx)
+		}
+	}
+}
+
+func TestFuzzProcessBaseFee_10000(t *testing.T) {
+	fuzzer := fuzz.NewWithSeed(0)
+	state := &ethpb.BeaconState{}
+	bf := uint64(0)
+	ctx := context.Background()
+	for i := 0; i < 10000; i++ {
+		fuzzer.Fuzz(state)
+		fuzzer.Fuzz(&bf)
+		s, err := state_native.InitializeFromProtoUnsafePhase0(state)
+		require.NoError(t, err)
+		r, err := ProcessBaseFee(ctx, s, bf)
+		if err != nil && r != nil {
+			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and base fee: %d", r, err, state, bf)
+		}
+	}
+}
+
+func TestFuzzProcessExecutionHeight_10000(t *testing.T) {
+	fuzzer := fuzz.NewWithSeed(0)
+	state := &ethpb.BeaconState{}
+	h := uint64(0)
+	ctx := context.Background()
+	for i := 0; i < 10000; i++ {
+		fuzzer.Fuzz(state)
+		fuzzer.Fuzz(&h)
+		s, err := state_native.InitializeFromProtoUnsafePhase0(state)
+		require.NoError(t, err)
+		r, err := ProcessExecutionHeight(ctx, s, h)
+		if err != nil && r != nil {
+			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and execution height: %d", r, err, state, h)
 		}
 	}
 }

@@ -3,13 +3,13 @@ package altair
 import (
 	"context"
 
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	state_native "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1/attestation"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	state_native "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1/attestation"
 )
 
 // UpgradeToAltair updates input state to return the version Altair state.
@@ -80,22 +80,17 @@ func UpgradeToAltair(ctx context.Context, state state.BeaconState) (state.Beacon
 			CurrentVersion:  params.BeaconConfig().AltairForkVersion,
 			Epoch:           epoch,
 		},
-		LatestBlockHeader:              state.LatestBlockHeader(),
-		BlockRoots:                     state.BlockRoots(),
-		StateRoots:                     state.StateRoots(),
-		HistoricalRoots:                hrs,
-		Eth1Data:                       state.Eth1Data(),
-		Eth1DataVotes:                  state.Eth1DataVotes(),
-		Eth1DepositIndex:               state.Eth1DepositIndex(),
-		LatestProcessedBlockActivities: state.LatestProcessedBlockActivities(),
-		TransactionsGasPerPeriod:       state.TransactionsGasPerPeriod(),
-		TransactionsPerLatestEpoch:     state.TransactionsPerLatestEpoch(),
-		// TODO(fastex): Uncomment this lines before mainnet start.
-		// NonStakersGasPerPeriod:         state.NonStakersGasPerPeriod(),
-		// NonStakersGasPerEpoch:          state.NonStakersGasPerEpoch(),
+		LatestBlockHeader:           state.LatestBlockHeader(),
+		BlockRoots:                  state.BlockRoots(),
+		StateRoots:                  state.StateRoots(),
+		HistoricalRoots:             hrs,
+		Eth1Data:                    state.Eth1Data(),
+		Eth1DataVotes:               state.Eth1DataVotes(),
+		Eth1DepositIndex:            state.Eth1DepositIndex(),
+		SharedActivity:              state.SharedActivity(),
+		ExecutionHeight:             state.ExecutionHeight(),
 		Validators:                  state.Validators(),
 		Balances:                    state.Balances(),
-		Contracts:                   state.Contracts(),
 		Activities:                  state.Activities(),
 		RandaoMixes:                 state.RandaoMixes(),
 		Slashings:                   state.Slashings(),

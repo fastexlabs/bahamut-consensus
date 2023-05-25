@@ -7,14 +7,14 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	customtypes "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/custom-types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/stateutil"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
+	customtypes "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/custom-types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
 )
 
 func Test_handlePendingAttestation_OutOfRange(t *testing.T) {
@@ -73,16 +73,16 @@ func TestBalancesSlice_CorrectRoots_Some(t *testing.T) {
 
 func TestActivitiesSlice_CorrectRoots_All(t *testing.T) {
 	activities := []uint64{5, 2929, 34, 1291, 354305}
-	roots, err := handleBalanceSlice(activities, []uint64{}, true)
+	roots, err := handleActivitiesSlice(activities, []uint64{}, true)
 	assert.NoError(t, err)
 
-	root1 := [32]byte{}
+	var root1 [32]byte
 	binary.LittleEndian.PutUint64(root1[:8], activities[0])
 	binary.LittleEndian.PutUint64(root1[8:16], activities[1])
 	binary.LittleEndian.PutUint64(root1[16:24], activities[2])
 	binary.LittleEndian.PutUint64(root1[24:32], activities[3])
 
-	root2 := [32]byte{}
+	var root2 [32]byte
 	binary.LittleEndian.PutUint64(root2[:8], activities[4])
 
 	assert.DeepEqual(t, roots, [][32]byte{root1, root2})
@@ -90,10 +90,10 @@ func TestActivitiesSlice_CorrectRoots_All(t *testing.T) {
 
 func TestActivitiesSlice_CorrectRoots_Some(t *testing.T) {
 	activities := []uint64{5, 2929, 34, 1291, 354305}
-	roots, err := handleBalanceSlice(activities, []uint64{2, 3}, false)
+	roots, err := handleActivitiesSlice(activities, []uint64{2, 3}, false)
 	assert.NoError(t, err)
 
-	root1 := [32]byte{}
+	var root1 [32]byte
 	binary.LittleEndian.PutUint64(root1[:8], activities[0])
 	binary.LittleEndian.PutUint64(root1[8:16], activities[1])
 	binary.LittleEndian.PutUint64(root1[16:24], activities[2])
@@ -233,7 +233,7 @@ func TestFieldTrie_NativeState_fieldConvertersNative(t *testing.T) {
 		{
 			name: "RandaoMixes [][]bytes",
 			args: &args{
-				field:      types.FieldIndex(20),
+				field:      types.FieldIndex(19),
 				indices:    []uint64{},
 				elements:   [][]byte{[]byte("dfsadfsadf")},
 				convertAll: true,
@@ -243,7 +243,7 @@ func TestFieldTrie_NativeState_fieldConvertersNative(t *testing.T) {
 		{
 			name: "RandaoMixes customtypes.RandaoMixes",
 			args: &args{
-				field:      types.FieldIndex(20),
+				field:      types.FieldIndex(19),
 				indices:    []uint64{},
 				elements:   &customtypes.RandaoMixes{},
 				convertAll: true,
@@ -254,7 +254,7 @@ func TestFieldTrie_NativeState_fieldConvertersNative(t *testing.T) {
 		{
 			name: "RandaoMixes type not found",
 			args: &args{
-				field:      types.FieldIndex(20),
+				field:      types.FieldIndex(19),
 				indices:    []uint64{},
 				elements:   123,
 				convertAll: true,
@@ -306,7 +306,7 @@ func TestFieldTrie_NativeState_fieldConvertersNative(t *testing.T) {
 		{
 			name: "Balance",
 			args: &args{
-				field:      types.FieldIndex(12),
+				field:      types.FieldIndex(17),
 				indices:    []uint64{},
 				elements:   []uint64{12321312321, 12131241234123123},
 				convertAll: true,
@@ -316,7 +316,7 @@ func TestFieldTrie_NativeState_fieldConvertersNative(t *testing.T) {
 		{
 			name: "Validators",
 			args: &args{
-				field:   types.FieldIndex(11),
+				field:   types.FieldIndex(16),
 				indices: []uint64{},
 				elements: []*ethpb.Validator{
 					{
@@ -325,12 +325,12 @@ func TestFieldTrie_NativeState_fieldConvertersNative(t *testing.T) {
 				},
 				convertAll: true,
 			},
-			wantHex: []string{"0x79817c24fc7ba90cdac48fd462fafc1cb501884e847b18733f7ca6df214a301e"},
+			wantHex: []string{"0xde33500a0fbc31736998df51b79538dd560f853731a4506b48b35784eb861217"},
 		},
 		{
 			name: "Validators not found",
 			args: &args{
-				field:      types.FieldIndex(11),
+				field:      types.FieldIndex(16),
 				indices:    []uint64{},
 				elements:   123,
 				convertAll: true,
@@ -341,7 +341,7 @@ func TestFieldTrie_NativeState_fieldConvertersNative(t *testing.T) {
 		{
 			name: "Attestations",
 			args: &args{
-				field:   types.FieldIndex(15),
+				field:   types.FieldIndex(21),
 				indices: []uint64{},
 				elements: []*ethpb.PendingAttestation{
 					{
@@ -355,7 +355,7 @@ func TestFieldTrie_NativeState_fieldConvertersNative(t *testing.T) {
 		{
 			name: "Attestations",
 			args: &args{
-				field:   types.FieldIndex(15),
+				field:   types.FieldIndex(21),
 				indices: []uint64{1},
 				elements: []*ethpb.PendingAttestation{
 					{
@@ -379,34 +379,6 @@ func TestFieldTrie_NativeState_fieldConvertersNative(t *testing.T) {
 				convertAll: true,
 			},
 			errMsg: "got unsupported type of",
-		},
-		{
-			name: "Contracts conteiner",
-			args:           &args{
-				field:      nativeStateTypes.FieldIndex(13),
-				indices:    []uint64{},
-				elements:   []*ethpb.ContractsContainer{
-					{
-						Contracts: [][]byte{
-							{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11},
-							{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12},
-							{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13},
-						},
-					},
-				},
-				convertAll: true,
-			},
-			wantHex:        []string{"0x4c31da4d6503e3f27551dfb6a4b9c246d9b03e5ade8980457c342a60392b0c20"},
-		},
-		{
-			name: "Activities",
-			args: &args{
-				field:      nativeStateTypes.FieldIndex(14),
-				indices:    []uint64{},
-				elements:   []uint64{12321312321, 12131241234123123},
-				convertAll: true,
-			},
-			wantHex: []string{"0x414e68de0200000073c971b44c192b0000000000000000000000000000000000"},
 		},
 	}
 	for _, tt := range tests {

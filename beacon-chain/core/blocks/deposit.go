@@ -5,16 +5,16 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/signing"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/container/trie"
-	"github.com/prysmaticlabs/prysm/v3/contracts/deposit"
-	"github.com/prysmaticlabs/prysm/v3/crypto/bls"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	"github.com/prysmaticlabs/prysm/v3/math"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/signing"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/container/trie"
+	"github.com/prysmaticlabs/prysm/v4/contracts/deposit"
+	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/math"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 // ProcessPreGenesisDeposits processes a deposit for the beacon state before chainstart.
@@ -169,12 +169,8 @@ func ProcessDeposit(beaconState state.BeaconState, deposit *ethpb.Deposit, verif
 	}
 	pubKey := deposit.Data.PublicKey
 	amount := deposit.Data.Amount
-	contract := deposit.Data.DeployedContract
-	owner, contractExist := beaconState.ValidatorIndexByContractAddress(bytesutil.ToBytes20(contract))
-	if contractExist {
-		log.Debugf("Contract %x already regestered by validator %d. Register new validator with 0x0 contract address", contract, owner)
-	}
-
+	contract := deposit.Data.Contract
+	contractOwner, contractExist := beaconState.ValidatorIndexByContract(bytesutil.ToBytes20(contract))
 	index, ok := beaconState.ValidatorIndexByPubkey(bytesutil.ToBytes48(pubKey))
 	if !ok {
 		if verifySignature {
@@ -193,9 +189,23 @@ func ProcessDeposit(beaconState state.BeaconState, deposit *ethpb.Deposit, verif
 		if params.BeaconConfig().MaxEffectiveBalance < effectiveBalance {
 			effectiveBalance = params.BeaconConfig().MaxEffectiveBalance
 		}
+		if contractExist {
+			// Set zero-contract to the old owner of the contract
+			// if the contract is already presented in beacon state.
+			owner, err := beaconState.ValidatorAtIndex(contractOwner)
+			if err != nil {
+				return nil, newValidator, err
+			}
+			newVal := ethpb.CopyValidator(owner)
+			newVal.Contract = params.BeaconConfig().ZeroContract[:]
+			if err := beaconState.UpdateValidatorAtIndex(contractOwner, newVal); err != nil {
+				return nil, newValidator, err
+			}
+		}
 		if err := beaconState.AppendValidator(&ethpb.Validator{
 			PublicKey:                  pubKey,
 			WithdrawalCredentials:      deposit.Data.WithdrawalCredentials,
+			Contract:                   contract,
 			ActivationEligibilityEpoch: params.BeaconConfig().FarFutureEpoch,
 			ActivationEpoch:            params.BeaconConfig().FarFutureEpoch,
 			ExitEpoch:                  params.BeaconConfig().FarFutureEpoch,
@@ -211,31 +221,11 @@ func ProcessDeposit(beaconState state.BeaconState, deposit *ethpb.Deposit, verif
 		if err := beaconState.AppendActivity(0); err != nil {
 			return nil, newValidator, err
 		}
-		contracts := [][]byte{contract}
-		if contractExist {
-			contracts = [][]byte{make([]byte, 20)}
-		}
-		if err := beaconState.AppendContracts(&ethpb.ContractsContainer{
-			Contracts: contracts,
-		}); err != nil {
-			return nil, newValidator, err
-		}
-	} else {
-		if err := helpers.IncreaseBalance(beaconState, index, amount); err != nil {
-			return nil, newValidator, err
-		}
-		if !contractExist && !isZeroContract(contract) {
-			if err := helpers.AppendValidatorContracts(beaconState, index, contract); err != nil {
-				return nil, newValidator, err
-			}
-		}
+	} else if err := helpers.IncreaseBalance(beaconState, index, amount); err != nil {
+		return nil, newValidator, err
 	}
 
 	return beaconState, newValidator, nil
-}
-
-func isZeroContract(contract []byte) bool {
-	return bytesutil.ToBytes20(contract) == [20]byte{}
 }
 
 func verifyDeposit(beaconState state.ReadOnlyBeaconState, deposit *ethpb.Deposit) error {
@@ -295,10 +285,9 @@ func verifyDepositDataWithDomain(ctx context.Context, deps []*ethpb.Deposit, dom
 		sigs[i] = dep.Data.Signature
 		depositMessage := &ethpb.DepositMessage{
 			PublicKey:             dep.Data.PublicKey,
+			Contract:              dep.Data.Contract,
 			WithdrawalCredentials: dep.Data.WithdrawalCredentials,
 			Amount:                dep.Data.Amount,
-			DeployedContract:      dep.Data.DeployedContract,
-			DeploymentNonce:       dep.Data.DeploymentNonce,
 		}
 		sr, err := signing.ComputeSigningRoot(depositMessage, domain)
 		if err != nil {

@@ -24,20 +24,6 @@ func hasBellatrixBlindKey(enc []byte) bool {
 	return bytes.Equal(enc[:len(bellatrixBlindKey)], bellatrixBlindKey)
 }
 
-func hasFastexPhase1Key(enc []byte) bool {
-	if len(fastexPhase1Key) >= len(enc) {
-		return false
-	}
-	return bytes.Equal(enc[:len(fastexPhase1Key)], fastexPhase1Key)
-}
-
-func hasFastexPhase1BlindKey(enc []byte) bool {
-	if len(fastexPhase1BlindKey) >= len(enc) {
-		return false
-	}
-	return bytes.Equal(enc[:len(fastexPhase1BlindKey)], fastexPhase1BlindKey)
-}
-
 func hasCapellaKey(enc []byte) bool {
 	if len(capellaKey) >= len(enc) {
 		return false

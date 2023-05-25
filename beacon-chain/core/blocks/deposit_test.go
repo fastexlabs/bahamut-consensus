@@ -4,19 +4,19 @@ import (
 	"context"
 	"testing"
 
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/blocks"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/signing"
-	state_native "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/container/trie"
-	"github.com/prysmaticlabs/prysm/v3/crypto/bls"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
-	"github.com/prysmaticlabs/prysm/v3/testing/util"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/blocks"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/signing"
+	state_native "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/container/trie"
+	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/testing/util"
 )
 
 func TestProcessDeposits_SameValidatorMultipleDepositsSameBlock(t *testing.T) {
@@ -40,9 +40,11 @@ func TestProcessDeposits_SameValidatorMultipleDepositsSameBlock(t *testing.T) {
 		},
 	}
 	balances := []uint64{0}
+	activities := []uint64{0}
 	beaconState, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
 		Validators: registry,
 		Balances:   balances,
+		Activities: activities,
 		Eth1Data:   eth1Data,
 		Fork: &ethpb.Fork{
 			PreviousVersion: params.BeaconConfig().GenesisForkVersion,
@@ -54,15 +56,16 @@ func TestProcessDeposits_SameValidatorMultipleDepositsSameBlock(t *testing.T) {
 	require.NoError(t, err, "Expected block deposits to process correctly")
 
 	assert.Equal(t, 2, len(newState.Validators()), "Incorrect validator count")
+	assert.Equal(t, len(activities)+1, len(newState.Activities()), "Incorrect activities count")
 }
 
 func TestProcessDeposits_MerkleBranchFailsVerification(t *testing.T) {
 	deposit := &ethpb.Deposit{
 		Data: &ethpb.Deposit_Data{
 			PublicKey:             bytesutil.PadTo([]byte{1, 2, 3}, fieldparams.BLSPubkeyLength),
+			Contract:              make([]byte, fieldparams.ContractAddressLength),
 			WithdrawalCredentials: make([]byte, 32),
 			Signature:             make([]byte, fieldparams.BLSSignatureLength),
-			DeployedContract:      make([]byte, 20),
 		},
 	}
 	leaf, err := deposit.Data.HashTreeRoot()
@@ -112,15 +115,11 @@ func TestProcessDeposits_AddsNewValidatorDeposit(t *testing.T) {
 		},
 	}
 	balances := []uint64{0}
-	contracts := []*ethpb.ContractsContainer{
-		{
-			Contracts: [][]byte{{0x11}},
-		},
-	}
+	activities := []uint64{0}
 	beaconState, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
 		Validators: registry,
 		Balances:   balances,
-		Contracts:  contracts,
+		Activities: activities,
 		Eth1Data:   eth1Data,
 		Fork: &ethpb.Fork{
 			PreviousVersion: params.BeaconConfig().GenesisForkVersion,
@@ -137,18 +136,6 @@ func TestProcessDeposits_AddsNewValidatorDeposit(t *testing.T) {
 			newState.Balances()[1],
 		)
 	}
-	cc := newState.Contracts()[1]
-	t.Logf("%x", cc.Contracts)
-	t.Logf("%x", dep[0].Data.DeployedContract)
-	if len(cc.Contracts) != 0 {
-		if bytesutil.ToBytes20(cc.Contracts[0]) != bytesutil.ToBytes20(dep[0].Data.DeployedContract) {
-			t.Errorf(
-				"Expected state validator contracts to equal %x, received %x",
-				dep[0].Data.DeployedContract,
-				cc.Contracts[0],
-			)
-		}
-	}
 }
 
 func TestProcessDeposits_RepeatedDeposit_IncreasesValidatorBalance(t *testing.T) {
@@ -157,10 +144,10 @@ func TestProcessDeposits_RepeatedDeposit_IncreasesValidatorBalance(t *testing.T)
 	deposit := &ethpb.Deposit{
 		Data: &ethpb.Deposit_Data{
 			PublicKey:             sk.PublicKey().Marshal(),
+			Contract:              make([]byte, 20),
 			Amount:                1000,
 			WithdrawalCredentials: make([]byte, 32),
 			Signature:             make([]byte, fieldparams.BLSSignatureLength),
-			DeployedContract:      make([]byte, 20),
 		},
 	}
 	sr, err := signing.ComputeSigningRoot(deposit.Data, bytesutil.ToBytes(3, 32))
@@ -209,6 +196,54 @@ func TestProcessDeposits_RepeatedDeposit_IncreasesValidatorBalance(t *testing.T)
 	assert.Equal(t, uint64(1000+50), newState.Balances()[1], "Expected balance at index 1 to be 1050")
 }
 
+func TestProcessDeposit_TwoValidatorsWithSameContract(t *testing.T) {
+	contract := []byte{0x42, 0x42, 0x42}
+	dep, _, err := util.DeterministicDepositsAndKeysWithContract(2, [][]byte{contract, contract})
+	require.NoError(t, err)
+	eth1Data, err := util.DeterministicEth1Data(len(dep))
+	require.NoError(t, err)
+
+	beaconState, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
+		Eth1Data: eth1Data,
+		Fork: &ethpb.Fork{
+			PreviousVersion: params.BeaconConfig().GenesisForkVersion,
+			CurrentVersion:  params.BeaconConfig().GenesisForkVersion,
+		},
+	})
+	require.NoError(t, err)
+	newState, isNewValidator, err := blocks.ProcessDeposit(beaconState, dep[0], true)
+	require.NoError(t, err, "Process deposit failed")
+	assert.Equal(t, true, isNewValidator, "Expected isNewValidator to be true")
+	assert.Equal(t, 1, len(newState.Validators()), "Expected validator list to have length 1")
+	assert.Equal(t, 1, len(newState.Balances()), "Expected validator balances list to have length 1")
+	assert.Equal(t, 1, len(newState.Activities()), "Expected validator activities list to have length 1")
+	if newState.Balances()[0] != dep[0].Data.Amount {
+		t.Errorf(
+			"Expected state validator balances index 1 to equal %d, received %d",
+			dep[0].Data.Amount,
+			newState.Balances()[1],
+		)
+	}
+	owner, exist := newState.ValidatorIndexByContract(bytesutil.ToBytes20(contract))
+	assert.Equal(t, true, exist, "Expected exist to be true")
+	assert.Equal(t, primitives.ValidatorIndex(0), owner, "Expected owner of the contract is 0")
+
+	newState, isNewValidator, err = blocks.ProcessDeposit(beaconState, dep[1], true)
+	require.NoError(t, err, "Process deposit failed")
+	assert.Equal(t, true, isNewValidator, "Expected isNewValidator to be true")
+	assert.Equal(t, 2, len(newState.Validators()), "Expected validator list to have length 2")
+	assert.Equal(t, 2, len(newState.Balances()), "Expected validator balances list to have length 2")
+	assert.Equal(t, 2, len(newState.Activities()), "Expected validator activities list to have length 2")
+
+	owner, exist = newState.ValidatorIndexByContract(bytesutil.ToBytes20(contract))
+	assert.Equal(t, true, exist, "Expected exist to be true")
+	assert.Equal(t, primitives.ValidatorIndex(1), owner, "Expected owner of the contract is 1")
+
+	contractAtIndex, ok := newState.ContractAtIndex(primitives.ValidatorIndex(0))
+	assert.Equal(t, true, ok, "Expected ok to be true")
+	assert.DeepEqual(t, params.BeaconConfig().ZeroContract, contractAtIndex, "Expected validator 0 to have zero-contract")
+}
+
 func TestProcessDeposit_AddsNewValidatorDeposit(t *testing.T) {
 	// Similar to TestProcessDeposits_AddsNewValidatorDeposit except that this test directly calls ProcessDeposit
 	dep, _, err := util.DeterministicDepositsAndKeys(1)
@@ -222,19 +257,14 @@ func TestProcessDeposit_AddsNewValidatorDeposit(t *testing.T) {
 			WithdrawalCredentials: []byte{1, 2, 3},
 		},
 	}
-	contracts := []*ethpb.ContractsContainer{
-		{
-			Contracts: [][]byte{{0x11}},
-		},
-	}
 	balances := []uint64{0}
 	beaconState, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
 		Validators: registry,
 		Balances:   balances,
-		Contracts:  contracts,
 		Eth1Data:   eth1Data,
 		Fork: &ethpb.Fork{
-			PreviousVersion: params.BeaconConfig().GenesisForkVersion, CurrentVersion: params.BeaconConfig().GenesisForkVersion,
+			PreviousVersion: params.BeaconConfig().GenesisForkVersion,
+			CurrentVersion:  params.BeaconConfig().GenesisForkVersion,
 		},
 	})
 	require.NoError(t, err)
@@ -248,85 +278,6 @@ func TestProcessDeposit_AddsNewValidatorDeposit(t *testing.T) {
 			"Expected state validator balances index 1 to equal %d, received %d",
 			dep[0].Data.Amount,
 			newState.Balances()[1],
-		)
-	}
-	t.Log(newState.Contracts())
-	cc := newState.Contracts()[1]
-	t.Logf("%x", cc.Contracts)
-	t.Logf("%x", dep[0].Data.DeployedContract)
-	if bytesutil.ToBytes20(cc.Contracts[0]) != bytesutil.ToBytes20(dep[0].Data.DeployedContract) {
-		t.Errorf(
-			"Expected state validator contracts to equal %x, received %x",
-			dep[0].Data.DeployedContract,
-			cc.Contracts[0],
-		)
-	}
-}
-
-func TestProcessDeposit_RepeatedContract(t *testing.T) {
-	contract := make([]byte, 20)
-	contract[19] = 1
-	dep, _, err := util.DeterministicDepositsAndKeysWithContracts(2, false, contract)
-	require.NoError(t, err)
-	eth1Data, err := util.DeterministicEth1Data(len(dep))
-	require.NoError(t, err)
-
-	registry := []*ethpb.Validator{
-		{
-			PublicKey:             []byte{1},
-			WithdrawalCredentials: []byte{1, 2, 3},
-		},
-	}
-	contracts := []*ethpb.ContractsContainer{
-		{
-			Contracts: [][]byte{{0x11}},
-		},
-	}
-	balances := []uint64{0}
-	beaconState, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
-		Validators: registry,
-		Balances:   balances,
-		Contracts:  contracts,
-		Eth1Data:   eth1Data,
-		Fork: &ethpb.Fork{
-			PreviousVersion: params.BeaconConfig().GenesisForkVersion, CurrentVersion: params.BeaconConfig().GenesisForkVersion,
-		},
-	})
-	require.NoError(t, err)
-	newState, isNewValidator, err := blocks.ProcessDeposit(beaconState, dep[0], true)
-	require.NoError(t, err, "Process deposit failed")
-	assert.Equal(t, true, isNewValidator, "Expected isNewValidator to be true")
-	assert.Equal(t, 2, len(newState.Validators()), "Expected validator list to have length 2")
-	assert.Equal(t, 2, len(newState.Balances()), "Expected validator balances list to have length 2")
-	if newState.Balances()[1] != dep[0].Data.Amount {
-		t.Errorf(
-			"Expected state validator balances index 1 to equal %d, received %d",
-			dep[0].Data.Amount,
-			newState.Balances()[1],
-		)
-	}
-	cc := newState.Contracts()[1]
-	if bytesutil.ToBytes20(cc.Contracts[0]) != bytesutil.ToBytes20(dep[0].Data.DeployedContract) {
-		t.Errorf(
-			"Expected state validator contracts to equal %x, received %x",
-			dep[0].Data.DeployedContract,
-			cc.Contracts[0],
-		)
-	}
-	newState, isNewValidator, err = blocks.ProcessDeposit(newState, dep[1], true)
-	require.NoError(t, err, "Process deposit failed")
-	assert.Equal(t, true, isNewValidator, "Expected isNewValidator to be true")
-	assert.Equal(t, 3, len(newState.Validators()), "Expected validator list to have length 2")
-	assert.Equal(t, 3, len(newState.Balances()), "Expected validator balances list to have length 2")
-	for i, ccc := range newState.Contracts() {
-		t.Logf("%d: %x", i, ccc.Contracts[0])
-	}
-	cc = newState.Contracts()[2]
-	if bytesutil.ToBytes20(cc.Contracts[0]) != bytesutil.ToBytes20(make([]byte, 20)) {
-		t.Errorf(
-			"Expected state validator contracts to equal %x, received %x",
-			dep[0].Data.DeployedContract,
-			cc.Contracts[0],
 		)
 	}
 }
@@ -454,10 +405,10 @@ func TestProcessDeposit_RepeatedDeposit_IncreasesValidatorBalance(t *testing.T) 
 	deposit := &ethpb.Deposit{
 		Data: &ethpb.Deposit_Data{
 			PublicKey:             sk.PublicKey().Marshal(),
+			Contract:              make([]byte, 20),
 			Amount:                1000,
 			WithdrawalCredentials: make([]byte, 32),
 			Signature:             make([]byte, 96),
-			DeployedContract:      make([]byte, 20),
 		},
 	}
 	sr, err := signing.ComputeSigningRoot(deposit.Data, bytesutil.ToBytes(3, 32))
@@ -500,158 +451,4 @@ func TestProcessDeposit_RepeatedDeposit_IncreasesValidatorBalance(t *testing.T) 
 	require.NoError(t, err, "Process deposit failed")
 	assert.Equal(t, false, isNewValidator, "Expected isNewValidator to be false")
 	assert.Equal(t, uint64(1000+50), newState.Balances()[1], "Expected balance at index 1 to be 1050")
-}
-
-func TestProcessDeposits_RepeatedDeposit_AppendValidatorContracts(t *testing.T) {
-	sk, err := bls.RandKey()
-	require.NoError(t, err)
-	deposit := &ethpb.Deposit{
-		Data: &ethpb.Deposit_Data{
-			PublicKey:             sk.PublicKey().Marshal(),
-			Amount:                1000,
-			WithdrawalCredentials: make([]byte, 32),
-			Signature:             make([]byte, fieldparams.BLSSignatureLength),
-			DeployedContract:      make([]byte, 20),
-		},
-	}
-	sr, err := signing.ComputeSigningRoot(deposit.Data, bytesutil.ToBytes(3, 32))
-	require.NoError(t, err)
-	sig := sk.Sign(sr[:])
-	deposit.Data.Signature = sig.Marshal()
-	leaf, err := deposit.Data.HashTreeRoot()
-	require.NoError(t, err)
-
-	// We then create a merkle branch for the test.
-	depositTrie, err := trie.GenerateTrieFromItems([][]byte{leaf[:]}, params.BeaconConfig().DepositContractTreeDepth)
-	require.NoError(t, err, "Could not generate trie")
-	proof, err := depositTrie.MerkleProof(0)
-	require.NoError(t, err, "Could not generate proof")
-
-	deposit.Proof = proof
-	b := util.NewBeaconBlock()
-	b.Block = &ethpb.BeaconBlock{
-		Body: &ethpb.BeaconBlockBody{
-			Deposits: []*ethpb.Deposit{deposit},
-		},
-	}
-	registry := []*ethpb.Validator{
-		{
-			PublicKey: []byte{1, 2, 3},
-		},
-		{
-			PublicKey:             sk.PublicKey().Marshal(),
-			WithdrawalCredentials: []byte{1},
-		},
-	}
-	balances := []uint64{0, 50}
-	contracts := []*ethpb.ContractsContainer{
-		{
-			Contracts: [][]byte{},
-		},
-		{
-			Contracts: [][]byte{
-				{0x01},
-			},
-		},
-	}
-	root, err := depositTrie.HashTreeRoot()
-	require.NoError(t, err)
-	beaconState, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
-		Validators: registry,
-		Balances:   balances,
-		Contracts:  contracts,
-		Eth1Data: &ethpb.Eth1Data{
-			DepositRoot: root[:],
-			BlockHash:   root[:],
-		},
-	})
-	require.NoError(t, err)
-	newState, err := blocks.ProcessDeposits(context.Background(), beaconState, b.Block.Body.Deposits)
-	require.NoError(t, err, "Process deposit failed")
-	cc := newState.Contracts()[1]
-	if len(cc.Contracts) != len(contracts[1].Contracts)+1 {
-		t.Errorf(
-			"Expected contracts length equal to %d, received %d",
-			len(contracts[1].Contracts)+1,
-			len(cc.Contracts),
-		)
-	}
-}
-
-func TestProcessDeposits_RepeatedDeposit_DoNotAppendValidatorContracts(t *testing.T) {
-	sk, err := bls.RandKey()
-	require.NoError(t, err)
-	deposit := &ethpb.Deposit{
-		Data: &ethpb.Deposit_Data{
-			PublicKey:             sk.PublicKey().Marshal(),
-			Amount:                1000,
-			WithdrawalCredentials: make([]byte, 32),
-			Signature:             make([]byte, fieldparams.BLSSignatureLength),
-			DeployedContract:      make([]byte, 20),
-		},
-	}
-	sr, err := signing.ComputeSigningRoot(deposit.Data, bytesutil.ToBytes(3, 32))
-	require.NoError(t, err)
-	sig := sk.Sign(sr[:])
-	deposit.Data.Signature = sig.Marshal()
-	leaf, err := deposit.Data.HashTreeRoot()
-	require.NoError(t, err)
-
-	// We then create a merkle branch for the test.
-	depositTrie, err := trie.GenerateTrieFromItems([][]byte{leaf[:]}, params.BeaconConfig().DepositContractTreeDepth)
-	require.NoError(t, err, "Could not generate trie")
-	proof, err := depositTrie.MerkleProof(0)
-	require.NoError(t, err, "Could not generate proof")
-
-	deposit.Proof = proof
-	b := util.NewBeaconBlock()
-	b.Block = &ethpb.BeaconBlock{
-		Body: &ethpb.BeaconBlockBody{
-			Deposits: []*ethpb.Deposit{deposit},
-		},
-	}
-	registry := []*ethpb.Validator{
-		{
-			PublicKey: []byte{1, 2, 3},
-		},
-		{
-			PublicKey:             sk.PublicKey().Marshal(),
-			WithdrawalCredentials: []byte{1},
-		},
-	}
-	balances := []uint64{0, 50}
-	contracts := []*ethpb.ContractsContainer{
-		{
-			Contracts: [][]byte{},
-		},
-		{
-			Contracts: [][]byte{
-				make([]byte, 20),
-			},
-		},
-	}
-	root, err := depositTrie.HashTreeRoot()
-	require.NoError(t, err)
-	beaconState, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
-		Validators: registry,
-		Balances:   balances,
-		Contracts:  contracts,
-		Eth1Data: &ethpb.Eth1Data{
-			DepositRoot: root[:],
-			BlockHash:   root[:],
-		},
-	})
-	require.NoError(t, err)
-	newState, err := blocks.ProcessDeposits(context.Background(), beaconState, b.Block.Body.Deposits)
-	require.NoError(t, err, "Process deposit failed")
-	cc := newState.Contracts()[1]
-	t.Logf("%x", cc.Contracts)
-	t.Logf("%x", contracts[1].Contracts)
-	if len(cc.Contracts) != len(contracts[1].Contracts) {
-		t.Errorf(
-			"Expected contracts length equal to %d, received %d",
-			len(contracts[1].Contracts),
-			len(cc.Contracts),
-		)
-	}
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+// activityChangeJSON is the custom json representation of ActivityChange structure.
 type activityChangeJSON struct {
 	ContractAddress *common.Address `json:"contract_address"`
 	DeltaActivtity  *uint64         `json:"delta_activity"`
@@ -40,4 +41,12 @@ func (c *ActivityChange) UnmarshalJSON(enc []byte) error {
 	c.ContractAddress = dec.ContractAddress.Bytes()
 	c.DeltaActivity = *(dec.DeltaActivtity)
 	return nil
+}
+
+// BlockActivities is the response kind received by the eth_getBlockActivities
+// endpoint via JSON-RPC.
+type BlockActivities struct {
+	BaseFee    uint64            `json:"baseFee"`
+	TxCount    uint64            `json:"txCount"`
+	Activities []*ActivityChange `json:"activities"`
 }

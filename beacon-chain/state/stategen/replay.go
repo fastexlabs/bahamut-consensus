@@ -6,19 +6,18 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/altair"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/capella"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/execution"
-	fastexphase1 "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/fastex-phase1"
-	prysmtime "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/time"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/db/filters"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/monitoring/tracing"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/altair"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/capella"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/execution"
+	prysmtime "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db/filters"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/monitoring/tracing"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 	"github.com/sirupsen/logrus"
 	"go.opencensus.io/trace"
 )
@@ -206,14 +205,8 @@ func ReplayProcessSlots(ctx context.Context, state state.BeaconState, slot primi
 					tracing.AnnotateError(span, err)
 					return nil, errors.Wrap(err, "could not process epoch with optimizations")
 				}
-			case version.Altair, version.Bellatrix:
+			case version.Altair, version.Bellatrix, version.Capella:
 				state, err = altair.ProcessEpoch(ctx, state)
-				if err != nil {
-					tracing.AnnotateError(span, err)
-					return nil, errors.Wrap(err, "could not process epoch")
-				}
-			case version.FastexPhase1, version.Capella:
-				state, err = fastexphase1.ProcessEpoch(ctx, state)
 				if err != nil {
 					tracing.AnnotateError(span, err)
 					return nil, errors.Wrap(err, "could not process epoch")
@@ -237,14 +230,6 @@ func ReplayProcessSlots(ctx context.Context, state state.BeaconState, slot primi
 
 		if prysmtime.CanUpgradeToBellatrix(state.Slot()) {
 			state, err = execution.UpgradeToBellatrix(state)
-			if err != nil {
-				tracing.AnnotateError(span, err)
-				return nil, err
-			}
-		}
-
-		if prysmtime.CanUpgradeToFastexPhase1(state.Slot()) {
-			state, err = fastexphase1.UpgradeToFastexPhase1(state)
 			if err != nil {
 				tracing.AnnotateError(span, err)
 				return nil, err

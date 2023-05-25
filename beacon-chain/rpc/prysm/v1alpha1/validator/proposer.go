@@ -11,19 +11,20 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	emptypb "github.com/golang/protobuf/ptypes/empty"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/builder"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/feed"
-	blockfeed "github.com/prysmaticlabs/prysm/v3/beacon-chain/core/feed/block"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/transition"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/db/kv"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/blocks"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/interfaces"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/blockchain"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/builder"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed"
+	blockfeed "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/block"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db/kv"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	"github.com/sirupsen/logrus"
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc/codes"
@@ -47,8 +48,12 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 		return nil, status.Error(codes.Unavailable, "Syncing to latest head, not ready to respond")
 	}
 
-	if err := vs.HeadUpdater.UpdateHead(ctx); err != nil {
-		log.WithError(err).Error("Could not process attestations and update head")
+	// process attestations and update head in forkchoice
+	vs.ForkchoiceFetcher.UpdateHead(ctx, vs.TimeFetcher.CurrentSlot())
+	headRoot := vs.ForkchoiceFetcher.CachedHeadRoot()
+	parentRoot := vs.ForkchoiceFetcher.GetProposerHead()
+	if parentRoot != headRoot {
+		blockchain.LateBlockAttemptedReorgCount.Inc()
 	}
 
 	// An optimistic validator MUST NOT produce a block (i.e., sign across the DOMAIN_BEACON_PROPOSER domain).
@@ -62,15 +67,11 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not prepare block: %v", err)
 	}
-	parentRoot, err := vs.HeadFetcher.HeadRoot(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not get head root: %v", err)
-	}
 	head, err := vs.HeadFetcher.HeadState(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not get head state: %v", err)
 	}
-	head, err = transition.ProcessSlotsUsingNextSlotCache(ctx, head, parentRoot, req.Slot)
+	head, err = transition.ProcessSlotsUsingNextSlotCache(ctx, head, parentRoot[:], req.Slot)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not process slots up to %d: %v", req.Slot, err)
 	}
@@ -79,7 +80,7 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	sBlk.SetSlot(req.Slot)
 	sBlk.SetGraffiti(req.Graffiti)
 	sBlk.SetRandaoReveal(req.RandaoReveal)
-	sBlk.SetParentRoot(parentRoot)
+	sBlk.SetParentRoot(parentRoot[:])
 
 	// Set eth1 data.
 	eth1Data, err := vs.eth1DataMajorityVote(ctx, head)
@@ -115,14 +116,9 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	// Set exits.
 	sBlk.SetVoluntaryExits(vs.getExits(head, req.Slot))
 
-	activityChanges, transactionsCount, latestProcessedBlock, err := vs.getActivityChanges(ctx, head)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not get activity changes %v", err)
+	if err := vs.setActivities(ctx, sBlk, head); err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not set activity changes: %v", err)
 	}
-	// Set activity changes, transaction count and latest processed block
-	sBlk.SetActivityChanges(activityChanges)
-	sBlk.SetTransactionsCount(transactionsCount)
-	sBlk.SetLatestProcessedBlock(latestProcessedBlock)
 
 	// Set sync aggregate. New in Altair.
 	vs.setSyncAggregate(ctx, sBlk)
@@ -130,11 +126,6 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 	// Set execution data. New in Bellatrix.
 	if err := vs.setExecutionData(ctx, sBlk, head); err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not set execution data: %v", err)
-	}
-
-	// Set base fee. New in FastexPhase1.
-	if err := vs.setBaseFee(ctx, sBlk, head); err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not set base fee: %v", err)
 	}
 
 	// Set bls to execution change. New in Capella.
@@ -155,12 +146,6 @@ func (vs *Server) GetBeaconBlock(ctx context.Context, req *ethpb.BlockRequest) (
 			return &ethpb.GenericBeaconBlock{Block: &ethpb.GenericBeaconBlock_BlindedCapella{BlindedCapella: pb.(*ethpb.BlindedBeaconBlockCapella)}}, nil
 		}
 		return &ethpb.GenericBeaconBlock{Block: &ethpb.GenericBeaconBlock_Capella{Capella: pb.(*ethpb.BeaconBlockCapella)}}, nil
-	}
-	if slots.ToEpoch(req.Slot) >= params.BeaconConfig().FastexPhase1ForkEpoch {
-		if sBlk.IsBlinded() {
-			return &ethpb.GenericBeaconBlock{Block: &ethpb.GenericBeaconBlock_BlindedFastexPhase1{BlindedFastexPhase1: pb.(*ethpb.BlindedBeaconBlockFastexPhase1)}}, nil
-		}
-		return &ethpb.GenericBeaconBlock{Block: &ethpb.GenericBeaconBlock_FastexPhase1{FastexPhase1: pb.(*ethpb.BeaconBlockFastexPhase1)}}, nil
 	}
 	if slots.ToEpoch(req.Slot) >= params.BeaconConfig().BellatrixForkEpoch {
 		if sBlk.IsBlinded() {
@@ -248,6 +233,7 @@ func (vs *Server) GetFeeRecipientByPubKey(ctx context.Context, request *ethpb.Fe
 			log.WithError(err).Error("An error occurred while retrieving validator index")
 			return nil, err
 		}
+
 	}
 	address, err := vs.BeaconDB.FeeRecipientByValidatorID(ctx, resp.GetIndex())
 	if err != nil {
@@ -275,11 +261,6 @@ func (vs *Server) proposeGenericBeaconBlock(ctx context.Context, blk interfaces.
 
 	if slots.ToEpoch(blk.Block().Slot()) >= params.BeaconConfig().CapellaForkEpoch {
 		blk, err = vs.unblindBuilderBlockCapella(ctx, blk)
-		if err != nil {
-			return nil, err
-		}
-	} else if slots.ToEpoch(blk.Block().Slot()) >= params.BeaconConfig().FastexPhase1ForkEpoch {
-		blk, err = vs.unblindBuilderBlockFastexPhase1(ctx, blk)
 		if err != nil {
 			return nil, err
 		}

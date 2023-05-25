@@ -8,10 +8,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-	types "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	v1 "github.com/prysmaticlabs/prysm/v3/proto/engine/v1"
-	eth "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	types "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	v1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
+	eth "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 type SignedValidatorRegistration struct {
@@ -89,10 +89,8 @@ func (r *ValidatorRegistration) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-var (
-	errInvalidUint256 = errors.New("invalid Uint256")
-	errDecodeUint256  = errors.New("unable to decode into Uint256")
-)
+var errInvalidUint256 = errors.New("invalid Uint256")
+var errDecodeUint256 = errors.New("unable to decode into Uint256")
 
 type Uint256 struct {
 	*big.Int
@@ -704,19 +702,15 @@ type DepositData struct {
 
 func (d *DepositData) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		PublicKey             hexutil.Bytes `json:"pubkey,omitempty"`
-		WithdrawalCredentials hexutil.Bytes `json:"withdrawal_credentials,omitempty"`
-		Amount                string        `json:"amount,omitempty"`
-		Signature             hexutil.Bytes `json:"signature,omitempty"`
-		DeployedContract      hexutil.Bytes `json:"deployed_contract,omitempty"`
-		DeploymentNonce       string        `json:"deployment_nonce,omitempty"`
+		PublicKey             hexutil.Bytes `json:"pubkey"`
+		WithdrawalCredentials hexutil.Bytes `json:"withdrawal_credentials"`
+		Amount                string        `json:"amount"`
+		Signature             hexutil.Bytes `json:"signature"`
 	}{
 		PublicKey:             d.PublicKey,
 		WithdrawalCredentials: d.WithdrawalCredentials,
 		Amount:                fmt.Sprintf("%d", d.Amount),
 		Signature:             d.Signature,
-		DeployedContract:      d.DeployedContract,
-		DeploymentNonce:       fmt.Sprintf("%d", d.DeploymentNonce),
 	})
 }
 
@@ -796,20 +790,6 @@ func (e *Eth1Data) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type ActivityChange struct {
-	*eth.ActivityChange
-}
-
-func (ac *ActivityChange) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		ContractAddress hexutil.Bytes `json:"contract_address"`
-		DeltaActivity   string        `json:"delta_activity"`
-	}{
-		ContractAddress: ac.ContractAddress,
-		DeltaActivity:   fmt.Sprintf("%d", ac.DeltaActivity),
-	})
-}
-
 func (b *BlindedBeaconBlockBodyBellatrix) MarshalJSON() ([]byte, error) {
 	sve := make([]*SignedVoluntaryExit, len(b.BlindedBeaconBlockBodyBellatrix.VoluntaryExits))
 	for i := range b.BlindedBeaconBlockBodyBellatrix.VoluntaryExits {
@@ -831,10 +811,6 @@ func (b *BlindedBeaconBlockBodyBellatrix) MarshalJSON() ([]byte, error) {
 	for i := range b.BlindedBeaconBlockBodyBellatrix.ProposerSlashings {
 		pros[i] = &ProposerSlashing{ProposerSlashing: b.BlindedBeaconBlockBodyBellatrix.ProposerSlashings[i]}
 	}
-	ac := make([]*ActivityChange, len(b.BlindedBeaconBlockBodyBellatrix.ActivityChanges))
-	for i := range b.BlindedBeaconBlockBodyBellatrix.ActivityChanges {
-		ac[i] = &ActivityChange{ActivityChange: b.BlindedBeaconBlockBodyBellatrix.ActivityChanges[i]}
-	}
 	return json.Marshal(struct {
 		RandaoReveal           hexutil.Bytes           `json:"randao_reveal"`
 		Eth1Data               *Eth1Data               `json:"eth1_data"`
@@ -844,9 +820,6 @@ func (b *BlindedBeaconBlockBodyBellatrix) MarshalJSON() ([]byte, error) {
 		Attestations           []*Attestation          `json:"attestations"`
 		Deposits               []*Deposit              `json:"deposits"`
 		VoluntaryExits         []*SignedVoluntaryExit  `json:"voluntary_exits"`
-		ActivityChanges        []*ActivityChange       `json:"activity_changes"`
-		LatestProcessedBlock   string                  `json:"latest_processed_block"`
-		TransactionsCount      string                  `json:"transactions_count"`
 		SyncAggregate          *SyncAggregate          `json:"sync_aggregate"`
 		ExecutionPayloadHeader *ExecutionPayloadHeader `json:"execution_payload_header"`
 	}{
@@ -858,9 +831,6 @@ func (b *BlindedBeaconBlockBodyBellatrix) MarshalJSON() ([]byte, error) {
 		Attestations:           atts,
 		Deposits:               deps,
 		VoluntaryExits:         sve,
-		ActivityChanges:        ac,
-		LatestProcessedBlock:   fmt.Sprintf("%d", b.LatestProcessedBlock),
-		TransactionsCount:      fmt.Sprintf("%d", b.TransactionsCount),
 		SyncAggregate:          &SyncAggregate{b.BlindedBeaconBlockBodyBellatrix.SyncAggregate},
 		ExecutionPayloadHeader: &ExecutionPayloadHeader{ExecutionPayloadHeader: b.BlindedBeaconBlockBodyBellatrix.ExecutionPayloadHeader},
 	})
@@ -893,102 +863,6 @@ func (ch *BLSToExecutionChange) MarshalJSON() ([]byte, error) {
 		ValidatorIndex:     fmt.Sprintf("%d", ch.ValidatorIndex),
 		FromBlsPubkey:      ch.FromBlsPubkey,
 		ToExecutionAddress: ch.ToExecutionAddress,
-	})
-}
-
-type SignedBlindedBeaconBlockFastexPhase1 struct {
-	*eth.SignedBlindedBeaconBlockFastexPhase1
-}
-
-type BlindedBeaconBlockFastexPhase1 struct {
-	*eth.BlindedBeaconBlockFastexPhase1
-}
-
-type BlindedBeaconBlockBodyFastexPhase1 struct {
-	*eth.BlindedBeaconBlockBodyFastexPhase1
-}
-
-func (r *SignedBlindedBeaconBlockFastexPhase1) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Message   *BlindedBeaconBlockFastexPhase1 `json:"message"`
-		Signature hexutil.Bytes                   `json:"signature"`
-	}{
-		Message:   &BlindedBeaconBlockFastexPhase1{r.SignedBlindedBeaconBlockFastexPhase1.Block},
-		Signature: r.SignedBlindedBeaconBlockFastexPhase1.Signature,
-	})
-}
-
-func (b *BlindedBeaconBlockFastexPhase1) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Slot          string                              `json:"slot"`
-		ProposerIndex string                              `json:"proposer_index"`
-		ParentRoot    hexutil.Bytes                       `json:"parent_root"`
-		StateRoot     hexutil.Bytes                       `json:"state_root"`
-		Body          *BlindedBeaconBlockBodyFastexPhase1 `json:"body"`
-	}{
-		Slot:          fmt.Sprintf("%d", b.Slot),
-		ProposerIndex: fmt.Sprintf("%d", b.ProposerIndex),
-		ParentRoot:    b.ParentRoot,
-		StateRoot:     b.StateRoot,
-		Body:          &BlindedBeaconBlockBodyFastexPhase1{b.BlindedBeaconBlockFastexPhase1.Body},
-	})
-}
-
-func (b *BlindedBeaconBlockBodyFastexPhase1) MarshalJSON() ([]byte, error) {
-	sve := make([]*SignedVoluntaryExit, len(b.BlindedBeaconBlockBodyFastexPhase1.VoluntaryExits))
-	for i := range b.BlindedBeaconBlockBodyFastexPhase1.VoluntaryExits {
-		sve[i] = &SignedVoluntaryExit{SignedVoluntaryExit: b.BlindedBeaconBlockBodyFastexPhase1.VoluntaryExits[i]}
-	}
-	deps := make([]*Deposit, len(b.BlindedBeaconBlockBodyFastexPhase1.Deposits))
-	for i := range b.BlindedBeaconBlockBodyFastexPhase1.Deposits {
-		deps[i] = &Deposit{Deposit: b.BlindedBeaconBlockBodyFastexPhase1.Deposits[i]}
-	}
-	atts := make([]*Attestation, len(b.BlindedBeaconBlockBodyFastexPhase1.Attestations))
-	for i := range b.BlindedBeaconBlockBodyFastexPhase1.Attestations {
-		atts[i] = &Attestation{Attestation: b.BlindedBeaconBlockBodyFastexPhase1.Attestations[i]}
-	}
-	atsl := make([]*AttesterSlashing, len(b.BlindedBeaconBlockBodyFastexPhase1.AttesterSlashings))
-	for i := range b.BlindedBeaconBlockBodyFastexPhase1.AttesterSlashings {
-		atsl[i] = &AttesterSlashing{AttesterSlashing: b.BlindedBeaconBlockBodyFastexPhase1.AttesterSlashings[i]}
-	}
-	pros := make([]*ProposerSlashing, len(b.BlindedBeaconBlockBodyFastexPhase1.ProposerSlashings))
-	for i := range b.BlindedBeaconBlockBodyFastexPhase1.ProposerSlashings {
-		pros[i] = &ProposerSlashing{ProposerSlashing: b.BlindedBeaconBlockBodyFastexPhase1.ProposerSlashings[i]}
-	}
-	ac := make([]*ActivityChange, len(b.BlindedBeaconBlockBodyFastexPhase1.ActivityChanges))
-	for i := range b.BlindedBeaconBlockBodyFastexPhase1.ActivityChanges {
-		ac[i] = &ActivityChange{ActivityChange: b.BlindedBeaconBlockBodyFastexPhase1.ActivityChanges[i]}
-	}
-	return json.Marshal(struct {
-		RandaoReveal           hexutil.Bytes           `json:"randao_reveal"`
-		Eth1Data               *Eth1Data               `json:"eth1_data"`
-		Graffiti               hexutil.Bytes           `json:"graffiti"`
-		ProposerSlashings      []*ProposerSlashing     `json:"proposer_slashings"`
-		AttesterSlashings      []*AttesterSlashing     `json:"attester_slashings"`
-		Attestations           []*Attestation          `json:"attestations"`
-		Deposits               []*Deposit              `json:"deposits"`
-		VoluntaryExits         []*SignedVoluntaryExit  `json:"voluntary_exits"`
-		ActivityChanges        []*ActivityChange       `json:"activity_changes"`
-		LatestProcessedBlock   string                  `json:"latest_processed_block"`
-		TransactionsCount      string                  `json:"transactions_count"`
-		SyncAggregate          *SyncAggregate          `json:"sync_aggregate"`
-		ExecutionPayloadHeader *ExecutionPayloadHeader `json:"execution_payload_header"`
-		BaseFee                string                  `json:"base_fee"`
-	}{
-		RandaoReveal:           b.RandaoReveal,
-		Eth1Data:               &Eth1Data{b.BlindedBeaconBlockBodyFastexPhase1.Eth1Data},
-		Graffiti:               b.BlindedBeaconBlockBodyFastexPhase1.Graffiti,
-		ProposerSlashings:      pros,
-		AttesterSlashings:      atsl,
-		Attestations:           atts,
-		Deposits:               deps,
-		VoluntaryExits:         sve,
-		ActivityChanges:        ac,
-		LatestProcessedBlock:   fmt.Sprintf("%d", b.LatestProcessedBlock),
-		TransactionsCount:      fmt.Sprintf("%d", b.TransactionsCount),
-		SyncAggregate:          &SyncAggregate{b.BlindedBeaconBlockBodyFastexPhase1.SyncAggregate},
-		ExecutionPayloadHeader: &ExecutionPayloadHeader{ExecutionPayloadHeader: b.BlindedBeaconBlockBodyFastexPhase1.ExecutionPayloadHeader},
-		BaseFee:                fmt.Sprintf("%d", b.BaseFee),
 	})
 }
 
@@ -1055,10 +929,6 @@ func (b *BlindedBeaconBlockBodyCapella) MarshalJSON() ([]byte, error) {
 	for i := range b.BlsToExecutionChanges {
 		chs[i] = &SignedBLSToExecutionChange{SignedBLSToExecutionChange: b.BlsToExecutionChanges[i]}
 	}
-	ac := make([]*ActivityChange, len(b.BlindedBeaconBlockBodyCapella.ActivityChanges))
-	for i := range b.BlindedBeaconBlockBodyCapella.ActivityChanges {
-		ac[i] = &ActivityChange{ActivityChange: b.BlindedBeaconBlockBodyCapella.ActivityChanges[i]}
-	}
 	return json.Marshal(struct {
 		RandaoReveal           hexutil.Bytes                  `json:"randao_reveal"`
 		Eth1Data               *Eth1Data                      `json:"eth1_data"`
@@ -1068,13 +938,9 @@ func (b *BlindedBeaconBlockBodyCapella) MarshalJSON() ([]byte, error) {
 		Attestations           []*Attestation                 `json:"attestations"`
 		Deposits               []*Deposit                     `json:"deposits"`
 		VoluntaryExits         []*SignedVoluntaryExit         `json:"voluntary_exits"`
-		ActivityChanges        []*ActivityChange              `json:"activity_changes"`
-		LatestProcessedBlock   string                         `json:"latest_processed_block"`
-		TransactionsCount      string                         `json:"transactions_count"`
 		BLSToExecutionChanges  []*SignedBLSToExecutionChange  `json:"bls_to_execution_changes"`
 		SyncAggregate          *SyncAggregate                 `json:"sync_aggregate"`
 		ExecutionPayloadHeader *ExecutionPayloadHeaderCapella `json:"execution_payload_header"`
-		BaseFee                string                         `json:"base_fee"`
 	}{
 		RandaoReveal:           b.RandaoReveal,
 		Eth1Data:               &Eth1Data{b.Eth1Data},
@@ -1084,13 +950,9 @@ func (b *BlindedBeaconBlockBodyCapella) MarshalJSON() ([]byte, error) {
 		Attestations:           atts,
 		Deposits:               deps,
 		VoluntaryExits:         sve,
-		ActivityChanges:        ac,
-		LatestProcessedBlock:   fmt.Sprintf("%d", b.LatestProcessedBlock),
-		TransactionsCount:      fmt.Sprintf("%d", b.TransactionsCount),
 		BLSToExecutionChanges:  chs,
 		SyncAggregate:          &SyncAggregate{b.SyncAggregate},
 		ExecutionPayloadHeader: &ExecutionPayloadHeaderCapella{ExecutionPayloadHeaderCapella: b.ExecutionPayloadHeader},
-		BaseFee:                fmt.Sprintf("%d", b.BaseFee),
 	})
 }
 

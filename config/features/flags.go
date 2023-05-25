@@ -7,11 +7,6 @@ import (
 )
 
 var (
-	FastexChainTestnet = &cli.BoolFlag{
-		Value: true,
-		Name:  "fastex-chain-testnet",
-		Usage: "Run Consensus layer configured for the fastex chain test network",
-	}
 	// PraterTestnet flag for the multiclient Ethereum consensus testnet.
 	PraterTestnet = &cli.BoolFlag{
 		Name:    "prater",
@@ -25,6 +20,7 @@ var (
 	}
 	// Mainnet flag for easier tooling, no-op
 	Mainnet = &cli.BoolFlag{
+		Value: true,
 		Name:  "mainnet",
 		Usage: "Run on Ethereum Beacon Chain Main Net. This is the default and can be omitted.",
 	}
@@ -45,9 +41,9 @@ var (
 		Name:  "disable-grpc-connection-logging",
 		Usage: "Disables displaying logs for newly connected grpc clients",
 	}
-	disablePeerScorer = &cli.BoolFlag{
-		Name:  "disable-peer-scorer",
-		Usage: "Disables experimental P2P peer scorer",
+	disableReorgLateBlocks = &cli.BoolFlag{
+		Name:  "disable-reorg-late-blocks",
+		Usage: "Disables reorgs of late blocks",
 	}
 	writeWalletPasswordOnWebOnboarding = &cli.BoolFlag{
 		Name: "write-wallet-password-on-web-onboarding",
@@ -92,27 +88,6 @@ var (
 			" (Warning): Once enabled, this feature migrates your database in to a new schema and " +
 			"there is no going back. At worst, your entire database might get corrupted.",
 	}
-	disablePullTips = &cli.BoolFlag{
-		Name:  "experimental-enable-boundary-checks",
-		Usage: "Experimental enable of boundary checks, useful for debugging, may cause bad votes.",
-	}
-	disableDefensivePull = &cli.BoolFlag{
-		Name:   "disable-back-pull",
-		Usage:  "Experimental disable of past boundary checks, useful for debugging, may cause bad votes.",
-		Hidden: true,
-	}
-	disableVecHTR = &cli.BoolFlag{
-		Name:  "disable-vectorized-htr",
-		Usage: "Disables the new go sha256 library which utilizes optimized routines for merkle trees",
-	}
-	disableForkChoiceDoublyLinkedTree = &cli.BoolFlag{
-		Name:  "disable-forkchoice-doubly-linked-tree",
-		Usage: "Disables the new forkchoice store structure that uses doubly linked trees",
-	}
-	disableGossipBatchAggregation = &cli.BoolFlag{
-		Name:  "disable-gossip-batch-aggregation",
-		Usage: "Disables new methods to further aggregate our gossip batches before verifying them.",
-	}
 	enableStartupOptimistic = &cli.BoolFlag{
 		Name:   "startup-optimistic",
 		Usage:  "Treats every block as optimistically synced at launch. Use with caution",
@@ -135,19 +110,29 @@ var (
 		Name:  "enable-verbose-sig-verification",
 		Usage: "Enables identifying invalid signatures if batch verification fails when processing block",
 	}
+	enableOptionalEngineMethods = &cli.BoolFlag{
+		Name:  "enable-optional-engine-methods",
+		Usage: "Enables the optional engine methods",
+	}
+	prepareAllPayloads = &cli.BoolFlag{
+		Name:  "prepare-all-payloads",
+		Usage: "Informs the engine to prepare all local payloads. Useful for relayers and builders",
+	}
 )
 
 // devModeFlags holds list of flags that are set when development mode is on.
-var devModeFlags = []cli.Flag{}
+var devModeFlags = []cli.Flag{
+	enableVerboseSigVerification,
+	enableOptionalEngineMethods,
+}
 
 // ValidatorFlags contains a list of all the feature flags that apply to the validator client.
 var ValidatorFlags = append(deprecatedFlags, []cli.Flag{
 	writeWalletPasswordOnWebOnboarding,
 	enableExternalSlasherProtectionFlag,
-	FastexChainTestnet,
-	// PraterTestnet,
-	// SepoliaTestnet,
-	// Mainnet,
+	PraterTestnet,
+	SepoliaTestnet,
+	Mainnet,
 	dynamicKeyReloadDebounceInterval,
 	attestTimely,
 	enableSlashingProtectionPruning,
@@ -165,24 +150,20 @@ var BeaconChainFlags = append(deprecatedBeaconFlags, append(deprecatedFlags, []c
 	devModeFlag,
 	writeSSZStateTransitionsFlag,
 	disableGRPCConnectionLogging,
-	FastexChainTestnet,
-	// PraterTestnet,
-	// SepoliaTestnet,
-	// Mainnet,
-	disablePeerScorer,
+	PraterTestnet,
+	SepoliaTestnet,
+	Mainnet,
 	disableBroadcastSlashingFlag,
 	enableSlasherFlag,
 	enableHistoricalSpaceRepresentation,
 	disableStakinContractCheck,
-	disablePullTips,
-	disableVecHTR,
-	disableForkChoiceDoublyLinkedTree,
-	disableGossipBatchAggregation,
+	disableReorgLateBlocks,
 	SaveFullExecutionPayloads,
 	enableStartupOptimistic,
-	disableDefensivePull,
 	enableFullSSZDataLogging,
 	enableVerboseSigVerification,
+	enableOptionalEngineMethods,
+	prepareAllPayloads,
 }...)...)
 
 // E2EBeaconChainFlags contains a list of the beacon chain feature flags to be tested in E2E.

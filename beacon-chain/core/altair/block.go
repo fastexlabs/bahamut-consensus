@@ -4,15 +4,15 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/helpers"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/core/signing"
-	p2pType "github.com/prysmaticlabs/prysm/v3/beacon-chain/p2p/types"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/crypto/bls"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/time/slots"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/signing"
+	p2pType "github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
 
 // ProcessSyncAggregate verifies sync committee aggregate signature signing over the previous slot block root.
@@ -60,11 +60,12 @@ func ProcessSyncAggregate(ctx context.Context, s state.BeaconState, sync *ethpb.
 // verifying the BLS signatures. It returns the modified beacons state, the list of validators'
 // public keys that voted (for future signature verification) and the proposer reward for including
 // sync aggregate messages.
-func processSyncAggregate(
-	ctx context.Context,
-	s state.BeaconState,
-	sync *ethpb.SyncAggregate,
-) (state.BeaconState, []bls.PublicKey, uint64, error) {
+func processSyncAggregate(ctx context.Context, s state.BeaconState, sync *ethpb.SyncAggregate) (
+	state.BeaconState,
+	[]bls.PublicKey,
+	uint64,
+	error,
+) {
 	currentSyncCommittee, err := s.CurrentSyncCommittee()
 	if err != nil {
 		return nil, nil, 0, err
@@ -82,7 +83,15 @@ func processSyncAggregate(
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	proposerReward, participantReward, err := SyncRewards(activeBalance)
+	totalPower, totalEffectivePower, err := helpers.Powers(ctx, s)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	baseProposerReward, err := BaseProposerReward(s, totalPower, totalEffectivePower)
+	if err != nil {
+		return nil, nil , 0, err
+	}
+	proposerReward, participantReward, err := SyncRewards(activeBalance, baseProposerReward)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -148,7 +157,7 @@ func VerifySyncCommitteeSig(s state.BeaconState, syncKeys []bls.PublicKey, syncS
 }
 
 // SyncRewards returns the proposer reward and the sync participant reward given the total active balance in state.
-func SyncRewards(activeBalance uint64) (proposerReward, participantReward uint64, err error) {
+func SyncRewards(activeBalance, baseProposerReward uint64) (proposerReward, participantReward uint64, err error) {
 	cfg := params.BeaconConfig()
 	totalActiveIncrements := activeBalance / cfg.EffectiveBalanceIncrement
 	baseRewardPerInc, err := BaseRewardPerIncrement(activeBalance)
@@ -158,6 +167,6 @@ func SyncRewards(activeBalance uint64) (proposerReward, participantReward uint64
 	totalBaseRewards := baseRewardPerInc * totalActiveIncrements
 	maxParticipantRewards := totalBaseRewards * cfg.SyncRewardWeight / cfg.WeightDenominator / uint64(cfg.SlotsPerEpoch)
 	participantReward = maxParticipantRewards / cfg.SyncCommitteeSize
-	proposerReward = participantReward * cfg.ProposerWeight / (cfg.WeightDenominator - cfg.ProposerWeight)
+	proposerReward = baseProposerReward * cfg.SyncRewardWeight / cfg.WeightDenominator / cfg.SyncCommitteeSize
 	return
 }

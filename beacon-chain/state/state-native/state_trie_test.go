@@ -5,14 +5,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	statenative "github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native"
-	"github.com/prysmaticlabs/prysm/v3/config/params"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
-	"github.com/prysmaticlabs/prysm/v3/testing/assert"
-	"github.com/prysmaticlabs/prysm/v3/testing/require"
-	"github.com/prysmaticlabs/prysm/v3/testing/util"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	statenative "github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/testing/assert"
+	"github.com/prysmaticlabs/prysm/v4/testing/require"
+	"github.com/prysmaticlabs/prysm/v4/testing/util"
 )
 
 func TestInitializeFromProto_Phase0(t *testing.T) {
@@ -487,7 +487,9 @@ func TestBeaconState_ValidatorMutation_Phase0(t *testing.T) {
 	require.NoError(t, testState.UpdateValidatorAtIndex(15, &ethpb.Validator{
 		PublicKey:                  make([]byte, 48),
 		WithdrawalCredentials:      make([]byte, 32),
+		Contract:                   make([]byte, 20),
 		EffectiveBalance:           1111,
+		EffectiveActivity:          1113,
 		Slashed:                    false,
 		ActivationEligibilityEpoch: 1112,
 		ActivationEpoch:            1114,
@@ -511,7 +513,9 @@ func TestBeaconState_ValidatorMutation_Phase0(t *testing.T) {
 	require.NoError(t, newState1.UpdateValidatorAtIndex(150, &ethpb.Validator{
 		PublicKey:                  make([]byte, 48),
 		WithdrawalCredentials:      make([]byte, 32),
+		Contract:                   make([]byte, 20),
 		EffectiveBalance:           2111,
+		EffectiveActivity:          2113,
 		Slashed:                    false,
 		ActivationEligibilityEpoch: 2112,
 		ActivationEpoch:            2114,
@@ -554,7 +558,9 @@ func TestBeaconState_ValidatorMutation_Altair(t *testing.T) {
 	require.NoError(t, testState.UpdateValidatorAtIndex(15, &ethpb.Validator{
 		PublicKey:                  make([]byte, 48),
 		WithdrawalCredentials:      make([]byte, 32),
+		Contract:                   make([]byte, 20),
 		EffectiveBalance:           1111,
+		EffectiveActivity:          1113,
 		Slashed:                    false,
 		ActivationEligibilityEpoch: 1112,
 		ActivationEpoch:            1114,
@@ -578,7 +584,9 @@ func TestBeaconState_ValidatorMutation_Altair(t *testing.T) {
 	require.NoError(t, newState1.UpdateValidatorAtIndex(150, &ethpb.Validator{
 		PublicKey:                  make([]byte, 48),
 		WithdrawalCredentials:      make([]byte, 32),
+		Contract:                   make([]byte, 20),
 		EffectiveBalance:           2111,
+		EffectiveActivity:          2113,
 		Slashed:                    false,
 		ActivationEligibilityEpoch: 2112,
 		ActivationEpoch:            2114,
@@ -621,7 +629,9 @@ func TestBeaconState_ValidatorMutation_Bellatrix(t *testing.T) {
 	require.NoError(t, testState.UpdateValidatorAtIndex(15, &ethpb.Validator{
 		PublicKey:                  make([]byte, 48),
 		WithdrawalCredentials:      make([]byte, 32),
+		Contract:                   make([]byte, 20),
 		EffectiveBalance:           1111,
+		EffectiveActivity:          1113,
 		Slashed:                    false,
 		ActivationEligibilityEpoch: 1112,
 		ActivationEpoch:            1114,
@@ -645,7 +655,9 @@ func TestBeaconState_ValidatorMutation_Bellatrix(t *testing.T) {
 	require.NoError(t, newState1.UpdateValidatorAtIndex(150, &ethpb.Validator{
 		PublicKey:                  make([]byte, 48),
 		WithdrawalCredentials:      make([]byte, 32),
+		Contract:                   make([]byte, 20),
 		EffectiveBalance:           2111,
+		EffectiveActivity:          2113,
 		Slashed:                    false,
 		ActivationEligibilityEpoch: 2112,
 		ActivationEpoch:            2114,

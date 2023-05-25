@@ -8,9 +8,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/rpc/apimiddleware"
-	"github.com/prysmaticlabs/prysm/v3/consensus-types/primitives"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/apimiddleware"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"google.golang.org/grpc"
 )
 
@@ -158,31 +158,6 @@ func (c beaconApiValidatorClient) getHeadSignedBeaconBlock(ctx context.Context) 
 		}
 
 		slot = bellatrixBlock.Slot
-
-	case "fastex-phase1":
-		jsonFastexPhase1Block := apimiddleware.SignedBeaconBlockFastexPhase1ContainerJson{}
-		if err := decoder.Decode(&jsonFastexPhase1Block); err != nil {
-			return nil, errors.Wrap(err, "failed to decode signed fastex-phase1 block response json")
-		}
-
-		fastexPhase1Block, err := c.beaconBlockConverter.ConvertRESTFastexPhase1BlockToProto(jsonFastexPhase1Block.Message)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get signed fastex-phase1 block")
-		}
-
-		decodedSignature, err := hexutil.Decode(jsonFastexPhase1Block.Signature)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to decode fastex-phase1 block signature `%s`", jsonFastexPhase1Block.Signature)
-		}
-
-		response.Block = &ethpb.StreamBlocksResponse_FastexPhase1Block{
-			FastexPhase1Block: &ethpb.SignedBeaconBlockFastexPhase1{
-				Signature: decodedSignature,
-				Block:     fastexPhase1Block,
-			},
-		}
-
-		slot = fastexPhase1Block.Slot
 
 	case "capella":
 		jsonCapellaBlock := apimiddleware.SignedBeaconBlockCapellaContainerJson{}

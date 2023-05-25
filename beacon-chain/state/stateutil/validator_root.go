@@ -4,33 +4,34 @@ import (
 	"encoding/binary"
 
 	"github.com/pkg/errors"
-	fieldparams "github.com/prysmaticlabs/prysm/v3/config/fieldparams"
-	"github.com/prysmaticlabs/prysm/v3/crypto/hash"
-	"github.com/prysmaticlabs/prysm/v3/encoding/bytesutil"
-	"github.com/prysmaticlabs/prysm/v3/encoding/ssz"
-	ethpb "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1"
+	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/encoding/ssz"
+	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
 // ValidatorRootWithHasher describes a method from which the hash tree root
 // of a validator is returned.
-func ValidatorRootWithHasher(hasher ssz.HashFn, validator *ethpb.Validator) ([32]byte, error) {
-	fieldRoots, err := ValidatorFieldRoots(hasher, validator)
+func ValidatorRootWithHasher(validator *ethpb.Validator) ([32]byte, error) {
+	fieldRoots, err := ValidatorFieldRoots(validator)
 	if err != nil {
 		return [32]byte{}, err
 	}
-	return ssz.BitwiseMerkleize(hasher, fieldRoots, uint64(len(fieldRoots)), uint64(len(fieldRoots)))
+	return ssz.BitwiseMerkleize(fieldRoots, uint64(len(fieldRoots)), uint64(len(fieldRoots)))
 }
 
 // ValidatorFieldRoots describes a method from which the hash tree root
 // of a validator is returned.
-func ValidatorFieldRoots(hasher ssz.HashFn, validator *ethpb.Validator) ([][32]byte, error) {
+func ValidatorFieldRoots(validator *ethpb.Validator) ([][32]byte, error) {
 	var fieldRoots [][32]byte
+	var zeroRoots [6][32]byte
 	if validator != nil {
 		pubkey := bytesutil.ToBytes48(validator.PublicKey)
 		withdrawCreds := bytesutil.ToBytes32(validator.WithdrawalCredentials)
+		contract := bytesutil.ToBytes32(validator.Contract)
 		var effectiveBalanceBuf [32]byte
 		binary.LittleEndian.PutUint64(effectiveBalanceBuf[:8], validator.EffectiveBalance)
-		effectiveActivityBuf := [32]byte{}
+		var effectiveActivityBuf [32]byte
 		binary.LittleEndian.PutUint64(effectiveActivityBuf[:8], validator.EffectiveActivity)
 		// Slashed.
 		var slashBuf [32]byte
@@ -52,25 +53,35 @@ func ValidatorFieldRoots(hasher ssz.HashFn, validator *ethpb.Validator) ([][32]b
 		binary.LittleEndian.PutUint64(withdrawalBuf[:8], uint64(validator.WithdrawableEpoch))
 
 		// Public key.
-		pubKeyRoot, err := merkleizePubkey(hasher, pubkey[:])
+		pubKeyRoot, err := merkleizePubkey(pubkey[:])
 		if err != nil {
 			return [][32]byte{}, err
 		}
-		fieldRoots = [][32]byte{pubKeyRoot, withdrawCreds, effectiveBalanceBuf, effectiveActivityBuf, slashBuf, activationEligibilityBuf,
-			activationBuf, exitBuf, withdrawalBuf, [32]byte{}, [32]byte{}, [32]byte{}, [32]byte{}, [32]byte{}, [32]byte{}, [32]byte{}}
+		fieldRoots = [][32]byte{
+			pubKeyRoot,
+			withdrawCreds,
+			contract,
+			effectiveBalanceBuf,
+			effectiveActivityBuf,
+			slashBuf,
+			activationEligibilityBuf,
+			activationBuf,
+			exitBuf,
+			withdrawalBuf,
+		}
 	}
+	fieldRoots = append(fieldRoots, zeroRoots[:]...)
 	return fieldRoots, nil
 }
 
 // Uint64ListRootWithRegistryLimit computes the HashTreeRoot Merkleization of
 // a list of uint64 and mixed with registry limit.
 func Uint64ListRootWithRegistryLimit(balances []uint64) ([32]byte, error) {
-	hasher := hash.CustomSHA256Hasher()
 	balancesChunks, err := PackUint64IntoChunks(balances)
 	if err != nil {
 		return [32]byte{}, errors.Wrap(err, "could not pack balances into chunks")
 	}
-	balancesRootsRoot, err := ssz.BitwiseMerkleize(hasher, balancesChunks, uint64(len(balancesChunks)), ValidatorLimitForBalancesChunks())
+	balancesRootsRoot, err := ssz.BitwiseMerkleize(balancesChunks, uint64(len(balancesChunks)), ValidatorLimitForBalancesChunks())
 	if err != nil {
 		return [32]byte{}, errors.Wrap(err, "could not compute balances merkleization")
 	}

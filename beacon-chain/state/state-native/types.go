@@ -3,9 +3,9 @@ package state_native
 import (
 	"fmt"
 
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v3/beacon-chain/state/state-native/types"
-	"github.com/prysmaticlabs/prysm/v3/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/types"
+	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
 
 // Ensure type BeaconState below implements BeaconState interface.
@@ -21,7 +21,6 @@ func init() {
 	// Initialize the composite arrays.
 	fieldMap[types.Eth1DataVotes] = types.CompositeArray
 	fieldMap[types.Validators] = types.CompositeArray
-	fieldMap[types.Contracts] = types.CompositeArray
 	fieldMap[types.PreviousEpochAttestations] = types.CompositeArray
 	fieldMap[types.CurrentEpochAttestations] = types.CompositeArray
 	fieldMap[types.Balances] = types.CompressedArray

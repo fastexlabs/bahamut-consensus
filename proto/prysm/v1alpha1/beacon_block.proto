@@ -18,11 +18,10 @@ package ethereum.eth.v1alpha1;
 import "proto/eth/ext/options.proto";
 import "proto/prysm/v1alpha1/attestation.proto";
 import "proto/prysm/v1alpha1/withdrawals.proto";
-import "proto/prysm/v1alpha1/blobs.proto";
 import "proto/engine/v1/execution_engine.proto";
 
 option csharp_namespace = "Ethereum.Eth.v1alpha1";
-option go_package = "github.com/prysmaticlabs/prysm/v3/proto/prysm/v1alpha1;eth";
+option go_package = "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1;eth";
 option java_multiple_files = true;
 option java_outer_classname = "BeaconBlockProto";
 option java_package = "org.ethereum.eth.v1alpha1";
@@ -42,17 +41,11 @@ message GenericSignedBeaconBlock {
         // Representing a signed, post-Bellatrix fork blinded beacon block.
         SignedBlindedBeaconBlockBellatrix blinded_bellatrix = 4;
 
-        // Representing a signed, post-FastexPhase1 fork beacon block.
-        SignedBeaconBlockFastexPhase1 fastex_phase1 = 5;
-
-        // Representing a signed, post-FastexPhase1 fork blinded beacon block.
-        SignedBlindedBeaconBlockFastexPhase1 blinded_fastex_phase1 = 6;
-
         // Representing a signed, post-Capella fork beacon block.
-        SignedBeaconBlockCapella capella = 7;
+        SignedBeaconBlockCapella capella = 5;
 
         // Representing a signed, post-Capella fork blinded beacon block.
-        SignedBlindedBeaconBlockCapella blinded_capella = 8;
+        SignedBlindedBeaconBlockCapella blinded_capella = 6;
     }
 }
 
@@ -70,27 +63,21 @@ message GenericBeaconBlock {
         // Representing a post-Bellatrix fork blinded beacon block.
         BlindedBeaconBlockBellatrix blinded_bellatrix = 4;
 
-        // Representing a post-FastexPhase1 fork beacon block.
-        BeaconBlockFastexPhase1 fastex_phase1 = 5;
-
-        // Representing a post-FastexPhase1 fork blinded beacon block.
-        BlindedBeaconBlockFastexPhase1 blinded_fastex_phase1 = 6;
-
         // Representing a post-Capella fork beacon block.
-        BeaconBlockCapella capella = 7;
+        BeaconBlockCapella capella = 5;
 
         // Representing a post-Capella fork blinded beacon block.
-        BlindedBeaconBlockCapella blinded_capella = 8;
+        BlindedBeaconBlockCapella blinded_capella = 6;
     }
 }
 
 // The Ethereum consensus beacon block. The message does not contain a validator signature.
 message BeaconBlock {
     // Beacon chain slot that this block represents.
-    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
+    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Slot"];
 
     // Validator index of the validator that proposed the block header.
-    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.ValidatorIndex"];
 
     // 32 byte root of the parent block.
     bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];
@@ -114,10 +101,10 @@ message SignedBeaconBlock {
 // The unsigned version of a (HF1) beacon block. The message does not contain a validator signature.
 message BeaconBlockAltair {
     // Beacon chain slot that this block represents.
-    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
+    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Slot"];
 
     // Validator index of the validator that proposed the block header.
-    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.ValidatorIndex"];
 
     // 32 byte root of the parent block.
     bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];
@@ -168,14 +155,17 @@ message BeaconBlockBody {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
-    // At most MAX_ACTIVITY_CHANGES.
-    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
+    // Activity changes from EL block.
+    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_size) = "?", (ethereum.eth.ext.ssz_max) = "1073741824"];
 
-    // The block number from which activity changes were processed.
-    uint64 latest_processed_block = 10;
+    // The number of transactions in EL block.
+    uint64 transactions_count = 10;
 
-    // The number of transactions in latest processed block.
-    uint64 transactions_count = 11;
+    // The base fee in EL block.
+    uint64 base_fee = 11;
+
+    // The latest processed EL block number.
+    uint64 execution_height = 12;
 }
 
 
@@ -210,17 +200,20 @@ message BeaconBlockBodyAltair {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
-    // At most MAX_ACTIVITY_CHANGES.
-    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
+    // Activity changes from EL.
+    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_size) = "?", (ethereum.eth.ext.ssz_max) = "1073741824"];
 
-    // The block number from which activity changes were processed.
-    uint64 latest_processed_block = 10;
+    // The number of transactions in EL block.
+    uint64 transactions_count = 10;
 
-    // The number of transactions in latest processed block.
-    uint64 transactions_count = 11;
+    // The base fee in EL block.
+    uint64 base_fee = 11;
+
+    // The latest processed EL block number.
+    uint64 execution_height = 12;
 
     // Sync aggregate object to track sync committee votes for light client support. [New in ]
-    SyncAggregate sync_aggregate = 12;
+    SyncAggregate sync_aggregate = 13;
 }
 
 // Proposer slashings are proofs that a slashable offense has been committed by
@@ -246,6 +239,7 @@ message AttesterSlashing {
 // Deposit into the Ethereum consensus from the Ethereum 1.x deposit contract.
 message Deposit {
     // DepositData that is encoded into a deposit signature.
+	// TODO(fastex-chain): add nonce to v1alpha1.DepositData.
     message Data {
         // 48 byte BLS public key of the validator.
         bytes public_key = 1 [(ethereum.eth.ext.ssz_size) = "48", (ethereum.eth.ext.spec_name) = "pubkey"];
@@ -253,16 +247,14 @@ message Deposit {
         // A 32 byte hash of the withdrawal address public key.
         bytes withdrawal_credentials = 2 [(ethereum.eth.ext.ssz_size) = "32"];
 
+        // A 20 byte address of the validator deployed contract.
+        bytes contract = 3  [(ethereum.eth.ext.ssz_size) = "20"];
+
         // Deposit amount in gwei.
-        uint64 amount = 3;
+        uint64 amount = 4;
 
         // 96 byte signature from the validators public key.
-        bytes signature = 4 [(ethereum.eth.ext.ssz_size) = "96"];
-
-        bytes deployed_contract = 5 [(ethereum.eth.ext.ssz_size) = "20"];
-
-        uint64 deployment_nonce = 6;
-
+        bytes signature = 5 [(ethereum.eth.ext.ssz_size) = "96"];
     }
     // 32 byte roots in the deposit tree branch.
     repeated bytes proof = 1 [(ethereum.eth.ext.ssz_size) = "33,32"];
@@ -275,10 +267,10 @@ message Deposit {
 // validator signature.
 message VoluntaryExit {
     // The epoch on when exit request becomes valid.
-    uint64 epoch = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Epoch"];
+    uint64 epoch = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Epoch"];
 
     // Index of the exiting validator.
-    uint64 validator_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+    uint64 validator_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.ValidatorIndex"];
 }
 
 // The signed version of voluntary exit.
@@ -305,22 +297,16 @@ message Eth1Data {
     bytes block_hash = 3 [(ethereum.eth.ext.ssz_size) = "32"];
 }
 
-message ActivityChange {
-    bytes contract_address = 1 [(ethereum.eth.ext.ssz_size) = "20"];
-
-    uint64 delta_activity = 2;
-}
-
 // A beacon block header is essentially a beacon block with only a reference to
 // the beacon body as a 32 byte merkle tree root. This type of message is more
 // lightweight than a full beacon block. The message does not contain
 // a validator signature.
 message BeaconBlockHeader {
     // Beacon chain slot that this block represents.
-    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
+    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Slot"];
 
     // Validator index of the validator that proposed the block header.
-    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.ValidatorIndex"];
 
     // 32 byte merkle tree root of the parent ssz encoded block.
     bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];
@@ -359,6 +345,15 @@ message SyncAggregate {
     bytes sync_committee_signature = 2 [(ethereum.eth.ext.ssz_size) = "96"];
 }
 
+// ActivityChange represents activity change of a single contract from EL
+message ActivityChange {
+    // Address of the smart contract
+    bytes contract_address = 1 [(ethereum.eth.ext.ssz_size) = "20"];
+
+    // The amount of gas used by the smart contract during its execution
+	uint64 delta_activity = 2;
+}
+
 message SignedBeaconBlockBellatrix {
     // The unsigned beacon block itself.
     BeaconBlockBellatrix block = 1;
@@ -369,10 +364,10 @@ message SignedBeaconBlockBellatrix {
 
 message BeaconBlockBellatrix {
     // Beacon chain slot that this block represents.
-    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
+    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Slot"];
 
     // Validator index of the validator that proposed the block header.
-    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.ValidatorIndex"];
 
     // 32 byte root of the parent block.
     bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];
@@ -413,20 +408,23 @@ message BeaconBlockBodyBellatrix {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
-    // At most MAX_ACTIVITY_CHANGES.
-    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
+    // Activity changes from EL.
+    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_size) = "?", (ethereum.eth.ext.ssz_max) = "1073741824"];
 
-    // The block number from which activity changes were processed.
-    uint64 latest_processed_block = 10;
+    // The number of transactions in EL block.
+    uint64 transactions_count = 10;
 
-    // The number of transactions in latest processed block.
-    uint64 transactions_count = 11;
+    // The base fee in EL block.
+    uint64 base_fee = 11;
+
+    // The latest processed EL block number.
+    uint64 execution_height = 12;
 
     // Sync aggregate object for the beacon chain to track sync committee votes. New in Altair network upgrade.
-    SyncAggregate sync_aggregate = 12;
+    SyncAggregate sync_aggregate = 13;
 
     // Execution payload from the execution chain. New in Bellatrix network upgrade.
-    ethereum.engine.v1.ExecutionPayload execution_payload = 13;
+    ethereum.engine.v1.ExecutionPayload execution_payload = 14;
 }
 
 message SignedBlindedBeaconBlockBellatrix {
@@ -439,10 +437,10 @@ message SignedBlindedBeaconBlockBellatrix {
 
 message BlindedBeaconBlockBellatrix {
     // Beacon chain slot that this blinded block represents.
-    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
+    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Slot"];
 
     // Validator index of the validator that proposed the block header.
-    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.ValidatorIndex"];
 
     // 32 byte root of the parent block.
     bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];
@@ -480,172 +478,23 @@ message BlindedBeaconBlockBodyBellatrix {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
-    // At most MAX_ACTIVITY_CHANGES.
-    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
+    // Activity changes from EL.
+    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_size) = "?", (ethereum.eth.ext.ssz_max) = "1073741824"];
 
-    // The block number from which activity changes were processed.
-    uint64 latest_processed_block = 10;
+    // The number of transactions in EL block.
+    uint64 transactions_count = 10;
 
-    // The number of transactions in latest processed block.
-    uint64 transactions_count = 11;
+    // The base fee in EL block.
+    uint64 base_fee = 11;
+
+    // The latest processed EL block number.
+    uint64 execution_height = 12;
 
     // Sync aggregate object for the beacon chain to track sync committee votes. New in Altair network upgrade.
-    SyncAggregate sync_aggregate = 12;
+    SyncAggregate sync_aggregate = 13;
 
     // Execution payload header from the execution chain. New in Bellatrix network upgrade to accommodate MEV interaction.
-    ethereum.engine.v1.ExecutionPayloadHeader execution_payload_header = 13;
-}
-
-message SignedBeaconBlockFastexPhase1 {
-    // The unsigned beacon block itself.
-    BeaconBlockFastexPhase1 block = 1;
-
-    // 96 byte BLS signature from the validator that produced this block.
-    bytes signature = 2 [(ethereum.eth.ext.ssz_size) = "96"];
-}
-
-message BeaconBlockFastexPhase1 {
-    // Beacon chain slot that this block represents.
-    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
-
-    // Validator index of the validator that proposed the block header.
-    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
-
-    // 32 byte root of the parent block.
-    bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];
-
-    // 32 byte root of the resulting state after processing this block.
-    bytes state_root = 4 [(ethereum.eth.ext.ssz_size) = "32"];
-
-    // The beacon block body.
-    BeaconBlockBodyFastexPhase1 body = 5;
-}
-
-message BeaconBlockBodyFastexPhase1 {
-    // The validators RANDAO reveal 96 byte value.
-    bytes randao_reveal = 1 [(ethereum.eth.ext.ssz_size) = "96"];
-
-    // A reference to the Ethereum 1.x chain.
-    Eth1Data eth1_data = 2;
-
-    // 32 byte field of arbitrary data. This field may contain any data and
-    // is not used for anything other than a fun message.
-    bytes graffiti = 3 [(ethereum.eth.ext.ssz_size) = "32"];
-
-    // Block operations
-    // Refer to spec constants at https://github.com/ethereum/consensus-specs/blob/dev/specs/core/0_beacon-chain.md#max-operations-per-block
-
-    // At most MAX_PROPOSER_SLASHINGS.
-    repeated ProposerSlashing proposer_slashings = 4 [(ethereum.eth.ext.ssz_max) = "16"];
-
-    // At most MAX_ATTESTER_SLASHINGS.
-    repeated AttesterSlashing attester_slashings = 5 [(ethereum.eth.ext.ssz_max) = "2"];
-
-    // At most MAX_ATTESTATIONS.
-    repeated Attestation attestations = 6 [(ethereum.eth.ext.ssz_max) = "128"];
-
-    // At most MAX_DEPOSITS.
-    repeated Deposit deposits = 7 [(ethereum.eth.ext.ssz_max) = "16"];
-
-    // At most MAX_VOLUNTARY_EXITS.
-    repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
-
-    // At most MAX_ACTIVITY_CHANGES.
-    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
-
-    // The block number from which activity changes were processed.
-    uint64 latest_processed_block = 10;
-
-    // The number of transactions in latest processed block.
-    uint64 transactions_count = 11;
-
-    // Sync aggregate object for the beacon chain to track sync committee votes. New in Altair network upgrade.
-    SyncAggregate sync_aggregate = 12;
-
-    // Execution payload from the execution chain. New in Bellatrix network upgrade.
-    ethereum.engine.v1.ExecutionPayload execution_payload = 13;
-
-    // Base fee per gas in latest processed block.
-    uint64 base_fee = 14;
-}
-
-message SignedBlindedBeaconBlockFastexPhase1 {
-    // The unsigned blinded beacon block itself.
-    BlindedBeaconBlockFastexPhase1 block = 1;
-
-    // 96 byte BLS signature from the validator that produced this blinded block.
-    bytes signature = 2 [(ethereum.eth.ext.ssz_size) = "96"];
-}
-
-message BlindedBeaconBlockFastexPhase1 {
-    // Beacon chain slot that this blinded block represents.
-    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
-
-    // Validator index of the validator that proposed the block header.
-    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
-
-    // 32 byte root of the parent block.
-    bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];
-
-    // 32 byte root of the resulting state after processing this blinded block.
-    bytes state_root = 4 [(ethereum.eth.ext.ssz_size) = "32"];
-
-    // The blinded beacon block body.
-    BlindedBeaconBlockBodyFastexPhase1 body = 5;
-}
-
-message BlindedBeaconBlockBodyFastexPhase1 {
-    // The validators RANDAO reveal 96 byte value.
-    bytes randao_reveal = 1 [(ethereum.eth.ext.ssz_size) = "96"];
-
-    // A reference to the Ethereum 1.x chain.
-    Eth1Data eth1_data = 2;
-
-    // 32 byte field of arbitrary data. This field may contain any data and
-    // is not used for anything other than a fun message.
-    bytes graffiti = 3 [(ethereum.eth.ext.ssz_size) = "32"];
-
-    // At most MAX_PROPOSER_SLASHINGS.
-    repeated ProposerSlashing proposer_slashings = 4 [(ethereum.eth.ext.ssz_max) = "16"];
-
-    // At most MAX_ATTESTER_SLASHINGS.
-    repeated AttesterSlashing attester_slashings = 5 [(ethereum.eth.ext.ssz_max) = "2"];
-
-    // At most MAX_ATTESTATIONS.
-    repeated Attestation attestations = 6 [(ethereum.eth.ext.ssz_max) = "128"];
-
-    // At most MAX_DEPOSITS.
-    repeated Deposit deposits = 7 [(ethereum.eth.ext.ssz_max) = "16"];
-
-    // At most MAX_VOLUNTARY_EXITS.
-    repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
-
-    // At most MAX_ACTIVITY_CHANGES.
-    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
-
-    // The block number from which activity changes were processed.
-    uint64 latest_processed_block = 10;
-
-    // The number of transactions in latest processed block.
-    uint64 transactions_count = 11;
-
-    // Sync aggregate object for the beacon chain to track sync committee votes. New in Altair network upgrade.
-    SyncAggregate sync_aggregate = 12;
-
-    // Execution payload header from the execution chain. New in Bellatrix network upgrade to accommodate MEV interaction.
-    ethereum.engine.v1.ExecutionPayloadHeader execution_payload_header = 13;
-
-    // Base fee per gas in latest processed block.
-    uint64 base_fee = 14;
-}
-
-// This contains beacon block and the blob sidecar objects under single container.
-// It is to be gossip'ed over p2p to peers to validate and process.
-message SignedBeaconBlockAndBlobsSidecar {
-    // The block of the beacon chain.
-    SignedBeaconBlockCapella beacon_block = 1;
-    // The blob sidecar which corresponds to the block itself.
-    BlobsSidecar blobs_sidecar = 2;
+    ethereum.engine.v1.ExecutionPayloadHeader execution_payload_header = 14;
 }
 
 message SignedBeaconBlockCapella {
@@ -658,10 +507,10 @@ message SignedBeaconBlockCapella {
 
 message BeaconBlockCapella {
     // Beacon chain slot that this block represents.
-    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
+    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Slot"];
 
     // Validator index of the validator that proposed the block header.
-    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.ValidatorIndex"];
 
     // 32 byte root of the parent block.
     bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];
@@ -702,23 +551,23 @@ message BeaconBlockBodyCapella {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
-    // At most MAX_ACTIVITY_CHANGES.
-    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
+    // Activity changes from EL.
+    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_size) = "?", (ethereum.eth.ext.ssz_max) = "1073741824"];
 
-    // The block number from which activity changes were processed.
-    uint64 latest_processed_block = 10;
+    // The number of transactions in EL block.
+    uint64 transactions_count = 10;
 
-    // The number of transactions in latest processed block.
-    uint64 transactions_count = 11;
+    // The base fee in EL block.
+    uint64 base_fee = 11;
+
+    // The latest processed EL block number.
+    uint64 execution_height = 12;
 
     // Sync aggregate object for the beacon chain to track sync committee votes. New in Altair network upgrade.
-    SyncAggregate sync_aggregate = 12;
+    SyncAggregate sync_aggregate = 13;
 
     // Execution payload from the execution chain. New in Bellatrix network upgrade.
-    ethereum.engine.v1.ExecutionPayloadCapella execution_payload = 13;
-
-    // Base fee per gas in latest processed block.
-    uint64 base_fee = 14;
+    ethereum.engine.v1.ExecutionPayloadCapella execution_payload = 14;
 
     // At most MAX_BLS_TO_EXECUTION_CHANGES. New in Capella network upgrade.
     repeated SignedBLSToExecutionChange bls_to_execution_changes = 15 [(ethereum.eth.ext.ssz_max) = "16"];
@@ -734,10 +583,10 @@ message SignedBlindedBeaconBlockCapella {
 
 message BlindedBeaconBlockCapella {
     // Beacon chain slot that this blinded block represents.
-    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.Slot"];
+    uint64 slot = 1 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.Slot"];
 
     // Validator index of the validator that proposed the block header.
-    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v3/consensus-types/primitives.ValidatorIndex"];
+    uint64 proposer_index = 2 [(ethereum.eth.ext.cast_type) = "github.com/prysmaticlabs/prysm/v4/consensus-types/primitives.ValidatorIndex"];
 
     // 32 byte root of the parent block.
     bytes parent_root = 3 [(ethereum.eth.ext.ssz_size) = "32"];
@@ -775,23 +624,23 @@ message BlindedBeaconBlockBodyCapella {
     // At most MAX_VOLUNTARY_EXITS.
     repeated SignedVoluntaryExit voluntary_exits = 8 [(ethereum.eth.ext.ssz_max) = "16"];
 
-    // At most MAX_ACTIVITY_CHANGES.
-    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_max) = "1024"];
+    // Activity changes from EL.
+    repeated ActivityChange activity_changes = 9 [(ethereum.eth.ext.ssz_size) = "?", (ethereum.eth.ext.ssz_max) = "1073741824"];
 
-    // The block number from which activity changes were processed.
-    uint64 latest_processed_block = 10;
+    // The number of transactions in EL block.
+    uint64 transactions_count = 10;
 
-    // The number of transactions in latest processed block.
-    uint64 transactions_count = 11;
+    // The base fee in EL block.
+    uint64 base_fee = 11;
+
+    // The latest processed EL block number.
+    uint64 execution_height = 12;
 
     // Sync aggregate object for the beacon chain to track sync committee votes. New in Altair network upgrade.
-    SyncAggregate sync_aggregate = 12;
+    SyncAggregate sync_aggregate = 13;
 
     // Execution payload header from the execution chain. New in Bellatrix network upgrade to accommodate MEV interaction.
-    ethereum.engine.v1.ExecutionPayloadHeaderCapella execution_payload_header = 13;
-
-    // Base fee per gas in latest processed block.
-    uint64 base_fee = 14;
+    ethereum.engine.v1.ExecutionPayloadHeaderCapella execution_payload_header = 14;
 
     // At most MAX_BLS_TO_EXECUTION_CHANGES. New in Capella network upgrade.
     repeated SignedBLSToExecutionChange bls_to_execution_changes = 15 [(ethereum.eth.ext.ssz_max) = "16"];
