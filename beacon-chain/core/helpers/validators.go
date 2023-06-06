@@ -224,6 +224,16 @@ func ValidatorChurnLimit(activeValidatorCount uint64) (uint64, error) {
 	return churnLimit, nil
 }
 
+// UpdateContract sets contract for validator with the given 'index'.
+func UpdateContract(s state.BeaconState, idx primitives.ValidatorIndex, contract []byte) error {
+	valAtIdx, err := s.ValidatorAtIndex(idx)
+	if err != nil {
+		return err
+	}
+	valAtIdx.Contract = contract
+	return s.UpdateValidatorAtIndex(idx, valAtIdx)
+}
+
 // TotalEffectiveActivity returns the total amount of gas used by validators contracts during period.
 func TotalEffectiveActivity(s state.ReadOnlyBeaconState) (uint64, error) {
 	e := time.CurrentEpoch(s)

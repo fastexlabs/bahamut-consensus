@@ -239,7 +239,6 @@ message AttesterSlashing {
 // Deposit into the Ethereum consensus from the Ethereum 1.x deposit contract.
 message Deposit {
     // DepositData that is encoded into a deposit signature.
-	// TODO(fastex-chain): add nonce to v1alpha1.DepositData.
     message Data {
         // 48 byte BLS public key of the validator.
         bytes public_key = 1 [(ethereum.eth.ext.ssz_size) = "48", (ethereum.eth.ext.spec_name) = "pubkey"];

@@ -1,8 +1,10 @@
 // Code generated - DO NOT EDIT.
 // This file is a generated binding and any manual changes will be lost.
+
 package deposit
 
 import (
+	"errors"
 	"math/big"
 	"strings"
 
@@ -16,6 +18,7 @@ import (
 
 // Reference imports to suppress errors if they are not otherwise used.
 var (
+	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
@@ -25,8 +28,14 @@ var (
 	_ = event.NewSubscription
 )
 
+// DepositContractMetaData contains all meta data concerning the DepositContract contract.
+var DepositContractMetaData = &bind.MetaData{
+	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"pubkey\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"withdrawal_credentials\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"contract_address\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"amount\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"signature\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"index\",\"type\":\"bytes\"}],\"name\":\"DepositEvent\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"pubkey\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"withdrawal_credentials\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"contract_address\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"signature\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"deposit_data_root\",\"type\":\"bytes32\"}],\"name\":\"deposit\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"contract_address\",\"type\":\"address\"}],\"name\":\"get_contract_owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"get_deposit_count\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"get_deposit_root\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"contract_address\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"new_owner_address\",\"type\":\"address\"}],\"name\":\"transfer_contract_ownership\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+}
+
 // DepositContractABI is the input ABI used to generate the binding from.
-const DepositContractABI = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"pubkey\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"withdrawal_credentials\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"amount\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"signature\",\"type\":\"bytes\"},{\"indexed\":false,\"internalType\":\"bytes\",\"name\":\"index\",\"type\":\"bytes\"}],\"name\":\"DepositEvent\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"pubkey\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"withdrawal_credentials\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"signature\",\"type\":\"bytes\"},{\"internalType\":\"bytes32\",\"name\":\"deposit_data_root\",\"type\":\"bytes32\"}],\"name\":\"deposit\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"get_deposit_count\",\"outputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"get_deposit_root\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}]"
+// Deprecated: Use DepositContractMetaData.ABI instead.
+var DepositContractABI = DepositContractMetaData.ABI
 
 // DepositContract is an auto generated Go binding around an Ethereum contract.
 type DepositContract struct {
@@ -170,6 +179,37 @@ func (_DepositContract *DepositContractTransactorRaw) Transact(opts *bind.Transa
 	return _DepositContract.Contract.contract.Transact(opts, method, params...)
 }
 
+// GetContractOwner is a free data retrieval call binding the contract method 0x847dbe4d.
+//
+// Solidity: function get_contract_owner(address contract_address) view returns(address)
+func (_DepositContract *DepositContractCaller) GetContractOwner(opts *bind.CallOpts, contract_address common.Address) (common.Address, error) {
+	var out []interface{}
+	err := _DepositContract.contract.Call(opts, &out, "get_contract_owner", contract_address)
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// GetContractOwner is a free data retrieval call binding the contract method 0x847dbe4d.
+//
+// Solidity: function get_contract_owner(address contract_address) view returns(address)
+func (_DepositContract *DepositContractSession) GetContractOwner(contract_address common.Address) (common.Address, error) {
+	return _DepositContract.Contract.GetContractOwner(&_DepositContract.CallOpts, contract_address)
+}
+
+// GetContractOwner is a free data retrieval call binding the contract method 0x847dbe4d.
+//
+// Solidity: function get_contract_owner(address contract_address) view returns(address)
+func (_DepositContract *DepositContractCallerSession) GetContractOwner(contract_address common.Address) (common.Address, error) {
+	return _DepositContract.Contract.GetContractOwner(&_DepositContract.CallOpts, contract_address)
+}
+
 // GetDepositCount is a free data retrieval call binding the contract method 0x621fd130.
 //
 // Solidity: function get_deposit_count() view returns(bytes)
@@ -263,25 +303,46 @@ func (_DepositContract *DepositContractCallerSession) SupportsInterface(interfac
 	return _DepositContract.Contract.SupportsInterface(&_DepositContract.CallOpts, interfaceId)
 }
 
-// Deposit is a paid mutator transaction binding the contract method 0x22895118.
+// Deposit is a paid mutator transaction binding the contract method 0xc1da06e2.
 //
-// Solidity: function deposit(bytes pubkey, bytes withdrawal_credentials, bytes signature, bytes32 deposit_data_root) payable returns()
-func (_DepositContract *DepositContractTransactor) Deposit(opts *bind.TransactOpts, pubkey []byte, withdrawal_credentials []byte, signature []byte, deposit_data_root [32]byte) (*types.Transaction, error) {
-	return _DepositContract.contract.Transact(opts, "deposit", pubkey, withdrawal_credentials, signature, deposit_data_root)
+// Solidity: function deposit(bytes pubkey, bytes withdrawal_credentials, bytes contract_address, bytes signature, bytes32 deposit_data_root) payable returns()
+func (_DepositContract *DepositContractTransactor) Deposit(opts *bind.TransactOpts, pubkey []byte, withdrawal_credentials []byte, contract_address []byte, signature []byte, deposit_data_root [32]byte) (*types.Transaction, error) {
+	return _DepositContract.contract.Transact(opts, "deposit", pubkey, withdrawal_credentials, contract_address, signature, deposit_data_root)
 }
 
-// Deposit is a paid mutator transaction binding the contract method 0x22895118.
+// Deposit is a paid mutator transaction binding the contract method 0xc1da06e2.
 //
-// Solidity: function deposit(bytes pubkey, bytes withdrawal_credentials, bytes signature, bytes32 deposit_data_root) payable returns()
-func (_DepositContract *DepositContractSession) Deposit(pubkey []byte, withdrawal_credentials []byte, signature []byte, deposit_data_root [32]byte) (*types.Transaction, error) {
-	return _DepositContract.Contract.Deposit(&_DepositContract.TransactOpts, pubkey, withdrawal_credentials, signature, deposit_data_root)
+// Solidity: function deposit(bytes pubkey, bytes withdrawal_credentials, bytes contract_address, bytes signature, bytes32 deposit_data_root) payable returns()
+func (_DepositContract *DepositContractSession) Deposit(pubkey []byte, withdrawal_credentials []byte, contract_address []byte, signature []byte, deposit_data_root [32]byte) (*types.Transaction, error) {
+	return _DepositContract.Contract.Deposit(&_DepositContract.TransactOpts, pubkey, withdrawal_credentials, contract_address, signature, deposit_data_root)
 }
 
-// Deposit is a paid mutator transaction binding the contract method 0x22895118.
+// Deposit is a paid mutator transaction binding the contract method 0xc1da06e2.
 //
-// Solidity: function deposit(bytes pubkey, bytes withdrawal_credentials, bytes signature, bytes32 deposit_data_root) payable returns()
-func (_DepositContract *DepositContractTransactorSession) Deposit(pubkey []byte, withdrawal_credentials []byte, signature []byte, deposit_data_root [32]byte) (*types.Transaction, error) {
-	return _DepositContract.Contract.Deposit(&_DepositContract.TransactOpts, pubkey, withdrawal_credentials, signature, deposit_data_root)
+// Solidity: function deposit(bytes pubkey, bytes withdrawal_credentials, bytes contract_address, bytes signature, bytes32 deposit_data_root) payable returns()
+func (_DepositContract *DepositContractTransactorSession) Deposit(pubkey []byte, withdrawal_credentials []byte, contract_address []byte, signature []byte, deposit_data_root [32]byte) (*types.Transaction, error) {
+	return _DepositContract.Contract.Deposit(&_DepositContract.TransactOpts, pubkey, withdrawal_credentials, contract_address, signature, deposit_data_root)
+}
+
+// TransferContractOwnership is a paid mutator transaction binding the contract method 0x36a8d230.
+//
+// Solidity: function transfer_contract_ownership(address contract_address, address new_owner_address) returns()
+func (_DepositContract *DepositContractTransactor) TransferContractOwnership(opts *bind.TransactOpts, contract_address common.Address, new_owner_address common.Address) (*types.Transaction, error) {
+	return _DepositContract.contract.Transact(opts, "transfer_contract_ownership", contract_address, new_owner_address)
+}
+
+// TransferContractOwnership is a paid mutator transaction binding the contract method 0x36a8d230.
+//
+// Solidity: function transfer_contract_ownership(address contract_address, address new_owner_address) returns()
+func (_DepositContract *DepositContractSession) TransferContractOwnership(contract_address common.Address, new_owner_address common.Address) (*types.Transaction, error) {
+	return _DepositContract.Contract.TransferContractOwnership(&_DepositContract.TransactOpts, contract_address, new_owner_address)
+}
+
+// TransferContractOwnership is a paid mutator transaction binding the contract method 0x36a8d230.
+//
+// Solidity: function transfer_contract_ownership(address contract_address, address new_owner_address) returns()
+func (_DepositContract *DepositContractTransactorSession) TransferContractOwnership(contract_address common.Address, new_owner_address common.Address) (*types.Transaction, error) {
+	return _DepositContract.Contract.TransferContractOwnership(&_DepositContract.TransactOpts, contract_address, new_owner_address)
 }
 
 // DepositContractDepositEventIterator is returned from FilterDepositEvent and is used to iterate over the raw logs and unpacked data for DepositEvent events raised by the DepositContract contract.
@@ -355,15 +416,16 @@ func (it *DepositContractDepositEventIterator) Close() error {
 type DepositContractDepositEvent struct {
 	Pubkey                []byte
 	WithdrawalCredentials []byte
+	ContractAddress       []byte
 	Amount                []byte
 	Signature             []byte
 	Index                 []byte
 	Raw                   types.Log // Blockchain specific contextual infos
 }
 
-// FilterDepositEvent is a free log retrieval operation binding the contract event 0x649bbc62d0e31342afea4e5cd82d4049e7e1ee912fc0889aa790803be39038c5.
+// FilterDepositEvent is a free log retrieval operation binding the contract event 0x9690c6325860650852f0f0bd0e7d47145a3d0c2c5c92cba852bad61c02928b09.
 //
-// Solidity: event DepositEvent(bytes pubkey, bytes withdrawal_credentials, bytes amount, bytes signature, bytes index)
+// Solidity: event DepositEvent(bytes pubkey, bytes withdrawal_credentials, bytes contract_address, bytes amount, bytes signature, bytes index)
 func (_DepositContract *DepositContractFilterer) FilterDepositEvent(opts *bind.FilterOpts) (*DepositContractDepositEventIterator, error) {
 
 	logs, sub, err := _DepositContract.contract.FilterLogs(opts, "DepositEvent")
@@ -373,9 +435,9 @@ func (_DepositContract *DepositContractFilterer) FilterDepositEvent(opts *bind.F
 	return &DepositContractDepositEventIterator{contract: _DepositContract.contract, event: "DepositEvent", logs: logs, sub: sub}, nil
 }
 
-// WatchDepositEvent is a free log subscription operation binding the contract event 0x649bbc62d0e31342afea4e5cd82d4049e7e1ee912fc0889aa790803be39038c5.
+// WatchDepositEvent is a free log subscription operation binding the contract event 0x9690c6325860650852f0f0bd0e7d47145a3d0c2c5c92cba852bad61c02928b09.
 //
-// Solidity: event DepositEvent(bytes pubkey, bytes withdrawal_credentials, bytes amount, bytes signature, bytes index)
+// Solidity: event DepositEvent(bytes pubkey, bytes withdrawal_credentials, bytes contract_address, bytes amount, bytes signature, bytes index)
 func (_DepositContract *DepositContractFilterer) WatchDepositEvent(opts *bind.WatchOpts, sink chan<- *DepositContractDepositEvent) (event.Subscription, error) {
 
 	logs, sub, err := _DepositContract.contract.WatchLogs(opts, "DepositEvent")
@@ -410,9 +472,9 @@ func (_DepositContract *DepositContractFilterer) WatchDepositEvent(opts *bind.Wa
 	}), nil
 }
 
-// ParseDepositEvent is a log parse operation binding the contract event 0x649bbc62d0e31342afea4e5cd82d4049e7e1ee912fc0889aa790803be39038c5.
+// ParseDepositEvent is a log parse operation binding the contract event 0x9690c6325860650852f0f0bd0e7d47145a3d0c2c5c92cba852bad61c02928b09.
 //
-// Solidity: event DepositEvent(bytes pubkey, bytes withdrawal_credentials, bytes amount, bytes signature, bytes index)
+// Solidity: event DepositEvent(bytes pubkey, bytes withdrawal_credentials, bytes contract_address, bytes amount, bytes signature, bytes index)
 func (_DepositContract *DepositContractFilterer) ParseDepositEvent(log types.Log) (*DepositContractDepositEvent, error) {
 	event := new(DepositContractDepositEvent)
 	if err := _DepositContract.contract.UnpackLog(event, "DepositEvent", log); err != nil {

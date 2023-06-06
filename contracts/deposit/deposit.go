@@ -26,9 +26,10 @@ import (
 //	- Send a transaction on the Ethereum 1.0 chain to DEPOSIT_CONTRACT_ADDRESS executing `deposit(pubkey: bytes[48], withdrawal_credentials: bytes[32], signature: bytes[96])` along with a deposit of amount Gwei.
 //
 // See: https://github.com/ethereum/consensus-specs/blob/master/specs/validator/0_beacon-chain-validator.md#submit-deposit
-func DepositInput(depositKey, withdrawalKey bls.SecretKey, amountInGwei uint64) (*ethpb.Deposit_Data, [32]byte, error) {
+func DepositInput(depositKey, withdrawalKey bls.SecretKey, contract []byte, amountInGwei uint64) (*ethpb.Deposit_Data, [32]byte, error) {
 	depositMessage := &ethpb.DepositMessage{
 		PublicKey:             depositKey.PublicKey().Marshal(),
+		Contract:              contract,
 		WithdrawalCredentials: WithdrawalCredentialsHash(withdrawalKey),
 		Amount:                amountInGwei,
 	}
@@ -53,6 +54,7 @@ func DepositInput(depositKey, withdrawalKey bls.SecretKey, amountInGwei uint64) 
 	di := &ethpb.Deposit_Data{
 		PublicKey:             depositMessage.PublicKey,
 		WithdrawalCredentials: depositMessage.WithdrawalCredentials,
+		Contract:              depositMessage.Contract,
 		Amount:                depositMessage.Amount,
 		Signature:             depositKey.Sign(root[:]).Marshal(),
 	}

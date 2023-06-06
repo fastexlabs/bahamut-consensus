@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/signing"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/container/trie"
@@ -167,6 +168,7 @@ func ProcessDeposit(beaconState state.BeaconState, deposit *ethpb.Deposit, verif
 	if err := beaconState.SetEth1DepositIndex(beaconState.Eth1DepositIndex() + 1); err != nil {
 		return nil, newValidator, err
 	}
+	epoch := time.CurrentEpoch(beaconState)
 	pubKey := deposit.Data.PublicKey
 	amount := deposit.Data.Amount
 	contract := deposit.Data.Contract
@@ -189,17 +191,15 @@ func ProcessDeposit(beaconState state.BeaconState, deposit *ethpb.Deposit, verif
 		if params.BeaconConfig().MaxEffectiveBalance < effectiveBalance {
 			effectiveBalance = params.BeaconConfig().MaxEffectiveBalance
 		}
+		// If contract already exists in state and contract owner is active validator
+		// in current epoch set zero-contract for new validator.
 		if contractExist {
-			// Set zero-contract to the old owner of the contract
-			// if the contract is already presented in beacon state.
-			owner, err := beaconState.ValidatorAtIndex(contractOwner)
+			owner, err := beaconState.ValidatorAtIndexReadOnly(contractOwner)
 			if err != nil {
 				return nil, newValidator, err
 			}
-			newVal := ethpb.CopyValidator(owner)
-			newVal.Contract = params.BeaconConfig().ZeroContract[:]
-			if err := beaconState.UpdateValidatorAtIndex(contractOwner, newVal); err != nil {
-				return nil, newValidator, err
+			if owner.ExitEpoch() >= epoch {
+				contract = params.BeaconConfig().ZeroContract[:]
 			}
 		}
 		if err := beaconState.AppendValidator(&ethpb.Validator{
@@ -221,8 +221,15 @@ func ProcessDeposit(beaconState state.BeaconState, deposit *ethpb.Deposit, verif
 		if err := beaconState.AppendActivity(0); err != nil {
 			return nil, newValidator, err
 		}
-	} else if err := helpers.IncreaseBalance(beaconState, index, amount); err != nil {
-		return nil, newValidator, err
+	} else {
+		if err := helpers.IncreaseBalance(beaconState, index, amount); err != nil {
+			return nil, newValidator, err
+		}
+		if bytesutil.ToBytes20(contract) != params.BeaconConfig().ZeroContract && !contractExist {
+			if err := helpers.UpdateContract(beaconState, index, contract); err != nil {
+				return nil, newValidator, err
+			}
+		}
 	}
 
 	return beaconState, newValidator, nil

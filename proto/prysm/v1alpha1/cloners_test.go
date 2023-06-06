@@ -666,11 +666,11 @@ func genSignedBeaconBlockHeader() *v1alpha1.SignedBeaconBlockHeader {
 
 func genDepositData() *v1alpha1.Deposit_Data {
 	return &v1alpha1.Deposit_Data{
-		PublicKey:             bytes(32),
+		PublicKey:             bytes(48),
 		Contract:              bytes(20),
 		WithdrawalCredentials: bytes(32),
-		Amount:                20000,
-		Signature:             bytes(32),
+		Amount:                8192 * 1e9,
+		Signature:             bytes(96),
 	}
 }
 

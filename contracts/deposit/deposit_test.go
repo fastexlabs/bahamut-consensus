@@ -18,8 +18,9 @@ func TestDepositInput_GeneratesPb(t *testing.T) {
 	require.NoError(t, err)
 	k2, err := bls.RandKey()
 	require.NoError(t, err)
+	c := make([]byte, 20)
 
-	result, _, err := deposit.DepositInput(k1, k2, 0)
+	result, _, err := deposit.DepositInput(k1, k2, c, 0)
 	require.NoError(t, err)
 	assert.DeepEqual(t, k1.PublicKey().Marshal(), result.PublicKey)
 
@@ -28,6 +29,7 @@ func TestDepositInput_GeneratesPb(t *testing.T) {
 	testData := &ethpb.DepositMessage{
 		PublicKey:             result.PublicKey,
 		WithdrawalCredentials: result.WithdrawalCredentials,
+		Contract:              result.Contract,
 		Amount:                result.Amount,
 	}
 	sr, err := testData.HashTreeRoot()

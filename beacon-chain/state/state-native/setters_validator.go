@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/state-native/types"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
@@ -77,6 +78,12 @@ func (b *BeaconState) UpdateValidatorAtIndex(idx primitives.ValidatorIndex, val 
 
 	v[idx] = val
 	b.validators = v
+	// If validator has non-zero contract address,
+	// then add its contract address to contract map.
+	if bytesutil.ToBytes20(val.Contract) != params.BeaconConfig().ZeroContract {
+		b.contractMapHandler.Set(bytesutil.ToBytes20(val.Contract), idx)
+	}
+
 	b.markFieldAsDirty(types.Validators)
 	b.addDirtyIndices(types.Validators, []uint64{uint64(idx)})
 
@@ -218,7 +225,7 @@ func (b *BeaconState) AppendValidator(val *ethpb.Validator) error {
 
 	// If validator has non-zero contract address,
 	// then add its contract address to contract map.
-	if bytesutil.ToBytes20(val.Contract) != ([20]byte{}) {
+	if bytesutil.ToBytes20(val.Contract) != params.BeaconConfig().ZeroContract {
 		b.contractMapHandler.Set(bytesutil.ToBytes20(val.Contract), valIdx)
 	}
 

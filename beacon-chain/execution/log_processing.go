@@ -28,16 +28,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	depositEventSignature = hash.HashKeccak256([]byte("DepositEvent(bytes,bytes,bytes,bytes,bytes)"))
-)
+var depositEventSignature = hash.HashKeccak256([]byte("DepositEvent(bytes,bytes,bytes,bytes,bytes,bytes)"))
 
-const eth1DataSavingInterval = 1000
-const maxTolerableDifference = 50
-const defaultEth1HeaderReqLimit = uint64(1000)
-const depositLogRequestLimit = 10000
-const additiveFactorMultiplier = 0.10
-const multiplicativeDecreaseDivisor = 2
+const (
+	eth1DataSavingInterval        = 1000
+	maxTolerableDifference        = 50
+	defaultEth1HeaderReqLimit     = uint64(1000)
+	depositLogRequestLimit        = 10000
+	additiveFactorMultiplier      = 0.10
+	multiplicativeDecreaseDivisor = 2
+)
 
 var errTimedOut = errors.New("net/http: request canceled")
 
@@ -109,7 +109,7 @@ func (s *Service) ProcessLog(ctx context.Context, depositLog gethtypes.Log) erro
 // the eth1 chain by trying to ascertain which participant deposited
 // in the contract.
 func (s *Service) ProcessDepositLog(ctx context.Context, depositLog gethtypes.Log) error {
-	pubkey, withdrawalCredentials, amount, signature, merkleTreeIndex, err := contracts.UnpackDepositLogData(depositLog.Data)
+	pubkey, withdrawalCredentials, contractAddress, amount, signature, merkleTreeIndex, err := contracts.UnpackDepositLogData(depositLog.Data)
 	if err != nil {
 		return errors.Wrap(err, "Could not unpack log")
 	}
@@ -133,6 +133,7 @@ func (s *Service) ProcessDepositLog(ctx context.Context, depositLog gethtypes.Lo
 	depositData := &ethpb.Deposit_Data{
 		Amount:                bytesutil.FromBytes8(amount),
 		PublicKey:             pubkey,
+		Contract:              contractAddress,
 		Signature:             signature,
 		WithdrawalCredentials: withdrawalCredentials,
 	}
@@ -509,7 +510,8 @@ func (s *Service) processChainStartFromHeader(ctx context.Context, header *types
 }
 
 func (s *Service) checkHeaderRange(ctx context.Context, start, end uint64, headersMap map[uint64]*types.HeaderInfo,
-	requestHeaders func(uint64, uint64) error) error {
+	requestHeaders func(uint64, uint64) error,
+) error {
 	for i := start; i <= end; i++ {
 		if !s.chainStartData.Chainstarted {
 			h, ok := headersMap[i]
