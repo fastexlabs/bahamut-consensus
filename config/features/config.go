@@ -60,7 +60,7 @@ type Flags struct {
 	SaveFullExecutionPayloads bool // Save full beacon blocks with execution payloads in the database.
 	EnableStartOptimistic     bool // EnableStartOptimistic treats every block as optimistic at startup.
 
-	DisableStakinContractCheck bool // Disables check for deposit contract when proposing blocks
+	DisableStakingContractCheck bool // Disables check for deposit contract when proposing blocks
 
 	EnableVerboseSigVerification bool // EnableVerboseSigVerification specifies whether to verify individual signature if batch verification fails
 	EnableOptionalEngineMethods  bool // EnableOptionalEngineMethods specifies whether to activate capella specific engine methods
@@ -186,7 +186,7 @@ func ConfigureBeaconChain(ctx *cli.Context) error {
 	}
 	if ctx.Bool(disableStakinContractCheck.Name) {
 		logEnabled(disableStakinContractCheck)
-		cfg.DisableStakinContractCheck = true
+		cfg.DisableStakingContractCheck = true
 	}
 	if ctx.Bool(SaveFullExecutionPayloads.Name) {
 		logEnabled(SaveFullExecutionPayloads)
