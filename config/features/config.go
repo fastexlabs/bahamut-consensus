@@ -31,8 +31,10 @@ import (
 
 var log = logrus.WithField("prefix", "flags")
 
-const enabledFeatureFlag = "Enabled feature flag"
-const disabledFeatureFlag = "Disabled feature flag"
+const (
+	enabledFeatureFlag  = "Enabled feature flag"
+	disabledFeatureFlag = "Disabled feature flag"
+)
 
 // Flags is a struct to represent which features the client will perform on runtime.
 type Flags struct {
@@ -72,8 +74,10 @@ type Flags struct {
 	KeystoreImportDebounceInterval time.Duration
 }
 
-var featureConfig *Flags
-var featureConfigLock sync.RWMutex
+var (
+	featureConfig     *Flags
+	featureConfigLock sync.RWMutex
+)
 
 // Get retrieves feature config.
 func Get() *Flags {
@@ -111,7 +115,14 @@ func InitWithReset(c *Flags) func() {
 
 // configureTestnet sets the config according to specified testnet flag
 func configureTestnet(ctx *cli.Context) error {
-	if ctx.Bool(PraterTestnet.Name) {
+	if ctx.Bool(OasisTestnet.Name) {
+		log.Warn("Running on the Oasis Testnet")
+		if err := params.SetActive(params.OasisConfig().Copy()); err != nil {
+			return err
+		}
+		applyOasisFeatureFlags(ctx)
+		params.UseOasisNetworkConfig()
+	} else if ctx.Bool(PraterTestnet.Name) {
 		log.Warn("Running on the Prater Testnet")
 		if err := params.SetActive(params.PraterConfig().Copy()); err != nil {
 			return err
@@ -136,6 +147,10 @@ func configureTestnet(ctx *cli.Context) error {
 		}
 	}
 	return nil
+}
+
+// Insert feature flags within the function to be enabled for Oasis testnet.
+func applyOasisFeatureFlags(ctx *cli.Context) {
 }
 
 // Insert feature flags within the function to be enabled for Prater testnet.

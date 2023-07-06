@@ -35,7 +35,6 @@ var phase0Fields = []types.FieldIndex{
 	types.Eth1DataVotes,
 	types.Eth1DepositIndex,
 	types.SharedActivity,
-	types.ExecutionHeight,
 	types.Validators,
 	types.Balances,
 	types.Activities,
@@ -62,7 +61,6 @@ var altairFields = []types.FieldIndex{
 	types.Eth1DataVotes,
 	types.Eth1DepositIndex,
 	types.SharedActivity,
-	types.ExecutionHeight,
 	types.Validators,
 	types.Balances,
 	types.Activities,
@@ -155,7 +153,6 @@ func InitializeFromProtoUnsafePhase0(st *ethpb.BeaconState) (state.BeaconState, 
 		eth1DataVotes:               st.Eth1DataVotes,
 		eth1DepositIndex:            st.Eth1DepositIndex,
 		sharedActivity:              st.SharedActivity,
-		executionHeight:             st.ExecutionHeight,
 		validators:                  st.Validators,
 		balances:                    st.Balances,
 		activities:                  st.Activities,
@@ -246,7 +243,6 @@ func InitializeFromProtoUnsafeAltair(st *ethpb.BeaconStateAltair) (state.BeaconS
 		eth1DataVotes:               st.Eth1DataVotes,
 		eth1DepositIndex:            st.Eth1DepositIndex,
 		sharedActivity:              st.SharedActivity,
-		executionHeight:             st.ExecutionHeight,
 		validators:                  st.Validators,
 		balances:                    st.Balances,
 		activities:                  st.Activities,
@@ -341,7 +337,6 @@ func InitializeFromProtoUnsafeBellatrix(st *ethpb.BeaconStateBellatrix) (state.B
 		eth1DataVotes:                st.Eth1DataVotes,
 		eth1DepositIndex:             st.Eth1DepositIndex,
 		sharedActivity:               st.SharedActivity,
-		executionHeight:              st.ExecutionHeight,
 		validators:                   st.Validators,
 		balances:                     st.Balances,
 		activities:                   st.Activities,
@@ -438,7 +433,6 @@ func InitializeFromProtoUnsafeCapella(st *ethpb.BeaconStateCapella) (state.Beaco
 		eth1DataVotes:                       st.Eth1DataVotes,
 		eth1DepositIndex:                    st.Eth1DepositIndex,
 		sharedActivity:                      st.SharedActivity,
-		executionHeight:                     st.ExecutionHeight,
 		validators:                          st.Validators,
 		balances:                            st.Balances,
 		activities:                          st.Activities,
@@ -524,7 +518,6 @@ func (b *BeaconState) Copy() state.BeaconState {
 		genesisTime:                  b.genesisTime,
 		slot:                         b.slot,
 		eth1DepositIndex:             b.eth1DepositIndex,
-		executionHeight:              b.executionHeight,
 		nextWithdrawalIndex:          b.nextWithdrawalIndex,
 		nextWithdrawalValidatorIndex: b.nextWithdrawalValidatorIndex,
 
@@ -733,8 +726,6 @@ func (b *BeaconState) rootSelector(ctx context.Context, field types.FieldIndex) 
 		return ssz.Uint64Root(uint64(b.slot)), nil
 	case types.Eth1DepositIndex:
 		return ssz.Uint64Root(b.eth1DepositIndex), nil
-	case types.ExecutionHeight:
-		return ssz.Uint64Root(b.executionHeight), nil
 	case types.Fork:
 		return ssz.ForkRoot(b.fork)
 	case types.LatestBlockHeader:

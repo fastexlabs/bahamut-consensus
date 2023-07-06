@@ -391,7 +391,6 @@ type BeaconBlockBodyJson struct {
 	ActivityChanges   []*ActivityChangeJson      `json:"activity_changes"`
 	TransactionsCount string                     `json:"transactions_count"`
 	BaseFee           string                     `json:"base_fee"`
-	ExecutionHeight   string                     `json:"execution_height"`
 }
 
 type SignedBeaconBlockContainerV2Json struct {
@@ -501,7 +500,6 @@ type BeaconBlockBodyAltairJson struct {
 	ActivityChanges   []*ActivityChangeJson      `json:"activity_changes"`
 	TransactionsCount string                     `json:"transactions_count"`
 	BaseFee           string                     `json:"base_fee"`
-	ExecutionHeight   string                     `json:"execution_height"`
 	SyncAggregate     *SyncAggregateJson         `json:"sync_aggregate"`
 }
 
@@ -517,7 +515,6 @@ type BeaconBlockBodyBellatrixJson struct {
 	ActivityChanges   []*ActivityChangeJson      `json:"activity_changes"`
 	TransactionsCount string                     `json:"transactions_count"`
 	BaseFee           string                     `json:"base_fee"`
-	ExecutionHeight   string                     `json:"execution_height"`
 	SyncAggregate     *SyncAggregateJson         `json:"sync_aggregate"`
 	ExecutionPayload  *ExecutionPayloadJson      `json:"execution_payload"`
 }
@@ -534,7 +531,6 @@ type BeaconBlockBodyCapellaJson struct {
 	ActivityChanges       []*ActivityChangeJson             `json:"activity_changes"`
 	TransactionsCount     string                            `json:"transactions_count"`
 	BaseFee               string                            `json:"base_fee"`
-	ExecutionHeight       string                            `json:"execution_height"`
 	SyncAggregate         *SyncAggregateJson                `json:"sync_aggregate"`
 	ExecutionPayload      *ExecutionPayloadCapellaJson      `json:"execution_payload"`
 	BLSToExecutionChanges []*SignedBLSToExecutionChangeJson `json:"bls_to_execution_changes"`
@@ -552,7 +548,6 @@ type BlindedBeaconBlockBodyBellatrixJson struct {
 	ActivityChanges        []*ActivityChangeJson       `json:"activity_changes"`
 	TransactionsCount      string                      `json:"transactions_count"`
 	BaseFee                string                      `json:"base_fee"`
-	ExecutionHeight        string                      `json:"execution_height"`
 	SyncAggregate          *SyncAggregateJson          `json:"sync_aggregate"`
 	ExecutionPayloadHeader *ExecutionPayloadHeaderJson `json:"execution_payload_header"`
 }
@@ -569,7 +564,6 @@ type BlindedBeaconBlockBodyCapellaJson struct {
 	ActivityChanges        []*ActivityChangeJson              `json:"activity_changes"`
 	TransactionsCount      string                             `json:"transactions_count"`
 	BaseFee                string                             `json:"base_fee"`
-	ExecutionHeight        string                             `json:"execution_height"`
 	SyncAggregate          *SyncAggregateJson                 `json:"sync_aggregate"`
 	ExecutionPayloadHeader *ExecutionPayloadHeaderCapellaJson `json:"execution_payload_header"`
 	BLSToExecutionChanges  []*SignedBLSToExecutionChangeJson  `json:"bls_to_execution_changes"`

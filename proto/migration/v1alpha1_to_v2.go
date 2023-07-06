@@ -299,7 +299,6 @@ func V1Alpha1BeaconBlockBellatrixToV2Blinded(v1alpha1Block *ethpbalpha.BeaconBlo
 		ActivityChanges:   resultActivityChanges,
 		TransactionsCount: v1alpha1Block.Body.TransactionsCount,
 		BaseFee:           v1alpha1Block.Body.BaseFee,
-		ExecutionHeight:   v1alpha1Block.Body.ExecutionHeight,
 		SyncAggregate: &ethpbv1.SyncAggregate{
 			SyncCommitteeBits:      bytesutil.SafeCopyBytes(v1alpha1Block.Body.SyncAggregate.SyncCommitteeBits),
 			SyncCommitteeSignature: bytesutil.SafeCopyBytes(v1alpha1Block.Body.SyncAggregate.SyncCommitteeSignature),
@@ -502,7 +501,6 @@ func V1Alpha1BeaconBlockCapellaToV2Blinded(v1alpha1Block *ethpbalpha.BeaconBlock
 		ActivityChanges:   resultActivityChanges,
 		TransactionsCount: v1alpha1Block.Body.TransactionsCount,
 		BaseFee:           v1alpha1Block.Body.BaseFee,
-		ExecutionHeight:   v1alpha1Block.Body.ExecutionHeight,
 		SyncAggregate: &ethpbv1.SyncAggregate{
 			SyncCommitteeBits:      bytesutil.SafeCopyBytes(v1alpha1Block.Body.SyncAggregate.SyncCommitteeBits),
 			SyncCommitteeSignature: bytesutil.SafeCopyBytes(v1alpha1Block.Body.SyncAggregate.SyncCommitteeSignature),

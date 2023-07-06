@@ -177,7 +177,6 @@ type ReadOnlyEth1Data interface {
 	Eth1DataVotes() []*ethpb.Eth1Data
 	Eth1DepositIndex() uint64
 	SharedActivity() *ethpb.SharedActivity
-	ExecutionHeight() uint64
 }
 
 // ReadOnlyAttestations defines a struct which only has read access to attestations methods.
@@ -229,7 +228,6 @@ type WriteOnlyEth1Data interface {
 	AppendEth1DataVotes(val *ethpb.Eth1Data) error
 	SetEth1DepositIndex(val uint64) error
 	SetSharedActivity(val *ethpb.SharedActivity) error
-	SetExecutionHeight(val uint64) error
 }
 
 // WriteOnlyValidators defines a struct which only has write access to validators methods.

@@ -51,8 +51,6 @@ func (f FieldIndex) String(_ int) string {
 		return "eth1DepositIndex"
 	case SharedActivity:
 		return "sharedActivity"
-	case ExecutionHeight:
-		return "executionHeight"
 	case Validators:
 		return "validators"
 	case Balances:
@@ -128,44 +126,42 @@ func (f FieldIndex) RealPosition() int {
 		return 10
 	case SharedActivity:
 		return 11
-	case ExecutionHeight:
-		return 12
 	case Validators:
-		return 13
+		return 12
 	case Balances:
-		return 14
+		return 13
 	case Activities:
-		return 15
+		return 14
 	case RandaoMixes:
-		return 16
+		return 15
 	case Slashings:
-		return 17
+		return 16
 	case PreviousEpochAttestations, PreviousEpochParticipationBits:
-		return 18
+		return 17
 	case CurrentEpochAttestations, CurrentEpochParticipationBits:
-		return 19
+		return 18
 	case JustificationBits:
-		return 20
+		return 19
 	case PreviousJustifiedCheckpoint:
-		return 21
+		return 20
 	case CurrentJustifiedCheckpoint:
-		return 22
+		return 21
 	case FinalizedCheckpoint:
-		return 23
+		return 22
 	case InactivityScores:
-		return 24
+		return 23
 	case CurrentSyncCommittee:
-		return 25
+		return 24
 	case NextSyncCommittee:
-		return 26
+		return 25
 	case LatestExecutionPayloadHeader, LatestExecutionPayloadHeaderCapella:
-		return 27
+		return 26
 	case NextWithdrawalIndex:
-		return 28
+		return 27
 	case NextWithdrawalValidatorIndex:
-		return 29
+		return 28
 	case HistoricalSummaries:
-		return 30
+		return 29
 	default:
 		return -1
 	}
@@ -201,7 +197,6 @@ const (
 	Eth1DataVotes
 	Eth1DepositIndex
 	SharedActivity
-	ExecutionHeight
 	Validators
 	Balances
 	Activities

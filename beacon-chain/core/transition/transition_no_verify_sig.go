@@ -250,24 +250,11 @@ func ProcessOperationsNoVerifyAttsSigs(
 		return nil, errors.Wrap(err, "could not verify operation lengths")
 	}
 
+	if err := ValidateActivitiesLengths(ctx, state, signedBeaconBlock.Block().Body()); err != nil {
+		return nil, errors.Wrap(err, "could not verify activities length")
+	}
+
 	var err error
-	mergeComplete, err := b.IsMergeTransitionComplete(state)
-	if err != nil {
-		return nil, err
-	}
-
-	if !mergeComplete {
-		if len(signedBeaconBlock.Block().Body().ActivityChanges()) > 0 {
-			return nil, errors.New("activity changes in pre-merge block")
-		}
-		if signedBeaconBlock.Block().Body().TransactionsCount() > 0 {
-			return nil, errors.New("transactions count in pre-merge block")
-		}
-		if signedBeaconBlock.Block().Body().BaseFee() > 0 {
-			return nil, errors.New("transactions count in pre-merge block")
-		}
-	}
-
 	switch signedBeaconBlock.Version() {
 	case version.Phase0:
 		state, err = phase0Operations(ctx, state, signedBeaconBlock)
@@ -284,6 +271,26 @@ func ProcessOperationsNoVerifyAttsSigs(
 	}
 
 	return state, nil
+}
+
+func ValidateActivitiesLengths(ctx context.Context, state state.BeaconState, blk interfaces.ReadOnlyBeaconBlockBody) error {
+	mergeComplete, err := b.IsMergeTransitionComplete(state)
+	if err != nil {
+		return  err
+	}
+
+	if !mergeComplete {
+		if len(blk.ActivityChanges()) > 0 {
+			return errors.New("activity changes are not allowed for inclusion in pre-merge block")
+		}
+		if blk.TransactionsCount() > 0 {
+			return errors.New("transactions count is not allowed for inclusion in pre-merge block")
+		}
+		if blk.BaseFee() > 0 {
+			return errors.New("base fee is not allowed for inclusion in pre-merge block")
+		}
+	}
+	return nil
 }
 
 // ProcessBlockForStateRoot processes the state for state root computation. It skips proposer signature
@@ -414,10 +421,6 @@ func altairOperations(
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process base fee")
 	}
-	st, err = b.ProcessExecutionHeight(ctx, st, signedBeaconBlock.Block().Body().ExecutionHeight())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not process execution height")
-	}
 	return b.ProcessBLSToExecutionChanges(st, signedBeaconBlock)
 }
 
@@ -457,10 +460,6 @@ func phase0Operations(
 	st, err = b.ProcessBaseFee(ctx, st, signedBeaconBlock.Block().Body().BaseFee())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not process base fee")
-	}
-	st, err = b.ProcessExecutionHeight(ctx, st, signedBeaconBlock.Block().Body().ExecutionHeight())
-	if err != nil {
-		return nil, errors.Wrap(err, "could not process execution height")
 	}
 	return st, nil
 }

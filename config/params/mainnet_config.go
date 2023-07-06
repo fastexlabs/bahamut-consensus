@@ -73,7 +73,7 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	FarFutureSlot:            math.MaxUint64,
 	BaseRewardsPerEpoch:      4,
 	DepositContractTreeDepth: 32,
-	GenesisDelay:             604800, // 1 week.
+	GenesisDelay:             28800, // 3 days.
 
 	// Misc constant.
 	TargetCommitteeSize:            128,
@@ -82,15 +82,15 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	MinPerEpochChurnLimit:          4,
 	ChurnLimitQuotient:             1 << 16,
 	ShuffleRoundCount:              90,
-	MinGenesisActiveValidatorCount: 16384,
-	MinGenesisTime:                 1606824000, // Dec 1, 2020, 12pm UTC.
+	MinGenesisActiveValidatorCount: 4096,
+	MinGenesisTime:                 1689321600, // Jul 12, 2023, 8am UTC.
 	TargetAggregatorsPerCommittee:  16,
 	HysteresisQuotient:             4,
 	HysteresisDownwardMultiplier:   1,
 	HysteresisUpwardMultiplier:     5,
 
 	// Gwei value constants.
-	MinDepositAmount:          1 * 1e9,
+	MinDepositAmount:          256 * 1e9,
 	MaxEffectiveBalance:       8192 * 1e9,
 	EjectionBalance:           4096 * 1e9,
 	EffectiveBalanceIncrement: 1 * 1e9,
@@ -121,10 +121,9 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	IntervalsPerSlot:                3,
 
 	// Ethereum PoW parameters.
-    // TODO(fastex-chain): Change Chain and Network IDs for FastexChain.
-	DepositChainID:         1, // Chain ID of eth1 mainnet.
-	DepositNetworkID:       1, // Network ID of eth1 mainnet.
-	DepositContractAddress: "0x00000000219ab540356cBB839Cbe05303d7705Fa",
+	DepositChainID:         5165, // Chain ID of eth1 mainnet.
+	DepositNetworkID:       5165, // Network ID of eth1 mainnet.
+	DepositContractAddress: "0x00000000219ab540356cBB839Cbe05303d7705Fa", // TODO(fastex): set Fasttoken deposit contract address
 
 	// Validator params.
 	RandomSubnetsPerValidator:         1 << 0,
@@ -145,7 +144,7 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	ValidatorRegistryLimit:    1099511627776,
 
 	// Reward and penalty quotients constants.
-	BaseRewardFactor:               56,
+	BaseRewardFactor:               156,
 	WhistleBlowerRewardQuotient:    512,
 	ProposerRewardQuotient:         8,
 	InactivityPenaltyQuotient:      67108864,
@@ -197,10 +196,10 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	GenesisCountdownInterval:       time.Minute,
 	ConfigName:                     MainnetName,
 	PresetBase:                     "mainnet",
-	BeaconStateFieldCount:          24,
-	BeaconStateAltairFieldCount:    27,
-	BeaconStateBellatrixFieldCount: 28,
-	BeaconStateCapellaFieldCount:   31,
+	BeaconStateFieldCount:          23,
+	BeaconStateAltairFieldCount:    26,
+	BeaconStateBellatrixFieldCount: 27,
+	BeaconStateCapellaFieldCount:   30,
 
 	// Slasher related values.
 	WeakSubjectivityPeriod:          54000,
@@ -211,13 +210,14 @@ var mainnetBeaconConfig = &BeaconChainConfig{
 	SafetyDecay: 10,
 
 	// Fork related values.
+	// TODO(fastex): set fork shcedule
 	GenesisEpoch:         genesisForkEpoch,
-	GenesisForkVersion:   []byte{0, 0, 0, 0},
-	AltairForkVersion:    []byte{1, 0, 0, 0},
+	GenesisForkVersion:   []byte{0, 0, 51, 65},
+	AltairForkVersion:    []byte{1, 0, 51, 65},
 	AltairForkEpoch:      mainnetAltairForkEpoch,
-	BellatrixForkVersion: []byte{2, 0, 0, 0},
+	BellatrixForkVersion: []byte{2, 0, 51, 65},
 	BellatrixForkEpoch:   mainnetBellatrixForkEpoch,
-	CapellaForkVersion:   []byte{3, 0, 0, 0},
+	CapellaForkVersion:   []byte{3, 0, 51, 65},
 	CapellaForkEpoch:     194048,
 
 	// New values introduced in Altair hard fork 1.

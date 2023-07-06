@@ -63,7 +63,6 @@ func UpgradeToCapella(state state.BeaconState) (state.BeaconState, error) {
 		Eth1DataVotes:               state.Eth1DataVotes(),
 		Eth1DepositIndex:            state.Eth1DepositIndex(),
 		SharedActivity:              state.SharedActivity(),
-		ExecutionHeight:             state.ExecutionHeight(),
 		Validators:                  state.Validators(),
 		Balances:                    state.Balances(),
 		Activities:                  state.Activities(),

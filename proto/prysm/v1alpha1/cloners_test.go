@@ -605,7 +605,6 @@ func genBeaconBlockBody() *v1alpha1.BeaconBlockBody {
 		ActivityChanges:   genActivityChanges(5),
 		TransactionsCount: 4,
 		BaseFee:           5,
-		ExecutionHeight:   6,
 	}
 }
 
@@ -756,7 +755,6 @@ func genBeaconBlockBodyAltair() *v1alpha1.BeaconBlockBodyAltair {
 		ActivityChanges:   genActivityChanges(5),
 		TransactionsCount: 4,
 		BaseFee:           5,
-		ExecutionHeight:   6,
 		SyncAggregate:     genSyncAggregate(),
 	}
 }
@@ -791,7 +789,6 @@ func genBeaconBlockBodyBellatrix() *v1alpha1.BeaconBlockBodyBellatrix {
 		ActivityChanges:   genActivityChanges(5),
 		TransactionsCount: 4,
 		BaseFee:           5,
-		ExecutionHeight:   6,
 		SyncAggregate:     genSyncAggregate(),
 		ExecutionPayload:  genPayload(),
 	}
@@ -827,7 +824,6 @@ func genBeaconBlockBodyCapella() *v1alpha1.BeaconBlockBodyCapella {
 		ActivityChanges:       genActivityChanges(5),
 		TransactionsCount:     4,
 		BaseFee:               5,
-		ExecutionHeight:       6,
 		SyncAggregate:         genSyncAggregate(),
 		ExecutionPayload:      genPayloadCapella(),
 		BlsToExecutionChanges: genBLSToExecutionChanges(10),
@@ -864,7 +860,6 @@ func genBlindedBeaconBlockBodyCapella() *v1alpha1.BlindedBeaconBlockBodyCapella 
 		ActivityChanges:        genActivityChanges(5),
 		TransactionsCount:      4,
 		BaseFee:                5,
-		ExecutionHeight:        6,
 		SyncAggregate:          genSyncAggregate(),
 		ExecutionPayloadHeader: genPayloadHeaderCapella(),
 		BlsToExecutionChanges:  genBLSToExecutionChanges(10),

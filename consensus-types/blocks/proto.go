@@ -243,7 +243,6 @@ func (b *BeaconBlockBody) Proto() (proto.Message, error) {
 			ActivityChanges:   b.activityChanges,
 			TransactionsCount: b.transactionsCount,
 			BaseFee:           b.baseFee,
-			ExecutionHeight:   b.executionHeight,
 		}, nil
 	case version.Altair:
 		return &eth.BeaconBlockBodyAltair{
@@ -258,7 +257,6 @@ func (b *BeaconBlockBody) Proto() (proto.Message, error) {
 			ActivityChanges:   b.activityChanges,
 			TransactionsCount: b.transactionsCount,
 			BaseFee:           b.baseFee,
-			ExecutionHeight:   b.executionHeight,
 			SyncAggregate:     b.syncAggregate,
 		}, nil
 	case version.Bellatrix:
@@ -283,7 +281,6 @@ func (b *BeaconBlockBody) Proto() (proto.Message, error) {
 				ActivityChanges:        b.activityChanges,
 				TransactionsCount:      b.transactionsCount,
 				BaseFee:                b.baseFee,
-				ExecutionHeight:        b.executionHeight,
 				SyncAggregate:          b.syncAggregate,
 				ExecutionPayloadHeader: ph,
 			}, nil
@@ -308,7 +305,6 @@ func (b *BeaconBlockBody) Proto() (proto.Message, error) {
 			ActivityChanges:   b.activityChanges,
 			TransactionsCount: b.transactionsCount,
 			BaseFee:           b.baseFee,
-			ExecutionHeight:   b.executionHeight,
 			SyncAggregate:     b.syncAggregate,
 			ExecutionPayload:  p,
 		}, nil
@@ -334,7 +330,6 @@ func (b *BeaconBlockBody) Proto() (proto.Message, error) {
 				ActivityChanges:        b.activityChanges,
 				TransactionsCount:      b.transactionsCount,
 				BaseFee:                b.baseFee,
-				ExecutionHeight:        b.executionHeight,
 				SyncAggregate:          b.syncAggregate,
 				ExecutionPayloadHeader: ph,
 				BlsToExecutionChanges:  b.blsToExecutionChanges,
@@ -360,7 +355,6 @@ func (b *BeaconBlockBody) Proto() (proto.Message, error) {
 			ActivityChanges:       b.activityChanges,
 			TransactionsCount:     b.transactionsCount,
 			BaseFee:               b.baseFee,
-			ExecutionHeight:       b.executionHeight,
 			SyncAggregate:         b.syncAggregate,
 			ExecutionPayload:      p,
 			BlsToExecutionChanges: b.blsToExecutionChanges,
@@ -611,7 +605,6 @@ func initBlockBodyFromProtoPhase0(pb *eth.BeaconBlockBody) (*BeaconBlockBody, er
 		activityChanges:   pb.ActivityChanges,
 		transactionsCount: pb.TransactionsCount,
 		baseFee:           pb.BaseFee,
-		executionHeight:   pb.ExecutionHeight,
 	}
 	return b, nil
 }
@@ -635,7 +628,6 @@ func initBlockBodyFromProtoAltair(pb *eth.BeaconBlockBodyAltair) (*BeaconBlockBo
 		activityChanges:   pb.ActivityChanges,
 		transactionsCount: pb.TransactionsCount,
 		baseFee:           pb.BaseFee,
-		executionHeight:   pb.ExecutionHeight,
 		syncAggregate:     pb.SyncAggregate,
 	}
 	return b, nil
@@ -665,7 +657,6 @@ func initBlockBodyFromProtoBellatrix(pb *eth.BeaconBlockBodyBellatrix) (*BeaconB
 		activityChanges:   pb.ActivityChanges,
 		transactionsCount: pb.TransactionsCount,
 		baseFee:           pb.BaseFee,
-		executionHeight:   pb.ExecutionHeight,
 		syncAggregate:     pb.SyncAggregate,
 		executionPayload:  p,
 	}
@@ -696,7 +687,6 @@ func initBlindedBlockBodyFromProtoBellatrix(pb *eth.BlindedBeaconBlockBodyBellat
 		activityChanges:        pb.ActivityChanges,
 		transactionsCount:      pb.TransactionsCount,
 		baseFee:                pb.BaseFee,
-		executionHeight:        pb.ExecutionHeight,
 		syncAggregate:          pb.SyncAggregate,
 		executionPayloadHeader: ph,
 	}
@@ -727,7 +717,6 @@ func initBlockBodyFromProtoCapella(pb *eth.BeaconBlockBodyCapella) (*BeaconBlock
 		activityChanges:       pb.ActivityChanges,
 		transactionsCount:     pb.TransactionsCount,
 		baseFee:               pb.BaseFee,
-		executionHeight:       pb.ExecutionHeight,
 		syncAggregate:         pb.SyncAggregate,
 		executionPayload:      p,
 		blsToExecutionChanges: pb.BlsToExecutionChanges,
@@ -759,7 +748,6 @@ func initBlindedBlockBodyFromProtoCapella(pb *eth.BlindedBeaconBlockBodyCapella)
 		activityChanges:        pb.ActivityChanges,
 		transactionsCount:      pb.TransactionsCount,
 		baseFee:                pb.BaseFee,
-		executionHeight:        pb.ExecutionHeight,
 		syncAggregate:          pb.SyncAggregate,
 		executionPayloadHeader: ph,
 		blsToExecutionChanges:  pb.BlsToExecutionChanges,

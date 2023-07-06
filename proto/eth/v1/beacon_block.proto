@@ -91,9 +91,6 @@ message BeaconBlockBody {
 
     // The base fee in EL block.
     uint64 base_fee = 11;
-
-    // The latest processed EL block number.
-    uint64 execution_height = 12;
 }
 
 // Proposer slashings are proofs that a slashable offense has been committed by

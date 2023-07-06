@@ -71,13 +71,3 @@ func (b *BeaconState) SetSharedActivity(val *ethpb.SharedActivity) error {
 	b.markFieldAsDirty(types.SharedActivity)
 	return nil
 }
-
-// SetExecutionHeight for the beacon state.
-func (b *BeaconState) SetExecutionHeight(val uint64) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	b.executionHeight = val
-	b.markFieldAsDirty(types.ExecutionHeight)
-	return nil
-}

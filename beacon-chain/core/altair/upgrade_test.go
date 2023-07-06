@@ -91,7 +91,6 @@ func TestUpgradeToAltair(t *testing.T) {
 	require.DeepSSZEqual(t, preForkState.Eth1DataVotes(), aState.Eth1DataVotes())
 	require.DeepSSZEqual(t, preForkState.Eth1DepositIndex(), aState.Eth1DepositIndex())
 	require.DeepSSZEqual(t, preForkState.SharedActivity(), aState.SharedActivity())
-	require.DeepSSZEqual(t, preForkState.ExecutionHeight(), aState.ExecutionHeight())
 	require.DeepSSZEqual(t, preForkState.Validators(), aState.Validators())
 	require.DeepSSZEqual(t, preForkState.Balances(), aState.Balances())
 	require.DeepSSZEqual(t, preForkState.Activities(), aState.Activities())

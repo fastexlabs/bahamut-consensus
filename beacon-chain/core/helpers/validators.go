@@ -505,17 +505,17 @@ func ComputeProposerIndex(
 //	      and validator.effective_balance == MAX_EFFECTIVE_BALANCE
 //	  )
 func IsEligibleForActivationQueue(validator *ethpb.Validator) bool {
-	return isEligibileForActivationQueue(validator.ActivationEligibilityEpoch, validator.EffectiveBalance)
+	return isEligibleForActivationQueue(validator.ActivationEligibilityEpoch, validator.EffectiveBalance)
 }
 
 // IsEligibleForActivationQueueUsingTrie checks if the read-only validator is eligible to
 // be placed into the activation queue.
 func IsEligibleForActivationQueueUsingTrie(validator state.ReadOnlyValidator) bool {
-	return isEligibileForActivationQueue(validator.ActivationEligibilityEpoch(), validator.EffectiveBalance())
+	return isEligibleForActivationQueue(validator.ActivationEligibilityEpoch(), validator.EffectiveBalance())
 }
 
 // isEligibleForActivationQueue carries out the logic for IsEligibleForActivationQueue*
-func isEligibileForActivationQueue(activationEligibilityEpoch primitives.Epoch, effectiveBalance uint64) bool {
+func isEligibleForActivationQueue(activationEligibilityEpoch primitives.Epoch, effectiveBalance uint64) bool {
 	return activationEligibilityEpoch == params.BeaconConfig().FarFutureEpoch &&
 		effectiveBalance == params.BeaconConfig().MaxEffectiveBalance
 }

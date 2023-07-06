@@ -835,7 +835,6 @@ func bodyPbPhase0() *eth.BeaconBlockBody {
 		ActivityChanges:   f.activityChanges,
 		TransactionsCount: 128,
 		BaseFee:           128,
-		ExecutionHeight:   128,
 	}
 }
 
@@ -857,7 +856,6 @@ func bodyPbAltair() *eth.BeaconBlockBodyAltair {
 		ActivityChanges:   f.activityChanges,
 		TransactionsCount: 128,
 		BaseFee:           128,
-		ExecutionHeight:   128,
 		SyncAggregate:     f.syncAggregate,
 	}
 }
@@ -880,7 +878,6 @@ func bodyPbBellatrix() *eth.BeaconBlockBodyBellatrix {
 		ActivityChanges:   f.activityChanges,
 		TransactionsCount: 128,
 		BaseFee:           128,
-		ExecutionHeight:   128,
 		SyncAggregate:     f.syncAggregate,
 		ExecutionPayload:  f.execPayload,
 	}
@@ -904,7 +901,6 @@ func bodyPbBlindedBellatrix() *eth.BlindedBeaconBlockBodyBellatrix {
 		ActivityChanges:        f.activityChanges,
 		TransactionsCount:      128,
 		BaseFee:                128,
-		ExecutionHeight:        128,
 		SyncAggregate:          f.syncAggregate,
 		ExecutionPayloadHeader: f.execPayloadHeader,
 	}
@@ -928,7 +924,6 @@ func bodyPbCapella() *eth.BeaconBlockBodyCapella {
 		ActivityChanges:       f.activityChanges,
 		TransactionsCount:     128,
 		BaseFee:               128,
-		ExecutionHeight:       128,
 		SyncAggregate:         f.syncAggregate,
 		ExecutionPayload:      f.execPayloadCapella,
 		BlsToExecutionChanges: f.blsToExecutionChanges,
@@ -953,7 +948,6 @@ func bodyPbBlindedCapella() *eth.BlindedBeaconBlockBodyCapella {
 		ActivityChanges:        f.activityChanges,
 		TransactionsCount:      128,
 		BaseFee:                128,
-		ExecutionHeight:        128,
 		SyncAggregate:          f.syncAggregate,
 		ExecutionPayloadHeader: f.execPayloadHeaderCapella,
 		BlsToExecutionChanges:  f.blsToExecutionChanges,
@@ -979,7 +973,6 @@ func bodyPhase0() *BeaconBlockBody {
 		activityChanges:   f.activityChanges,
 		transactionsCount: 128,
 		baseFee:           128,
-		executionHeight:   128,
 	}
 }
 
@@ -1002,7 +995,6 @@ func bodyAltair() *BeaconBlockBody {
 		activityChanges:   f.activityChanges,
 		transactionsCount: 128,
 		baseFee:           128,
-		executionHeight:   128,
 		syncAggregate:     f.syncAggregate,
 	}
 }
@@ -1028,7 +1020,6 @@ func bodyBellatrix(t *testing.T) *BeaconBlockBody {
 		activityChanges:   f.activityChanges,
 		transactionsCount: 128,
 		baseFee:           128,
-		executionHeight:   128,
 		syncAggregate:     f.syncAggregate,
 		executionPayload:  p,
 	}
@@ -1056,7 +1047,6 @@ func bodyBlindedBellatrix(t *testing.T) *BeaconBlockBody {
 		activityChanges:        f.activityChanges,
 		transactionsCount:      128,
 		baseFee:                128,
-		executionHeight:        128,
 		syncAggregate:          f.syncAggregate,
 		executionPayloadHeader: ph,
 	}
@@ -1083,7 +1073,6 @@ func bodyCapella(t *testing.T) *BeaconBlockBody {
 		activityChanges:       f.activityChanges,
 		transactionsCount:     128,
 		baseFee:               128,
-		executionHeight:       128,
 		syncAggregate:         f.syncAggregate,
 		executionPayload:      p,
 		blsToExecutionChanges: f.blsToExecutionChanges,
@@ -1112,7 +1101,6 @@ func bodyBlindedCapella(t *testing.T) *BeaconBlockBody {
 		activityChanges:        f.activityChanges,
 		transactionsCount:      128,
 		baseFee:                128,
-		executionHeight:        128,
 		syncAggregate:          f.syncAggregate,
 		executionPayloadHeader: ph,
 		blsToExecutionChanges:  f.blsToExecutionChanges,

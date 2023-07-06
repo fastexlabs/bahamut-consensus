@@ -251,10 +251,6 @@ func (s *Service) ProcessChainStart(genesisTime uint64, eth1BlockHash [32]byte, 
 		DepositRoot:  root[:],
 		BlockHash:    eth1BlockHash[:],
 	}
-	if err := s.preGenesisState.SetExecutionHeight(blockNumber.Uint64()); err != nil {
-		log.Error(err)
-		return
-	}
 
 	log.WithFields(logrus.Fields{
 		"ChainStartTime": chainStartTime,

@@ -74,10 +74,8 @@ func TestServer_setActivities(t *testing.T) {
 		baseFee := blk.Block().Body().BaseFee()
 		transactionCount := blk.Block().Body().TransactionsCount()
 		activityChanges := blk.Block().Body().ActivityChanges()
-		executionHeight := blk.Block().Body().ExecutionHeight()
 		require.Equal(t, uint64(123), baseFee)
 		require.Equal(t, uint64(123), transactionCount)
-		require.Equal(t, uint64(1), executionHeight)
 		require.DeepSSZEqual(t, activityChangesFromEL, activityChanges)
 	})
 }

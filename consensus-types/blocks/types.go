@@ -55,7 +55,6 @@ type BeaconBlockBody struct {
 	activityChanges        []*eth.ActivityChange
 	transactionsCount      uint64
 	baseFee                uint64
-	executionHeight        uint64
 	syncAggregate          *eth.SyncAggregate
 	executionPayload       interfaces.ExecutionData
 	executionPayloadHeader interfaces.ExecutionData

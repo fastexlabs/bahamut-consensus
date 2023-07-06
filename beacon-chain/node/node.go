@@ -223,7 +223,7 @@ func New(cliCtx *cli.Context, opts ...Option) (*BeaconNode, error) {
 		return nil, err
 	}
 
-	log.Debugln("Registering Determinstic Genesis Service")
+	log.Debugln("Registering Deterministic Genesis Service")
 	if err := beacon.registerDeterministicGenesisService(); err != nil {
 		return nil, err
 	}

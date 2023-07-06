@@ -56,11 +56,12 @@ func (s *State) StateByRoot(ctx context.Context, blockRoot [32]byte) (state.Beac
 
 	// Genesis case. If block root is zero hash, short circuit to use genesis state stored in DB.
 	if blockRoot == params.BeaconConfig().ZeroHash {
-		root, err := s.beaconDB.GenesisBlockRoot(ctx)
-		if err != nil {
-			return nil, errors.Wrap(err, "could not get genesis block root")
-		}
-		blockRoot = root
+		return s.beaconDB.GenesisState(ctx)
+		// root, err := s.beaconDB.GenesisBlockRoot(ctx)
+		// if err != nil {
+		// 	return nil, errors.Wrap(err, "could not get genesis block root")
+		// }
+		// blockRoot = root
 	}
 	return s.loadStateByRoot(ctx, blockRoot)
 }
@@ -78,7 +79,7 @@ func (s *State) ActiveNonSlashedBalancesByRoot(ctx context.Context, blockRoot [3
 	epoch := time.CurrentEpoch(st)
 
 	balances := make([]uint64, st.NumValidators())
-	var balanceAccretor = func(idx int, val state.ReadOnlyValidator) error {
+	balanceAccretor := func(idx int, val state.ReadOnlyValidator) error {
 		if helpers.IsActiveNonSlashedValidatorUsingTrie(val, epoch) {
 			balances[idx] = val.EffectiveBalance()
 		} else {

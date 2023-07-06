@@ -114,18 +114,3 @@ func ProcessBaseFee(
 	}
 	return beaconState, nil
 }
-
-// ProcessExecutionHeight perform execution height updates.
-func ProcessExecutionHeight(
-	ctx context.Context,
-	beaconState state.BeaconState,
-	executionHeight uint64,
-) (state.BeaconState, error) {
-	ctx, span := trace.StartSpan(ctx, "core.ProcessExecutionHeight")
-	defer span.End()
-
-	if err := beaconState.SetExecutionHeight(executionHeight); err != nil {
-		return nil, err
-	}
-	return beaconState, nil
-}

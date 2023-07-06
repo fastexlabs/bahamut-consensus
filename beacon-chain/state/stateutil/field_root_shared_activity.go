@@ -12,5 +12,5 @@ func SharedActivityRoot(sharedActivity *ethpb.SharedActivity) ([32]byte, error) 
 	if sharedActivity == nil {
 		return [32]byte{}, errors.New("nil eth1 data")
 	}
-	return SharedActivityRootWithHaher(sharedActivity)
+	return SharedActivityRootWithHasher(sharedActivity)
 }

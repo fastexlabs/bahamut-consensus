@@ -22,10 +22,10 @@ func MinimalSpecConfig() *BeaconChainConfig {
 	minimalConfig.TargetAggregatorsPerCommittee = 16
 
 	// Gwei values
-	minimalConfig.MinDepositAmount = 1e9
-	minimalConfig.MaxEffectiveBalance = 32e9
-	minimalConfig.EjectionBalance = 16e9
-	minimalConfig.EffectiveBalanceIncrement = 1e9
+	minimalConfig.MinDepositAmount = 256 * 1e9
+	minimalConfig.MaxEffectiveBalance = 8192 * 1e9
+	minimalConfig.EjectionBalance = 4096 * 1e9
+	minimalConfig.EffectiveBalanceIncrement = 1 * 1e9
 
 	// Initial values
 	minimalConfig.BLSWithdrawalPrefixByte = byte(0)
@@ -44,7 +44,7 @@ func MinimalSpecConfig() *BeaconChainConfig {
 	minimalConfig.ShardCommitteePeriod = 64
 	minimalConfig.MinEpochsToInactivityPenalty = 4
 	minimalConfig.Eth1FollowDistance = 16
-	minimalConfig.SecondsPerETH1Block = 14
+	minimalConfig.SecondsPerETH1Block = 12
 
 	// State vector lengths
 	minimalConfig.EpochsPerHistoricalVector = 64
@@ -53,7 +53,7 @@ func MinimalSpecConfig() *BeaconChainConfig {
 	minimalConfig.ValidatorRegistryLimit = 1099511627776
 
 	// Reward and penalty quotients
-	minimalConfig.BaseRewardFactor = 64
+	minimalConfig.BaseRewardFactor = 156
 	minimalConfig.WhistleBlowerRewardQuotient = 512
 	minimalConfig.ProposerRewardQuotient = 8
 	minimalConfig.InactivityPenaltyQuotient = 33554432
@@ -94,8 +94,8 @@ func MinimalSpecConfig() *BeaconChainConfig {
 	minimalConfig.EpochsPerSyncCommitteePeriod = 8
 
 	// Ethereum PoW parameters.
-	minimalConfig.DepositChainID = 5   // Chain ID of eth1 goerli.
-	minimalConfig.DepositNetworkID = 5 // Network ID of eth1 goerli.
+	minimalConfig.DepositChainID = 4091   // Chain ID of eth1 goerli.
+	minimalConfig.DepositNetworkID = 4091 // Network ID of eth1 goerli.
 	minimalConfig.DepositContractAddress = "0x1234567890123456789012345678901234567890"
 	// 2**256-2**10 for fake minimal network
 	minimalConfig.TerminalTotalDifficulty = "115792089237316195423570985008687907853269984665640564039457584007913129638912"

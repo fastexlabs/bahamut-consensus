@@ -32,7 +32,6 @@ type BeaconState struct {
 	eth1DataVotes                       []*ethpb.Eth1Data
 	eth1DepositIndex                    uint64
 	sharedActivity                      *ethpb.SharedActivity
-	executionHeight                     uint64
 	validators                          []*ethpb.Validator
 	balances                            []uint64
 	activities                          []uint64

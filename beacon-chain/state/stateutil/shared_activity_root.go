@@ -9,8 +9,8 @@ import (
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 )
 
-// SharedActivityRootWithHaher returns the hash tree root of input `sharedActivity`
-func SharedActivityRootWithHaher(sharedActivity *ethpb.SharedActivity) ([32]byte, error) {
+// SharedActivityRootWithHasher returns the hash tree root of input `sharedActivity`
+func SharedActivityRootWithHasher(sharedActivity *ethpb.SharedActivity) ([32]byte, error) {
 	if sharedActivity == nil {
 		return [32]byte{}, errors.New("nil shared activity")
 	}

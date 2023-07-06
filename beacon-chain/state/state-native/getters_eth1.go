@@ -86,11 +86,3 @@ func (b *BeaconState) sharedActivityVal() *ethpb.SharedActivity {
 
 	return ethpb.CopySharedActivity(b.sharedActivity)
 }
-
-// ExecutionHeight corresponds to the current EL chain height.
-func (b *BeaconState) ExecutionHeight() uint64 {
-	b.lock.RLock()
-	defer b.lock.RUnlock()
-
-	return b.executionHeight
-}

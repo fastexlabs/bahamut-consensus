@@ -26,7 +26,6 @@ var (
 	gasLimit         = uint64(10)
 	gasUsed          = uint64(10)
 	timestamp        = uint64(10)
-	executionHeight  = uint64(10)
 	parentRoot       = bytesutil.PadTo([]byte("parentroot"), fieldparams.RootLength)
 	stateRoot        = bytesutil.PadTo([]byte("stateroot"), fieldparams.RootLength)
 	signature        = bytesutil.PadTo([]byte("signature"), 96)
@@ -102,7 +101,6 @@ func Test_V1Alpha1ToV1SignedBlock(t *testing.T) {
 		BlockHash:    blockHash,
 	}
 	alphaBlock.Signature = signature
-	alphaBlock.Block.Body.ExecutionHeight = executionHeight
 
 	v1Block, err := V1Alpha1ToV1SignedBlock(alphaBlock)
 	require.NoError(t, err)
@@ -126,7 +124,6 @@ func Test_V1ToV1Alpha1SignedBlock(t *testing.T) {
 		BlockHash:    blockHash,
 	}
 	v1Block.Signature = signature
-	v1Block.Block.Body.ExecutionHeight = executionHeight
 
 	alphaBlock, err := V1ToV1Alpha1SignedBlock(v1Block)
 	require.NoError(t, err)
@@ -149,7 +146,6 @@ func Test_V1ToV1Alpha1Block(t *testing.T) {
 		DepositCount: depositCount,
 		BlockHash:    blockHash,
 	}
-	alphaBlock.Body.ExecutionHeight = executionHeight
 
 	v1Block, err := V1Alpha1ToV1Block(alphaBlock)
 	require.NoError(t, err)
@@ -368,7 +364,6 @@ func Test_BlockInterfaceToV1Block(t *testing.T) {
 		BlockHash:    blockHash,
 	}
 	v1Alpha1Block.Signature = signature
-	v1Alpha1Block.Block.Body.ExecutionHeight = executionHeight
 
 	wsb, err := blocks.NewSignedBeaconBlock(v1Alpha1Block)
 	require.NoError(t, err)

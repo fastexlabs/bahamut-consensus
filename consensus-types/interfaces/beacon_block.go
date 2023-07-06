@@ -69,7 +69,6 @@ type ReadOnlyBeaconBlockBody interface {
 	ActivityChanges() []*ethpb.ActivityChange
 	TransactionsCount() uint64
 	BaseFee() uint64
-	ExecutionHeight() uint64
 	SyncAggregate() (*ethpb.SyncAggregate, error)
 	IsNil() bool
 	HashTreeRoot() ([field_params.RootLength]byte, error)
@@ -83,7 +82,6 @@ type SignedBeaconBlock interface {
 	SetExecution(ExecutionData) error
 	SetBLSToExecutionChanges([]*ethpb.SignedBLSToExecutionChange) error
 	SetSyncAggregate(*ethpb.SyncAggregate) error
-	SetExecutionHeight(uint64)
 	SetBaseFee(uint64)
 	SetTransactionsCount(uint64)
 	SetActivityChanges([]*ethpb.ActivityChange)

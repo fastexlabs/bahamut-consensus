@@ -227,7 +227,6 @@ func (b *SignedBeaconBlock) ToBlinded() (interfaces.ReadOnlySignedBeaconBlock, e
 						ActivityChanges:        b.block.body.activityChanges,
 						TransactionsCount:      b.block.body.transactionsCount,
 						BaseFee:                b.block.body.baseFee,
-						ExecutionHeight:        b.block.body.executionHeight,
 						SyncAggregate:          b.block.body.syncAggregate,
 						ExecutionPayloadHeader: header,
 					},
@@ -258,7 +257,6 @@ func (b *SignedBeaconBlock) ToBlinded() (interfaces.ReadOnlySignedBeaconBlock, e
 						ActivityChanges:        b.block.body.activityChanges,
 						TransactionsCount:      b.block.body.transactionsCount,
 						BaseFee:                b.block.body.baseFee,
-						ExecutionHeight:        b.block.body.executionHeight,
 						SyncAggregate:          b.block.body.syncAggregate,
 						ExecutionPayloadHeader: header,
 						BlsToExecutionChanges:  b.block.body.blsToExecutionChanges,
@@ -832,11 +830,6 @@ func (b *BeaconBlockBody) TransactionsCount() uint64 {
 // BaseFee returns the base fee in the block.
 func (b *BeaconBlockBody) BaseFee() uint64 {
 	return b.baseFee
-}
-
-// ExecutionHeight returns the base fee in the block.
-func (b *BeaconBlockBody) ExecutionHeight() uint64 {
-	return b.executionHeight
 }
 
 // SyncAggregate returns the sync aggregate in the block.

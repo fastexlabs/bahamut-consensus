@@ -198,7 +198,6 @@ func OptimizedGenesisBeaconState(genesisTime uint64, preState state.BeaconState,
 		Eth1DataVotes:    []*ethpb.Eth1Data{},
 		Eth1DepositIndex: preState.Eth1DepositIndex(),
 		SharedActivity:   preState.SharedActivity(),
-		ExecutionHeight:  preState.ExecutionHeight(),
 	}
 
 	bodyRoot, err := (&ethpb.BeaconBlockBody{

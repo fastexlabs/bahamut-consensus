@@ -33,7 +33,6 @@ func TestUpgradeToBellatrix(t *testing.T) {
 	require.DeepSSZEqual(t, preForkState.Eth1DataVotes(), mSt.Eth1DataVotes())
 	require.DeepSSZEqual(t, preForkState.Eth1DepositIndex(), mSt.Eth1DepositIndex())
 	require.DeepSSZEqual(t, preForkState.SharedActivity(), mSt.SharedActivity())
-	require.DeepSSZEqual(t, preForkState.ExecutionHeight(), mSt.ExecutionHeight())
 	require.DeepSSZEqual(t, preForkState.Validators(), mSt.Validators())
 	require.DeepSSZEqual(t, preForkState.Balances(), mSt.Balances())
 	require.DeepSSZEqual(t, preForkState.Activities(), mSt.Activities())

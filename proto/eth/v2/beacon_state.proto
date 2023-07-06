@@ -49,7 +49,6 @@ message BeaconState {
   repeated v1.Eth1Data eth1_data_votes = 3002 [(ethereum.eth.ext.ssz_max) = "eth1_data_votes.size"];
   uint64 eth1_deposit_index = 3003;
   v1.SharedActivity shared_activity = 3004;
-  uint64 execution_height = 3005;
 
   // Registry [4001-5000]
   repeated v1.Validator validators = 4001 [(ethereum.eth.ext.ssz_max) = "1099511627776"];
@@ -97,7 +96,6 @@ message BeaconStateBellatrix {
   repeated v1.Eth1Data eth1_data_votes = 3002 [(ethereum.eth.ext.ssz_max) = "eth1_data_votes.size"];
   uint64 eth1_deposit_index = 3003;
   v1.SharedActivity shared_activity = 3004;
-  uint64 execution_height = 3005;
 
   // Registry [4001-5000]
   repeated v1.Validator validators = 4001 [(ethereum.eth.ext.ssz_max) = "1099511627776"];
@@ -148,7 +146,6 @@ message BeaconStateCapella {
   repeated v1.Eth1Data eth1_data_votes = 3002 [(ethereum.eth.ext.ssz_max) = "eth1_data_votes.size"];
   uint64 eth1_deposit_index = 3003;
   v1.SharedActivity shared_activity = 3004;
-  uint64 execution_height = 3005;
 
   // Registry [4001-5000]
   repeated v1.Validator validators = 4001 [(ethereum.eth.ext.ssz_max) = "1099511627776"];

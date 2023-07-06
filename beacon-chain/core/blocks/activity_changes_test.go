@@ -253,24 +253,3 @@ func TestProcessBaseFee(t *testing.T) {
 	}
 	assert.Equal(t, 10*uint64(params.BeaconConfig().SlotsPerEpoch), st.SharedActivity().BaseFeePerEpoch)
 }
-
-func TestExecutionHeight(t *testing.T) {
-	st, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
-		Fork: &ethpb.Fork{
-			CurrentVersion:  params.BeaconConfig().GenesisForkVersion,
-			PreviousVersion: params.BeaconConfig().GenesisForkVersion,
-		},
-	})
-	require.NoError(t, err)
-
-	var prev uint64
-	for i := primitives.Slot(1); i < params.BeaconConfig().SlotsPerEpoch; i++ {
-		if i == 5 {
-			continue
-		}
-		assert.Equal(t, prev, st.ExecutionHeight())
-		st, err = blocks.ProcessExecutionHeight(context.Background(), st, uint64(i))
-		require.NoError(t, err)
-		prev = uint64(i)
-	}
-}

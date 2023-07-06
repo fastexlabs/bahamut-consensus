@@ -14,13 +14,13 @@ func ActivityChangesRoot(activities []*ethpb.ActivityChange) ([32]byte, error) {
 	for _, activity := range activities {
 		root, err := activity.HashTreeRoot()
 		if err != nil {
-			return [32]byte{}, errors.Wrap(err, "could not compute activity change merkleiztion")
+			return [32]byte{}, errors.Wrap(err, "could not compute activity change merkleization")
 		}
 		roots = append(roots, root)
 	}
 	activitiesRoot, err := ssz.BitwiseMerkleize(roots, uint64(len(roots)), uint64(len(roots)))
 	if err != nil {
-		return [32]byte{}, errors.Wrap(err, "could not compute activity changes merkleiztion")
+		return [32]byte{}, errors.Wrap(err, "could not compute activity changes merkleization")
 	}
 	activitiesLenBuf := new(bytes.Buffer)
 	if err := binary.Write(activitiesLenBuf, binary.LittleEndian, uint64(len(activities))); err != nil {

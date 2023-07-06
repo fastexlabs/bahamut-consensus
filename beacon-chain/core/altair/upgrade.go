@@ -88,7 +88,6 @@ func UpgradeToAltair(ctx context.Context, state state.BeaconState) (state.Beacon
 		Eth1DataVotes:               state.Eth1DataVotes(),
 		Eth1DepositIndex:            state.Eth1DepositIndex(),
 		SharedActivity:              state.SharedActivity(),
-		ExecutionHeight:             state.ExecutionHeight(),
 		Validators:                  state.Validators(),
 		Balances:                    state.Balances(),
 		Activities:                  state.Activities(),

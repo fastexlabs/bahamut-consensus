@@ -122,12 +122,6 @@ func ComputeFieldRootsWithHasher(ctx context.Context, state *BeaconState) ([][]b
 	}
 	fieldRoots[types.SharedActivity.RealPosition()] = sharedActivityHashTreeRoot[:]
 
-	// ExecutionHeight root.
-	executionHeightBuf := make([]byte, 8)
-	binary.LittleEndian.PutUint64(executionHeightBuf, state.executionHeight)
-	executionHeightRoot := bytesutil.ToBytes32(executionHeightBuf)
-	fieldRoots[types.ExecutionHeight.RealPosition()] = executionHeightRoot[:]
-
 	// Validators slice root.
 	validatorsRoot, err := stateutil.ValidatorRegistryRoot(state.validators)
 	if err != nil {

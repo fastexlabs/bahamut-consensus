@@ -109,12 +109,6 @@ func (b *SignedBeaconBlock) SetBaseFee(v uint64) {
 	b.block.body.baseFee = v
 }
 
-// SetExecutionHeight sets the base fee in the block.
-// This function is not thread safe, it is only used during block creation.
-func (b *SignedBeaconBlock) SetExecutionHeight(v uint64) {
-	b.block.body.executionHeight = v
-}
-
 // SetSyncAggregate sets the sync aggregate in the block.
 // This function is not thread safe, it is only used during block creation.
 func (b *SignedBeaconBlock) SetSyncAggregate(s *eth.SyncAggregate) error {

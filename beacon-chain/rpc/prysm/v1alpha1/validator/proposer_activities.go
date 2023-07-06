@@ -41,7 +41,6 @@ func (vs *Server) setActivities(
 	blk.SetActivityChanges(blockActivities.Activities)
 	blk.SetTransactionsCount(blockActivities.TxCount)
 	blk.SetBaseFee(blockActivities.BaseFee)
-	blk.SetExecutionHeight(latestExecutionHeader.BlockNumber())
 
 	return nil
 }

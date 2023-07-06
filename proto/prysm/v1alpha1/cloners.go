@@ -136,7 +136,6 @@ func CopyBeaconBlockBody(body *BeaconBlockBody) *BeaconBlockBody {
 		ActivityChanges:   CopyActivityChanges(body.ActivityChanges),
 		TransactionsCount: body.TransactionsCount,
 		BaseFee:           body.BaseFee,
-		ExecutionHeight:   body.ExecutionHeight,
 	}
 }
 
@@ -182,7 +181,6 @@ func CopyBeaconBlockBodyAltair(body *BeaconBlockBodyAltair) *BeaconBlockBodyAlta
 		ActivityChanges:   CopyActivityChanges(body.ActivityChanges),
 		TransactionsCount: body.TransactionsCount,
 		BaseFee:           body.BaseFee,
-		ExecutionHeight:   body.ExecutionHeight,
 		SyncAggregate:     CopySyncAggregate(body.SyncAggregate),
 	}
 }
@@ -471,7 +469,6 @@ func CopyBeaconBlockBodyBellatrix(body *BeaconBlockBodyBellatrix) *BeaconBlockBo
 		ActivityChanges:   CopyActivityChanges(body.ActivityChanges),
 		TransactionsCount: body.TransactionsCount,
 		BaseFee:           body.BaseFee,
-		ExecutionHeight:   body.ExecutionHeight,
 		SyncAggregate:     CopySyncAggregate(body.SyncAggregate),
 		ExecutionPayload:  CopyExecutionPayload(body.ExecutionPayload),
 	}
@@ -519,7 +516,6 @@ func CopyBeaconBlockBodyCapella(body *BeaconBlockBodyCapella) *BeaconBlockBodyCa
 		ActivityChanges:       CopyActivityChanges(body.ActivityChanges),
 		TransactionsCount:     body.TransactionsCount,
 		BaseFee:               body.BaseFee,
-		ExecutionHeight:       body.ExecutionHeight,
 		SyncAggregate:         CopySyncAggregate(body.SyncAggregate),
 		ExecutionPayload:      CopyExecutionPayloadCapella(body.ExecutionPayload),
 		BlsToExecutionChanges: CopyBLSToExecutionChanges(body.BlsToExecutionChanges),
@@ -568,7 +564,6 @@ func CopyBlindedBeaconBlockBodyCapella(body *BlindedBeaconBlockBodyCapella) *Bli
 		ActivityChanges:        CopyActivityChanges(body.ActivityChanges),
 		TransactionsCount:      body.TransactionsCount,
 		BaseFee:                body.BaseFee,
-		ExecutionHeight:        body.ExecutionHeight,
 		SyncAggregate:          CopySyncAggregate(body.SyncAggregate),
 		ExecutionPayloadHeader: CopyExecutionPayloadHeaderCapella(body.ExecutionPayloadHeader),
 		BlsToExecutionChanges:  CopyBLSToExecutionChanges(body.BlsToExecutionChanges),
@@ -713,7 +708,6 @@ func CopyBlindedBeaconBlockBodyBellatrix(body *BlindedBeaconBlockBodyBellatrix) 
 		ActivityChanges:        CopyActivityChanges(body.ActivityChanges),
 		TransactionsCount:      body.TransactionsCount,
 		BaseFee:                body.BaseFee,
-		ExecutionHeight:        body.ExecutionHeight,
 		SyncAggregate:          CopySyncAggregate(body.SyncAggregate),
 		ExecutionPayloadHeader: CopyExecutionPayloadHeader(body.ExecutionPayloadHeader),
 	}

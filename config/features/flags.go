@@ -7,22 +7,30 @@ import (
 )
 
 var (
+	// Mainnet flag for easier tooling, no-op
+	Mainnet = &cli.BoolFlag{
+		Value:   true,
+		Name:    "mainnet",
+		Aliases: []string{"sahara"},
+		Usage:   "Run on Ethereum Beacon Chain Main Net. This is the default and can be omitted.",
+	}
+	OasisTestnet = &cli.BoolFlag{
+		Name:  "oasis",
+		Usage: "Run beacon node configured for the Oasis test network",
+	}
+
 	// PraterTestnet flag for the multiclient Ethereum consensus testnet.
 	PraterTestnet = &cli.BoolFlag{
 		Name:    "prater",
 		Usage:   "Run Prysm configured for the Prater / Goerli test network",
 		Aliases: []string{"goerli"},
+		Hidden:  true,
 	}
 	// SepoliaTestnet flag for the multiclient Ethereum consensus testnet.
 	SepoliaTestnet = &cli.BoolFlag{
-		Name:  "sepolia",
-		Usage: "Run Prysm configured for the Sepolia beacon chain test network",
-	}
-	// Mainnet flag for easier tooling, no-op
-	Mainnet = &cli.BoolFlag{
-		Value: true,
-		Name:  "mainnet",
-		Usage: "Run on Ethereum Beacon Chain Main Net. This is the default and can be omitted.",
+		Name:   "sepolia",
+		Usage:  "Run Prysm configured for the Sepolia beacon chain test network",
+		Hidden: true,
 	}
 	devModeFlag = &cli.BoolFlag{
 		Name:  "dev",
@@ -130,6 +138,7 @@ var devModeFlags = []cli.Flag{
 var ValidatorFlags = append(deprecatedFlags, []cli.Flag{
 	writeWalletPasswordOnWebOnboarding,
 	enableExternalSlasherProtectionFlag,
+	OasisTestnet,
 	PraterTestnet,
 	SepoliaTestnet,
 	Mainnet,
@@ -150,6 +159,7 @@ var BeaconChainFlags = append(deprecatedBeaconFlags, append(deprecatedFlags, []c
 	devModeFlag,
 	writeSSZStateTransitionsFlag,
 	disableGRPCConnectionLogging,
+	OasisTestnet,
 	PraterTestnet,
 	SepoliaTestnet,
 	Mainnet,
@@ -174,6 +184,7 @@ var E2EBeaconChainFlags = []string{
 // NetworkFlags contains a list of network flags.
 var NetworkFlags = []cli.Flag{
 	Mainnet,
+	OasisTestnet,
 	PraterTestnet,
 	SepoliaTestnet,
 }

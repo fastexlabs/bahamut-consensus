@@ -234,6 +234,9 @@ func (BeaconBlockBody) ActivityChanges() []*eth.ActivityChange {
 func (BeaconBlockBody) TransactionsCount() uint64 {
 	panic("implement me")
 }
+func (BeaconBlockBody) BaseFee() uint64 {
+	panic("implement me")
+}
 
 func (BeaconBlockBody) SyncAggregate() (*eth.SyncAggregate, error) {
 	panic("implement me")
