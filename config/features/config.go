@@ -199,8 +199,8 @@ func ConfigureBeaconChain(ctx *cli.Context) error {
 		log.WithField(enableHistoricalSpaceRepresentation.Name, enableHistoricalSpaceRepresentation.Usage).Warn(enabledFeatureFlag)
 		cfg.EnableHistoricalSpaceRepresentation = true
 	}
-	if ctx.Bool(disableStakinContractCheck.Name) {
-		logEnabled(disableStakinContractCheck)
+	if ctx.Bool(disableStakingContractCheck.Name) {
+		logEnabled(disableStakingContractCheck)
 		cfg.DisableStakingContractCheck = true
 	}
 	if ctx.Bool(SaveFullExecutionPayloads.Name) {

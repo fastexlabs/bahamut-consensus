@@ -427,23 +427,23 @@ func TotalEffectivePower(
 
 // RandomBytes generates random number that used for proposer selection.
 func RandomBytes(seed [32]byte, totalEffectivePower uint64) uint64 {
-	maxRandomBytes := uint64(1<<64 - 1)
-	hashFunc := hash.CustomSHA256Hasher()
-	hash := hashFunc(append(seed[:], bytesutil.Bytes8(0)...))
-	randomBytes := hash[:8]
-	randomNumber := bytesutil.FromBytes8(randomBytes)
-
 	if totalEffectivePower == 0 {
 		return 0
 	}
 
-	for i := uint64(1); randomNumber > (maxRandomBytes/totalEffectivePower)*totalEffectivePower; i++ {
-		hash = hashFunc(append(seed[:], bytesutil.Bytes8(i)...))
-		randomBytes = hash[:8]
-		randomNumber = bytesutil.FromBytes8(randomBytes)
-	}
+	var (
+		random         uint64
+		maxRandomBytes uint64 = 1<<64 - 1
+		hashFunc              = hash.CustomSHA256Hasher()
+	)
 
-	return randomNumber % totalEffectivePower
+	for i := uint64(0); ; i++ {
+		hash := hashFunc(append(seed[:], bytesutil.Bytes8(i)...))
+		random = bytesutil.FromBytes8(hash[:8])
+		if random <= (maxRandomBytes/totalEffectivePower)*totalEffectivePower {
+			return random % totalEffectivePower
+		}
+	}
 }
 
 func ComputeProposerIndex(
