@@ -1,6 +1,9 @@
 package altair
 
 import (
+	stdmath "math"
+	"math/big"
+
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
@@ -79,9 +82,28 @@ func BaseProposerReward(s state.ReadOnlyBeaconState, totalPower, totalEffectiveP
 	transactionsGas := sharedActivity.TransactionsGasPerPeriod
 	baseFee := sharedActivity.BaseFeePerPeriod
 	reward := baseFee * (activity + transactionsGas) / denominator
+
+	return baseProposerReward(reward, totalEffectivePower, totalPower), nil
+}
+
+func baseProposerReward(reward, totalEffectivePower, totalPower uint64) uint64 {
 	if totalPower == 0 {
-		return reward, nil
+		return reward
 	}
 
-	return reward * totalEffectivePower / totalPower, nil
+	if stdmath.MaxUint64/totalEffectivePower > reward {
+		return reward * totalEffectivePower / totalPower
+	}
+
+	var (
+		rewardBig              = big.NewInt(0).SetUint64(reward)
+		totalEffectivePowerBig = big.NewInt(0).SetUint64(totalEffectivePower)
+		totalPowerBig          = big.NewInt(0).SetUint64(totalPower)
+		ret                    = big.NewInt(0)
+	)
+
+	ret.Mul(rewardBig, totalEffectivePowerBig)
+	ret.Div(ret, totalPowerBig)
+
+	return ret.Uint64()
 }

@@ -440,7 +440,7 @@ func RandomBytes(seed [32]byte, totalEffectivePower uint64) uint64 {
 	for i := uint64(0); ; i++ {
 		hash := hashFunc(append(seed[:], bytesutil.Bytes8(i)...))
 		random = bytesutil.FromBytes8(hash[:8])
-		if random <= (maxRandomBytes/totalEffectivePower)*totalEffectivePower {
+		if random < (maxRandomBytes/totalEffectivePower)*totalEffectivePower {
 			return random % totalEffectivePower
 		}
 	}
