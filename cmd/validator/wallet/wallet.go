@@ -32,8 +32,11 @@ var Commands = &cli.Command{
 				flags.SkipMnemonic25thWordCheckFlag,
 				features.Mainnet,
 				features.OasisTestnet,
+				features.OceanTestnet,
+				features.HorizonTestnet,
 				features.PraterTestnet,
 				features.SepoliaTestnet,
+				features.HoleskyTestnet,
 				cmd.AcceptTosFlag,
 			}),
 			Before: func(cliCtx *cli.Context) error {
@@ -64,8 +67,11 @@ var Commands = &cli.Command{
 				flags.SkipMnemonic25thWordCheckFlag,
 				features.Mainnet,
 				features.OasisTestnet,
+				features.OceanTestnet,
+				features.HorizonTestnet,
 				features.PraterTestnet,
 				features.SepoliaTestnet,
+				features.HoleskyTestnet,
 				cmd.AcceptTosFlag,
 			}),
 			Before: func(cliCtx *cli.Context) error {

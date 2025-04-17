@@ -3,7 +3,6 @@ package blockchain
 import (
 	"github.com/prysmaticlabs/prysm/v4/async/event"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/cache/depositcache"
 	statefeed "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/state"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/db"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/execution"
@@ -13,6 +12,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/operations/slashings"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/operations/voluntaryexits"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/startup"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stategen"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
@@ -61,7 +61,7 @@ func WithExecutionEngineCaller(c execution.EngineCaller) Option {
 }
 
 // WithDepositCache for deposit lifecycle after chain inclusion.
-func WithDepositCache(c *depositcache.DepositCache) Option {
+func WithDepositCache(c cache.DepositCache) Option {
 	return func(s *Service) error {
 		s.cfg.DepositCache = c
 		return nil
@@ -160,6 +160,21 @@ func WithSlasherAttestationsFeed(f *event.Feed) Option {
 func WithFinalizedStateAtStartUp(st state.BeaconState) Option {
 	return func(s *Service) error {
 		s.cfg.FinalizedStateAtStartUp = st
+		return nil
+	}
+}
+
+func WithClockSynchronizer(gs *startup.ClockSynchronizer) Option {
+	return func(s *Service) error {
+		s.clockSetter = gs
+		s.clockWaiter = gs
+		return nil
+	}
+}
+
+func WithSyncComplete(c chan struct{}) Option {
+	return func(s *Service) error {
+		s.syncComplete = c
 		return nil
 	}
 }

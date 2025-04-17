@@ -225,7 +225,18 @@ func ProcessDeposit(beaconState state.BeaconState, deposit *ethpb.Deposit, verif
 		if err := helpers.IncreaseBalance(beaconState, index, amount); err != nil {
 			return nil, newValidator, err
 		}
-		if bytesutil.ToBytes20(contract) != params.BeaconConfig().ZeroContract && !contractExist {
+		// If contract already exists in state and contract owner is active validator
+		// in current epoch set zero-contract for new validator.
+		if contractExist {
+			owner, err := beaconState.ValidatorAtIndexReadOnly(contractOwner)
+			if err != nil {
+				return nil, newValidator, err
+			}
+			if owner.ExitEpoch() >= epoch {
+				contract = params.BeaconConfig().ZeroContract[:]
+			}
+		}
+		if bytesutil.ToBytes20(contract) != params.BeaconConfig().ZeroContract {
 			if err := helpers.UpdateContract(beaconState, index, contract); err != nil {
 				return nil, newValidator, err
 			}

@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/prysmaticlabs/prysm/v4/async/event"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
 	"github.com/prysmaticlabs/prysm/v4/config/features"
@@ -47,6 +45,9 @@ func (s *Service) AttestationTargetState(ctx context.Context, target *ethpb.Chec
 	if err := slots.ValidateClock(ss, uint64(s.genesisTime.Unix())); err != nil {
 		return nil, err
 	}
+	// We acquire the lock here instead than on gettAttPreState because that function gets called from UpdateHead that holds a write lock
+	s.cfg.ForkChoiceStore.RLock()
+	defer s.cfg.ForkChoiceStore.RUnlock()
 	return s.getAttPreState(ctx, target)
 }
 
@@ -61,26 +62,19 @@ func (s *Service) VerifyLmdFfgConsistency(ctx context.Context, a *ethpb.Attestat
 		return err
 	}
 	if !bytes.Equal(a.Data.Target.Root, r) {
-		return errors.New("FFG and LMD votes are not consistent")
+		return fmt.Errorf("FFG and LMD votes are not consistent, block root: %#x, target root: %#x, canonical target root: %#x", a.Data.BeaconBlockRoot, a.Data.Target.Root, r)
 	}
 	return nil
 }
 
 // This routine processes fork choice attestations from the pool to account for validator votes and fork choice.
-func (s *Service) spawnProcessAttestationsRoutine(stateFeed *event.Feed) {
-	// Wait for state to be initialized.
-	stateChannel := make(chan *feed.Event, 1)
-	stateSub := stateFeed.Subscribe(stateChannel)
+func (s *Service) spawnProcessAttestationsRoutine() {
 	go func() {
-		select {
-		case <-s.ctx.Done():
-			stateSub.Unsubscribe()
+		_, err := s.clockWaiter.WaitForClock(s.ctx)
+		if err != nil {
+			log.WithError(err).Error("spawnProcessAttestationsRoutine failed to receive genesis data")
 			return
-		case <-stateChannel:
-			stateSub.Unsubscribe()
-			break
 		}
-
 		if s.genesisTime.IsZero() {
 			log.Warn("ProcessAttestations routine waiting for genesis time")
 			for s.genesisTime.IsZero() {
@@ -92,23 +86,30 @@ func (s *Service) spawnProcessAttestationsRoutine(stateFeed *event.Feed) {
 			}
 			log.Warn("Genesis time received, now available to process attestations")
 		}
+		// Wait for node to be synced before running the routine.
+		if err := s.waitForSync(); err != nil {
+			log.WithError(err).Error("Could not wait to sync")
+			return
+		}
 
-		st := slots.NewSlotTicker(s.genesisTime, params.BeaconConfig().SecondsPerSlot)
-		pat := slots.NewSlotTickerWithOffset(s.genesisTime, -reorgLateBlockCountAttestations, params.BeaconConfig().SecondsPerSlot)
+		reorgInterval := time.Second*time.Duration(params.BeaconConfig().SecondsPerSlot) - reorgLateBlockCountAttestations
+		ticker := slots.NewSlotTickerWithIntervals(s.genesisTime, []time.Duration{0, reorgInterval})
 		for {
 			select {
 			case <-s.ctx.Done():
 				return
-			case <-pat.C():
-				s.UpdateHead(s.ctx, s.CurrentSlot()+1)
-			case <-st.C():
-				s.cfg.ForkChoiceStore.Lock()
-				if err := s.cfg.ForkChoiceStore.NewSlot(s.ctx, s.CurrentSlot()); err != nil {
-					log.WithError(err).Error("could not process new slot")
-				}
-				s.cfg.ForkChoiceStore.Unlock()
+			case slotInterval := <-ticker.C():
+				if slotInterval.Interval > 0 {
+					s.UpdateHead(s.ctx, slotInterval.Slot+1)
+				} else {
+					s.cfg.ForkChoiceStore.Lock()
+					if err := s.cfg.ForkChoiceStore.NewSlot(s.ctx, slotInterval.Slot); err != nil {
+						log.WithError(err).Error("could not process new slot")
+					}
+					s.cfg.ForkChoiceStore.Unlock()
 
-				s.UpdateHead(s.ctx, s.CurrentSlot())
+					s.UpdateHead(s.ctx, slotInterval.Slot)
+				}
 			}
 		}
 	}()
@@ -117,6 +118,9 @@ func (s *Service) spawnProcessAttestationsRoutine(stateFeed *event.Feed) {
 // UpdateHead updates the canonical head of the chain based on information from fork-choice attestations and votes.
 // The caller of this function MUST hold a lock in forkchoice
 func (s *Service) UpdateHead(ctx context.Context, proposingSlot primitives.Slot) {
+	ctx, span := trace.StartSpan(ctx, "beacon-chain.blockchain.UpdateHead")
+	defer span.End()
+
 	start := time.Now()
 	s.cfg.ForkChoiceStore.Lock()
 	defer s.cfg.ForkChoiceStore.Unlock()
@@ -140,16 +144,17 @@ func (s *Service) UpdateHead(ctx context.Context, proposingSlot primitives.Slot)
 	}
 	newAttHeadElapsedTime.Observe(float64(time.Since(start).Milliseconds()))
 
-	s.headLock.RLock()
-	if s.headRoot() != newHeadRoot {
+	changed, err := s.forkchoiceUpdateWithExecution(s.ctx, newHeadRoot, proposingSlot)
+	if err != nil {
+		log.WithError(err).Error("could not update forkchoice")
+	}
+	if changed {
+		s.headLock.RLock()
 		log.WithFields(logrus.Fields{
 			"oldHeadRoot": fmt.Sprintf("%#x", s.headRoot()),
 			"newHeadRoot": fmt.Sprintf("%#x", newHeadRoot),
 		}).Debug("Head changed due to attestations")
-	}
-	s.headLock.RUnlock()
-	if err := s.forkchoiceUpdateWithExecution(s.ctx, newHeadRoot, proposingSlot); err != nil {
-		log.WithError(err).Error("could not update forkchoice")
+		s.headLock.RUnlock()
 	}
 }
 

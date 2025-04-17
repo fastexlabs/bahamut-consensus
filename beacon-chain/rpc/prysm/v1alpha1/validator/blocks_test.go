@@ -21,6 +21,7 @@ import (
 )
 
 func TestServer_StreamAltairBlocksVerified_ContextCanceled(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	ctx := context.Background()
 
 	chainService := &chainMock.ChainService{}
@@ -47,6 +48,7 @@ func TestServer_StreamAltairBlocksVerified_ContextCanceled(t *testing.T) {
 }
 
 func TestServer_StreamAltairBlocks_ContextCanceled(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	ctx := context.Background()
 
 	chainService := &chainMock.ChainService{}
@@ -72,7 +74,9 @@ func TestServer_StreamAltairBlocks_ContextCanceled(t *testing.T) {
 
 func TestServer_StreamAltairBlocks_OnHeadUpdated(t *testing.T) {
 	params.SetupTestConfigCleanup(t)
-	params.OverrideBeaconConfig(params.BeaconConfig())
+	cfg := params.BeaconConfig()
+	cfg.SyncCommitteeSize = 512
+	params.OverrideBeaconConfig(cfg)
 	ctx := context.Background()
 	beaconState, privs := util.DeterministicGenesisStateAltair(t, 64)
 	c, err := altair.NextSyncCommittee(ctx, beaconState)
@@ -114,7 +118,9 @@ func TestServer_StreamAltairBlocks_OnHeadUpdated(t *testing.T) {
 
 func TestServer_StreamCapellaBlocks_OnHeadUpdated(t *testing.T) {
 	params.SetupTestConfigCleanup(t)
-	params.OverrideBeaconConfig(params.BeaconConfig())
+	cfg := params.BeaconConfig()
+	cfg.SyncCommitteeSize = 512
+	params.OverrideBeaconConfig(cfg)
 	ctx := context.Background()
 	beaconState, privs := util.DeterministicGenesisStateCapella(t, 64)
 	c, err := altair.NextSyncCommittee(ctx, beaconState)
@@ -155,6 +161,11 @@ func TestServer_StreamCapellaBlocks_OnHeadUpdated(t *testing.T) {
 }
 
 func TestServer_StreamAltairBlocksVerified_OnHeadUpdated(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
+	cfg := params.BeaconConfig()
+	cfg.SyncCommitteeSize = 512
+	params.OverrideBeaconConfig(cfg)
+
 	db := dbTest.SetupDB(t)
 	ctx := context.Background()
 	beaconState, privs := util.DeterministicGenesisStateAltair(t, 32)
@@ -198,6 +209,11 @@ func TestServer_StreamAltairBlocksVerified_OnHeadUpdated(t *testing.T) {
 }
 
 func TestServer_StreamCapellaBlocksVerified_OnHeadUpdated(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
+	cfg := params.BeaconConfig()
+	cfg.SyncCommitteeSize = 512
+	params.OverrideBeaconConfig(cfg)
+
 	db := dbTest.SetupDB(t)
 	ctx := context.Background()
 	beaconState, privs := util.DeterministicGenesisStateCapella(t, 32)

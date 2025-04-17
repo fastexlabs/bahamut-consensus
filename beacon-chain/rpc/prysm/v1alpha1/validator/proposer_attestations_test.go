@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/prysmaticlabs/go-bitfield"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/testing/assert"
@@ -14,6 +15,7 @@ import (
 )
 
 func TestProposer_ProposerAtts_sortByProfitability(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	atts := proposerAtts([]*ethpb.Attestation{
 		util.HydrateAttestation(&ethpb.Attestation{Data: &ethpb.AttestationData{Slot: 4}, AggregationBits: bitfield.Bitlist{0b11100000}}),
 		util.HydrateAttestation(&ethpb.Attestation{Data: &ethpb.AttestationData{Slot: 1}, AggregationBits: bitfield.Bitlist{0b11000000}}),
@@ -38,6 +40,7 @@ func TestProposer_ProposerAtts_sortByProfitability(t *testing.T) {
 }
 
 func TestProposer_ProposerAtts_sortByProfitabilityUsingMaxCover(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	type testData struct {
 		slot primitives.Slot
 		bits bitfield.Bitlist
@@ -189,6 +192,7 @@ func TestProposer_ProposerAtts_sortByProfitabilityUsingMaxCover(t *testing.T) {
 }
 
 func TestProposer_ProposerAtts_dedup(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	data1 := util.HydrateAttestationData(&ethpb.AttestationData{
 		Slot: 4,
 	})

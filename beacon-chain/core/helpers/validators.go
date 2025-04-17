@@ -17,6 +17,7 @@ import (
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	log "github.com/sirupsen/logrus"
+	"go.opencensus.io/trace"
 )
 
 var CommitteeCacheInProgressHit = promauto.NewCounter(prometheus.CounterOpts{
@@ -205,10 +206,7 @@ func ActivationExitEpoch(epoch primitives.Epoch) primitives.Epoch {
 	return epoch + 1 + params.BeaconConfig().MaxSeedLookahead
 }
 
-// ValidatorChurnLimit returns the number of validators that are allowed to
-// enter and exit validator pool for an epoch.
-//
-// Spec pseudocode definition:
+// calculateChurnLimit based on the formula in the spec.
 //
 //	def get_validator_churn_limit(state: BeaconState) -> uint64:
 //	 """
@@ -216,12 +214,32 @@ func ActivationExitEpoch(epoch primitives.Epoch) primitives.Epoch {
 //	 """
 //	 active_validator_indices = get_active_validator_indices(state, get_current_epoch(state))
 //	 return max(MIN_PER_EPOCH_CHURN_LIMIT, uint64(len(active_validator_indices)) // CHURN_LIMIT_QUOTIENT)
-func ValidatorChurnLimit(activeValidatorCount uint64) (uint64, error) {
+func calculateChurnLimit(activeValidatorCount uint64) uint64 {
 	churnLimit := activeValidatorCount / params.BeaconConfig().ChurnLimitQuotient
 	if churnLimit < params.BeaconConfig().MinPerEpochChurnLimit {
-		churnLimit = params.BeaconConfig().MinPerEpochChurnLimit
+		return params.BeaconConfig().MinPerEpochChurnLimit
 	}
-	return churnLimit, nil
+	return churnLimit
+}
+
+// ValidatorActivationChurnLimit returns the maximum number of validators that can be activated in a slot.
+func ValidatorActivationChurnLimit(activeValidatorCount uint64) uint64 {
+	return calculateChurnLimit(activeValidatorCount)
+}
+
+// ValidatorExitChurnLimit returns the maximum number of validators that can be exited in a slot.
+func ValidatorExitChurnLimit(activeValidatorCount uint64) uint64 {
+	return calculateChurnLimit(activeValidatorCount)
+}
+
+// ValidatorActivationChurnLimitDeneb returns the maximum number of validators that can be activated in a slot post Deneb.
+func ValidatorActivationChurnLimitDeneb(activeValidatorCount uint64) uint64 {
+	limit := calculateChurnLimit(activeValidatorCount)
+	// New in Deneb.
+	if limit > params.BeaconConfig().MaxPerEpochActivationChurnLimit {
+		return params.BeaconConfig().MaxPerEpochActivationChurnLimit
+	}
+	return limit
 }
 
 // UpdateContract sets contract for validator with the given 'index'.
@@ -230,6 +248,13 @@ func UpdateContract(s state.BeaconState, idx primitives.ValidatorIndex, contract
 	if err != nil {
 		return err
 	}
+
+	// Do not update contract, if validator already has contract.
+	if bytesutil.ToBytes20(valAtIdx.Contract) != params.BeaconConfig().ZeroContract {
+		// TODO(fastex): shoud we return error here?
+		return nil
+	}
+
 	valAtIdx.Contract = contract
 	return s.UpdateValidatorAtIndex(idx, valAtIdx)
 }
@@ -286,7 +311,7 @@ func BeaconProposerIndex(ctx context.Context, state state.ReadOnlyBeaconState) (
 				}
 				return proposerIndices[state.Slot()%params.BeaconConfig().SlotsPerEpoch], nil
 			}
-			if err := UpdateProposerIndicesInCache(ctx, state); err != nil {
+			if err := UpdateProposerIndicesInCache(ctx, state, time.CurrentEpoch(state)); err != nil {
 				return 0, errors.Wrap(err, "could not update committee cache")
 			}
 		}
@@ -310,6 +335,7 @@ func BeaconProposerIndex(ctx context.Context, state state.ReadOnlyBeaconState) (
 
 // ComputeProposerIndex returns the index sampled by effective balance, which is used to calculate proposer.
 //
+// nolint:dupword
 // Spec pseudocode definition:
 //
 //	def compute_proposer_index(state: BeaconState, indices: Sequence[ValidatorIndex], seed: Bytes32) -> ValidatorIndex:
@@ -327,6 +353,7 @@ func BeaconProposerIndex(ctx context.Context, state state.ReadOnlyBeaconState) (
 //	      if effective_balance * MAX_RANDOM_BYTE >= MAX_EFFECTIVE_BALANCE * random_byte:
 //	          return candidate_index
 //	      i += 1
+//
 func ComputeProposerIndexEth(bState state.ReadOnlyValidators, activeIndices []primitives.ValidatorIndex, seed [32]byte) (primitives.ValidatorIndex, error) {
 	length := uint64(len(activeIndices))
 	if length == 0 {
@@ -468,14 +495,18 @@ func ComputeProposerIndex(
 		return 0, errors.Wrap(err, "could not calculate total effective power")
 	}
 
+	indices := make([]primitives.ValidatorIndex, length)
+	copy(indices, activeIndices)
+
+	unshuffledIndices, err := UnshuffleList(indices, seed)
+	if err != nil {
+		return 0, errors.Wrap(err, "could not unshuffle active indices")
+	}
+
 	random := RandomBytes(seed, totalEffectivePower)
 	var accumPower uint64
 	for i := uint64(0); ; i++ {
-		candidateIndex, err := ComputeShuffledIndex(primitives.ValidatorIndex(i%length), length, seed, true /* shuffle */)
-		if err != nil {
-			return 0, err
-		}
-		candidateIndex = activeIndices[candidateIndex]
+		candidateIndex := unshuffledIndices[i]
 		if uint64(candidateIndex) >= uint64(bState.NumValidators()) {
 			return 0, errors.New("active index out of range")
 		}
@@ -504,6 +535,7 @@ func ComputeProposerIndex(
 //	      validator.activation_eligibility_epoch == FAR_FUTURE_EPOCH
 //	      and validator.effective_balance == MAX_EFFECTIVE_BALANCE
 //	  )
+//
 func IsEligibleForActivationQueue(validator *ethpb.Validator) bool {
 	return isEligibleForActivationQueue(validator.ActivationEligibilityEpoch, validator.EffectiveBalance)
 }
@@ -552,4 +584,23 @@ func IsEligibleForActivationUsingTrie(state state.ReadOnlyCheckpoint, validator 
 func isEligibleForActivation(activationEligibilityEpoch, activationEpoch, finalizedEpoch primitives.Epoch) bool {
 	return activationEligibilityEpoch <= finalizedEpoch &&
 		activationEpoch == params.BeaconConfig().FarFutureEpoch
+}
+
+// LastActivatedValidatorIndex provides the last activated validator given a state
+func LastActivatedValidatorIndex(ctx context.Context, st state.ReadOnlyBeaconState) (primitives.ValidatorIndex, error) {
+	_, span := trace.StartSpan(ctx, "helpers.LastActivatedValidatorIndex")
+	defer span.End()
+	var lastActivatedvalidatorIndex primitives.ValidatorIndex
+	// linear search because status are not sorted
+	for j := st.NumValidators() - 1; j >= 0; j-- {
+		val, err := st.ValidatorAtIndexReadOnly(primitives.ValidatorIndex(j))
+		if err != nil {
+			return 0, err
+		}
+		if IsActiveValidatorUsingTrie(val, time.CurrentEpoch(st)) {
+			lastActivatedvalidatorIndex = primitives.ValidatorIndex(j)
+			break
+		}
+	}
+	return lastActivatedvalidatorIndex, nil
 }

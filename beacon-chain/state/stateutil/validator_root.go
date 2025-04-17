@@ -22,6 +22,7 @@ func ValidatorRootWithHasher(validator *ethpb.Validator) ([32]byte, error) {
 
 // ValidatorFieldRoots describes a method from which the hash tree root
 // of a validator is returned.
+// todo unit act
 func ValidatorFieldRoots(validator *ethpb.Validator) ([][32]byte, error) {
 	var fieldRoots [][32]byte
 	var zeroRoots [6][32]byte

@@ -46,6 +46,11 @@ func TestServer_ListAssignments_CannotRequestFutureEpoch(t *testing.T) {
 }
 
 func TestServer_ListAssignments_NoResults(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
+	cfg := params.BeaconConfig()
+	cfg.EpochsPerSlashingsVector = 8192
+	params.OverrideBeaconConfig(cfg)
+
 	db := dbTest.SetupDB(t)
 	ctx := context.Background()
 	st, err := util.NewBeaconState()
@@ -84,6 +89,11 @@ func TestServer_ListAssignments_NoResults(t *testing.T) {
 }
 
 func TestServer_ListAssignments_Pagination_InputOutOfRange(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
+	cfg := params.BeaconConfig()
+	cfg.EpochsPerSlashingsVector = 8192
+	params.OverrideBeaconConfig(cfg)
+
 	helpers.ClearCache()
 	db := dbTest.SetupDB(t)
 	ctx := context.Background()
@@ -99,6 +109,7 @@ func TestServer_ListAssignments_Pagination_InputOutOfRange(t *testing.T) {
 			ExitEpoch:             params.BeaconConfig().FarFutureEpoch,
 			EffectiveBalance:      params.BeaconConfig().MaxEffectiveBalance,
 			ActivationEpoch:       0,
+			Contract:              make([]byte, 20),
 		})
 	}
 
@@ -149,6 +160,11 @@ func TestServer_ListAssignments_Pagination_ExceedsMaxPageSize(t *testing.T) {
 }
 
 func TestServer_ListAssignments_Pagination_DefaultPageSize_NoArchive(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
+	cfg := params.BeaconConfig()
+	cfg.EpochsPerSlashingsVector = 8192
+	params.OverrideBeaconConfig(cfg)
+
 	helpers.ClearCache()
 	db := dbTest.SetupDB(t)
 	ctx := context.Background()
@@ -166,6 +182,7 @@ func TestServer_ListAssignments_Pagination_DefaultPageSize_NoArchive(t *testing.
 				ExitEpoch:             0,
 				ActivationEpoch:       0,
 				EffectiveBalance:      params.BeaconConfig().MaxEffectiveBalance,
+				Contract:              make([]byte, 20),
 			})
 		} else {
 			validators = append(validators, &ethpb.Validator{
@@ -174,6 +191,7 @@ func TestServer_ListAssignments_Pagination_DefaultPageSize_NoArchive(t *testing.
 				ExitEpoch:             params.BeaconConfig().FarFutureEpoch,
 				EffectiveBalance:      params.BeaconConfig().MaxEffectiveBalance,
 				ActivationEpoch:       0,
+				Contract:              make([]byte, 20),
 			})
 		}
 	}
@@ -231,6 +249,11 @@ func TestServer_ListAssignments_Pagination_DefaultPageSize_NoArchive(t *testing.
 }
 
 func TestServer_ListAssignments_FilterPubkeysIndices_NoPagination(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
+	cfg := params.BeaconConfig()
+	cfg.EpochsPerSlashingsVector = 8192
+	params.OverrideBeaconConfig(cfg)
+
 	helpers.ClearCache()
 	db := dbTest.SetupDB(t)
 
@@ -245,6 +268,7 @@ func TestServer_ListAssignments_FilterPubkeysIndices_NoPagination(t *testing.T) 
 			PublicKey:             pubKey,
 			WithdrawalCredentials: withdrawCreds,
 			ExitEpoch:             params.BeaconConfig().FarFutureEpoch,
+			Contract:              make([]byte, 20),
 		}
 		validators = append(validators, val)
 	}
@@ -302,6 +326,11 @@ func TestServer_ListAssignments_FilterPubkeysIndices_NoPagination(t *testing.T) 
 }
 
 func TestServer_ListAssignments_CanFilterPubkeysIndices_WithPagination(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
+	cfg := params.BeaconConfig()
+	cfg.EpochsPerSlashingsVector = 8192
+	params.OverrideBeaconConfig(cfg)
+
 	helpers.ClearCache()
 	db := dbTest.SetupDB(t)
 	ctx := context.Background()
@@ -315,6 +344,7 @@ func TestServer_ListAssignments_CanFilterPubkeysIndices_WithPagination(t *testin
 			PublicKey:             pubKey,
 			WithdrawalCredentials: withdrawCred,
 			ExitEpoch:             params.BeaconConfig().FarFutureEpoch,
+			Contract:              make([]byte, 20),
 		}
 		validators = append(validators, val)
 	}

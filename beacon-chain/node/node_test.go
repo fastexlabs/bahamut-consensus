@@ -79,7 +79,6 @@ func TestNodeStart_Ok(t *testing.T) {
 	time.Sleep(3 * time.Second)
 	node.Close()
 	require.LogsContain(t, hook, "Starting beacon node")
-
 }
 
 func TestNodeStart_Ok_registerDeterministicGenesisService(t *testing.T) {
@@ -97,12 +96,16 @@ func TestNodeStart_Ok_registerDeterministicGenesisService(t *testing.T) {
 	for i := uint64(1); i < 2; i++ {
 		var someRoot [32]byte
 		var someKey [fieldparams.BLSPubkeyLength]byte
+		var someContract [fieldparams.ContractAddressLength]byte
 		copy(someRoot[:], strconv.Itoa(int(i)))
 		copy(someKey[:], strconv.Itoa(int(i)))
+		copy(someContract[:], strconv.Itoa(int(i)))
 		genesisState.Validators = append(genesisState.Validators, &ethpb.Validator{
 			PublicKey:                  someKey[:],
 			WithdrawalCredentials:      someRoot[:],
+			Contract:                   someContract[:],
 			EffectiveBalance:           params.BeaconConfig().MaxEffectiveBalance,
+			EffectiveActivity:          1,
 			Slashed:                    false,
 			ActivationEligibilityEpoch: 1,
 			ActivationEpoch:            1,
@@ -113,7 +116,7 @@ func TestNodeStart_Ok_registerDeterministicGenesisService(t *testing.T) {
 	}
 	genesisBytes, err := genesisState.MarshalSSZ()
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile("genesis_ssz.json", genesisBytes, 0666))
+	require.NoError(t, os.WriteFile("genesis_ssz.json", genesisBytes, 0o666))
 	set.String("genesis-state", "genesis_ssz.json", "")
 	ctx := cli.NewContext(&app, set, nil)
 	node, err := New(ctx, WithBlockchainFlagOptions([]blockchain.Option{}),
@@ -164,7 +167,7 @@ func TestMonitor_RegisteredCorrectly(t *testing.T) {
 	require.NoError(t, cliCtx.Set(cmd.ValidatorMonitorIndicesFlag.Name, "1,2"))
 	n := &BeaconNode{ctx: context.Background(), cliCtx: cliCtx, services: runtime.NewServiceRegistry()}
 	require.NoError(t, n.services.RegisterService(&blockchain.Service{}))
-	require.NoError(t, n.registerValidatorMonitorService())
+	require.NoError(t, n.registerValidatorMonitorService(make(chan struct{})))
 
 	var mService *monitor.Service
 	require.NoError(t, n.services.FetchService(&mService))

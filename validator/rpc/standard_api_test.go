@@ -1,12 +1,14 @@
 package rpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -17,6 +19,8 @@ import (
 	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	validatorserviceconfig "github.com/prysmaticlabs/prysm/v4/config/validator/service"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/validator"
 	"github.com/prysmaticlabs/prysm/v4/crypto/bls"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 	ethpbservice "github.com/prysmaticlabs/prysm/v4/proto/eth/service"
@@ -31,6 +35,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/validator/accounts/wallet"
 	"github.com/prysmaticlabs/prysm/v4/validator/client"
 	"github.com/prysmaticlabs/prysm/v4/validator/db/kv"
+	dbtest "github.com/prysmaticlabs/prysm/v4/validator/db/testing"
 	"github.com/prysmaticlabs/prysm/v4/validator/keymanager"
 	"github.com/prysmaticlabs/prysm/v4/validator/keymanager/derived"
 	remoteweb3signer "github.com/prysmaticlabs/prysm/v4/validator/keymanager/remote-web3signer"
@@ -39,6 +44,8 @@ import (
 	keystorev4 "github.com/wealdtech/go-eth2-wallet-encryptor-keystorev4"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestServer_ListKeystores(t *testing.T) {
@@ -532,11 +539,11 @@ func createRandomKeystore(t testing.TB, password string) *keymanager.Keystore {
 	cryptoFields, err := encryptor.Encrypt(validatingKey.Marshal(), password)
 	require.NoError(t, err)
 	return &keymanager.Keystore{
-		Crypto:  cryptoFields,
-		Pubkey:  fmt.Sprintf("%x", pubKey),
-		ID:      id.String(),
-		Version: encryptor.Version(),
-		Name:    encryptor.Name(),
+		Crypto:      cryptoFields,
+		Pubkey:      fmt.Sprintf("%x", pubKey),
+		ID:          id.String(),
+		Version:     encryptor.Version(),
+		Description: encryptor.Name(),
 	}
 }
 
@@ -761,7 +768,8 @@ func TestServer_ListFeeRecipientByPubkey(t *testing.T) {
 			mockValidatorClient := validatormock.NewMockValidatorClient(ctrl)
 
 			m := &mock.MockValidator{}
-			m.SetProposerSettings(tt.args)
+			err := m.SetProposerSettings(ctx, tt.args)
+			require.NoError(t, err)
 
 			if tt.args == nil {
 				mockValidatorClient.EXPECT().GetFeeRecipientByPubKey(gomock.Any(), gomock.Any()).Return(tt.cached, nil)
@@ -997,16 +1005,20 @@ func TestServer_FeeRecipientByPubkey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &mock.MockValidator{}
-			m.SetProposerSettings(tt.proposerSettings)
+			err := m.SetProposerSettings(ctx, tt.proposerSettings)
+			require.NoError(t, err)
+			validatorDB := dbtest.SetupDB(t, [][fieldparams.BLSPubkeyLength]byte{})
 
+			// save a default here
 			vs, err := client.NewValidatorService(ctx, &client.Config{
 				Validator: m,
+				ValDB:     validatorDB,
 			})
-
 			require.NoError(t, err)
 			s := &Server{
 				validatorService:          vs,
 				beaconNodeValidatorClient: beaconClient,
+				valDB:                     validatorDB,
 			}
 
 			_, err = s.SetFeeRecipientByPubkey(ctx, &ethpbservice.SetFeeRecipientByPubkeyRequest{Pubkey: byteval, Ethaddress: common.HexToAddress(tt.args).Bytes()})
@@ -1096,13 +1108,17 @@ func TestServer_DeleteFeeRecipientByPubkey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &mock.MockValidator{}
-			m.SetProposerSettings(tt.proposerSettings)
+			err := m.SetProposerSettings(ctx, tt.proposerSettings)
+			require.NoError(t, err)
+			validatorDB := dbtest.SetupDB(t, [][fieldparams.BLSPubkeyLength]byte{})
 			vs, err := client.NewValidatorService(ctx, &client.Config{
 				Validator: m,
+				ValDB:     validatorDB,
 			})
 			require.NoError(t, err)
 			s := &Server{
 				validatorService: vs,
+				valDB:            validatorDB,
 			}
 			_, err = s.DeleteFeeRecipientByPubkey(ctx, &ethpbservice.PubkeyRequest{Pubkey: byteval})
 			require.NoError(t, err)
@@ -1189,7 +1205,8 @@ func TestServer_GetGasLimit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &mock.MockValidator{}
-			m.SetProposerSettings(tt.args)
+			err := m.SetProposerSettings(ctx, tt.args)
+			require.NoError(t, err)
 			vs, err := client.NewValidatorService(ctx, &client.Config{
 				Validator: m,
 			})
@@ -1207,7 +1224,6 @@ func TestServer_GetGasLimit(t *testing.T) {
 func TestServer_SetGasLimit(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
 	beaconClient := validatormock.NewMockValidatorClient(ctrl)
 	ctx := grpc.NewContextWithServerTransportStream(context.Background(), &runtime.ServerTransportStream{})
 
@@ -1231,20 +1247,16 @@ func TestServer_SetGasLimit(t *testing.T) {
 		pubkey           []byte
 		newGasLimit      uint64
 		proposerSettings *validatorserviceconfig.ProposerSettings
-		w                []want
+		w                []*want
 		beaconReturn     *beaconResp
+		wantErr          string
 	}{
 		{
 			name:             "ProposerSettings is nil",
 			pubkey:           pubkey1,
 			newGasLimit:      9999,
 			proposerSettings: nil,
-			w: []want{
-				{
-					pubkey:   pubkey1,
-					gaslimit: 9999,
-				},
-			},
+			wantErr:          "no proposer settings were found to update",
 		},
 		{
 			name:        "ProposerSettings.ProposeConfig is nil AND ProposerSettings.DefaultConfig is nil",
@@ -1254,12 +1266,7 @@ func TestServer_SetGasLimit(t *testing.T) {
 				ProposeConfig: nil,
 				DefaultConfig: nil,
 			},
-			w: []want{
-				{
-					pubkey:   pubkey1,
-					gaslimit: 9999,
-				},
-			},
+			wantErr: "gas limit changes only apply when builder is enabled",
 		},
 		{
 			name:        "ProposerSettings.ProposeConfig is nil AND ProposerSettings.DefaultConfig.BuilderConfig is nil",
@@ -1271,12 +1278,7 @@ func TestServer_SetGasLimit(t *testing.T) {
 					BuilderConfig: nil,
 				},
 			},
-			w: []want{
-				{
-					pubkey:   pubkey1,
-					gaslimit: 9999,
-				},
-			},
+			wantErr: "gas limit changes only apply when builder is enabled",
 		},
 		{
 			name:        "ProposerSettings.ProposeConfig is defined for pubkey, BuilderConfig is nil AND ProposerSettings.DefaultConfig is nil",
@@ -1290,12 +1292,7 @@ func TestServer_SetGasLimit(t *testing.T) {
 				},
 				DefaultConfig: nil,
 			},
-			w: []want{
-				{
-					pubkey:   pubkey1,
-					gaslimit: 9999,
-				},
-			},
+			wantErr: "gas limit changes only apply when builder is enabled",
 		},
 		{
 			name:        "ProposerSettings.ProposeConfig is defined for pubkey, BuilderConfig is defined AND ProposerSettings.DefaultConfig is nil",
@@ -1309,12 +1306,7 @@ func TestServer_SetGasLimit(t *testing.T) {
 				},
 				DefaultConfig: nil,
 			},
-			w: []want{
-				{
-					pubkey:   pubkey1,
-					gaslimit: 9999,
-				},
-			},
+			wantErr: "gas limit changes only apply when builder is enabled",
 		},
 		{
 			name:        "ProposerSettings.ProposeConfig is NOT defined for pubkey, BuilderConfig is defined AND ProposerSettings.DefaultConfig is nil",
@@ -1322,23 +1314,19 @@ func TestServer_SetGasLimit(t *testing.T) {
 			newGasLimit: 9999,
 			proposerSettings: &validatorserviceconfig.ProposerSettings{
 				ProposeConfig: map[[48]byte]*validatorserviceconfig.ProposerOption{
-					bytesutil.ToBytes48(pubkey1): {
+					bytesutil.ToBytes48(pubkey2): {
 						BuilderConfig: &validatorserviceconfig.BuilderConfig{
+							Enabled:  true,
 							GasLimit: 12345,
 						},
 					},
 				},
 				DefaultConfig: nil,
 			},
-			w: []want{
-				{
-					pubkey:   pubkey1,
-					gaslimit: 12345,
-				},
-				{
-					pubkey:   pubkey2,
-					gaslimit: 9999,
-				},
+			w: []*want{{
+				pubkey2,
+				9999,
+			},
 			},
 		},
 		{
@@ -1347,35 +1335,39 @@ func TestServer_SetGasLimit(t *testing.T) {
 			newGasLimit: 9999,
 			proposerSettings: &validatorserviceconfig.ProposerSettings{
 				ProposeConfig: map[[48]byte]*validatorserviceconfig.ProposerOption{
-					bytesutil.ToBytes48(pubkey1): {
+					bytesutil.ToBytes48(pubkey2): {
 						BuilderConfig: nil,
 					},
 				},
 				DefaultConfig: &validatorserviceconfig.ProposerOption{
-					BuilderConfig: &validatorserviceconfig.BuilderConfig{},
+					BuilderConfig: &validatorserviceconfig.BuilderConfig{
+						Enabled: true,
+					},
 				},
 			},
-			w: []want{
-				{
-					pubkey:   pubkey1,
-					gaslimit: 9999,
-				},
+			w: []*want{{
+				pubkey1,
+				9999,
+			},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &mock.MockValidator{}
-			m.SetProposerSettings(tt.proposerSettings)
-
+			err := m.SetProposerSettings(ctx, tt.proposerSettings)
+			require.NoError(t, err)
+			validatorDB := dbtest.SetupDB(t, [][fieldparams.BLSPubkeyLength]byte{})
 			vs, err := client.NewValidatorService(ctx, &client.Config{
 				Validator: m,
+				ValDB:     validatorDB,
 			})
 			require.NoError(t, err)
 
 			s := &Server{
 				validatorService:          vs,
 				beaconNodeValidatorClient: beaconClient,
+				valDB:                     validatorDB,
 			}
 
 			if tt.beaconReturn != nil {
@@ -1386,10 +1378,13 @@ func TestServer_SetGasLimit(t *testing.T) {
 			}
 
 			_, err = s.SetGasLimit(ctx, &ethpbservice.SetGasLimitRequest{Pubkey: tt.pubkey, GasLimit: tt.newGasLimit})
-			require.NoError(t, err)
-
-			for _, w := range tt.w {
-				assert.Equal(t, w.gaslimit, uint64(s.validatorService.ProposerSettings().ProposeConfig[bytesutil.ToBytes48(w.pubkey)].BuilderConfig.GasLimit))
+			if tt.wantErr != "" {
+				require.ErrorContains(t, tt.wantErr, err)
+			} else {
+				require.NoError(t, err)
+				for _, w := range tt.w {
+					assert.Equal(t, w.gaslimit, uint64(s.validatorService.ProposerSettings().ProposeConfig[bytesutil.ToBytes48(w.pubkey)].BuilderConfig.GasLimit))
+				}
 			}
 		})
 	}
@@ -1432,11 +1427,11 @@ func TestServer_DeleteGasLimit(t *testing.T) {
 		params.BeaconConfig().DefaultBuilderGasLimit = originBeaconChainGasLimit
 	}()
 
-	globalDefaultGasLimit := validatorserviceconfig.Uint64(0xbbdd)
+	globalDefaultGasLimit := validator.Uint64(0xbbdd)
 
 	type want struct {
 		pubkey   []byte
-		gaslimit validatorserviceconfig.Uint64
+		gaslimit validator.Uint64
 	}
 
 	tests := []struct {
@@ -1452,14 +1447,14 @@ func TestServer_DeleteGasLimit(t *testing.T) {
 			proposerSettings: &validatorserviceconfig.ProposerSettings{
 				ProposeConfig: map[[48]byte]*validatorserviceconfig.ProposerOption{
 					bytesutil.ToBytes48(pubkey1): {
-						BuilderConfig: &validatorserviceconfig.BuilderConfig{GasLimit: validatorserviceconfig.Uint64(987654321)},
+						BuilderConfig: &validatorserviceconfig.BuilderConfig{GasLimit: validator.Uint64(987654321)},
 					},
 					bytesutil.ToBytes48(pubkey2): {
-						BuilderConfig: &validatorserviceconfig.BuilderConfig{GasLimit: validatorserviceconfig.Uint64(123456789)},
+						BuilderConfig: &validatorserviceconfig.BuilderConfig{GasLimit: validator.Uint64(123456789)},
 					},
 				},
 				DefaultConfig: &validatorserviceconfig.ProposerOption{
-					BuilderConfig: &validatorserviceconfig.BuilderConfig{GasLimit: validatorserviceconfig.Uint64(5555)},
+					BuilderConfig: &validatorserviceconfig.BuilderConfig{GasLimit: validator.Uint64(5555)},
 				},
 			},
 			wantError: nil,
@@ -1467,11 +1462,11 @@ func TestServer_DeleteGasLimit(t *testing.T) {
 				{
 					pubkey: pubkey1,
 					// After deletion, use DefaultConfig.BuilderConfig.GasLimit.
-					gaslimit: validatorserviceconfig.Uint64(5555),
+					gaslimit: validator.Uint64(5555),
 				},
 				{
 					pubkey:   pubkey2,
-					gaslimit: validatorserviceconfig.Uint64(123456789),
+					gaslimit: validator.Uint64(123456789),
 				},
 			},
 		},
@@ -1481,10 +1476,10 @@ func TestServer_DeleteGasLimit(t *testing.T) {
 			proposerSettings: &validatorserviceconfig.ProposerSettings{
 				ProposeConfig: map[[48]byte]*validatorserviceconfig.ProposerOption{
 					bytesutil.ToBytes48(pubkey1): {
-						BuilderConfig: &validatorserviceconfig.BuilderConfig{GasLimit: validatorserviceconfig.Uint64(987654321)},
+						BuilderConfig: &validatorserviceconfig.BuilderConfig{GasLimit: validator.Uint64(987654321)},
 					},
 					bytesutil.ToBytes48(pubkey2): {
-						BuilderConfig: &validatorserviceconfig.BuilderConfig{GasLimit: validatorserviceconfig.Uint64(123456789)},
+						BuilderConfig: &validatorserviceconfig.BuilderConfig{GasLimit: validator.Uint64(123456789)},
 					},
 				},
 			},
@@ -1497,7 +1492,7 @@ func TestServer_DeleteGasLimit(t *testing.T) {
 				},
 				{
 					pubkey:   pubkey2,
-					gaslimit: validatorserviceconfig.Uint64(123456789),
+					gaslimit: validator.Uint64(123456789),
 				},
 			},
 		},
@@ -1507,7 +1502,7 @@ func TestServer_DeleteGasLimit(t *testing.T) {
 			proposerSettings: &validatorserviceconfig.ProposerSettings{
 				ProposeConfig: map[[48]byte]*validatorserviceconfig.ProposerOption{
 					bytesutil.ToBytes48(pubkey1): {
-						BuilderConfig: &validatorserviceconfig.BuilderConfig{GasLimit: validatorserviceconfig.Uint64(987654321)},
+						BuilderConfig: &validatorserviceconfig.BuilderConfig{GasLimit: validator.Uint64(987654321)},
 					},
 				},
 			},
@@ -1516,7 +1511,7 @@ func TestServer_DeleteGasLimit(t *testing.T) {
 				// pubkey1's gaslimit is unaffected
 				{
 					pubkey:   pubkey1,
-					gaslimit: validatorserviceconfig.Uint64(987654321),
+					gaslimit: validator.Uint64(987654321),
 				},
 			},
 		},
@@ -1530,13 +1525,17 @@ func TestServer_DeleteGasLimit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &mock.MockValidator{}
-			m.SetProposerSettings(tt.proposerSettings)
+			err := m.SetProposerSettings(ctx, tt.proposerSettings)
+			require.NoError(t, err)
+			validatorDB := dbtest.SetupDB(t, [][fieldparams.BLSPubkeyLength]byte{})
 			vs, err := client.NewValidatorService(ctx, &client.Config{
 				Validator: m,
+				ValDB:     validatorDB,
 			})
 			require.NoError(t, err)
 			s := &Server{
 				validatorService: vs,
+				valDB:            validatorDB,
 			}
 			// Set up global default value for builder gas limit.
 			params.BeaconConfig().DefaultBuilderGasLimit = uint64(globalDefaultGasLimit)
@@ -1549,6 +1548,119 @@ func TestServer_DeleteGasLimit(t *testing.T) {
 			for _, w := range tt.w {
 				assert.Equal(t, w.gaslimit, s.validatorService.ProposerSettings().ProposeConfig[bytesutil.ToBytes48(w.pubkey)].BuilderConfig.GasLimit)
 			}
+		})
+	}
+}
+
+func TestServer_SetVoluntaryExit(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx := grpc.NewContextWithServerTransportStream(context.Background(), &runtime.ServerTransportStream{})
+	defaultWalletPath = setupWalletDir(t)
+	opts := []accounts.Option{
+		accounts.WithWalletDir(defaultWalletPath),
+		accounts.WithKeymanagerType(keymanager.Derived),
+		accounts.WithWalletPassword(strongPass),
+		accounts.WithSkipMnemonicConfirm(true),
+	}
+	acc, err := accounts.NewCLIManager(opts...)
+	require.NoError(t, err)
+	w, err := acc.WalletCreate(ctx)
+	require.NoError(t, err)
+	km, err := w.InitializeKeymanager(ctx, iface.InitKeymanagerConfig{ListenForChanges: false})
+	require.NoError(t, err)
+
+	m := &mock.MockValidator{Km: km}
+	vs, err := client.NewValidatorService(ctx, &client.Config{
+		Validator: m,
+	})
+	require.NoError(t, err)
+
+	dr, ok := km.(*derived.Keymanager)
+	require.Equal(t, true, ok)
+	err = dr.RecoverAccountsFromMnemonic(ctx, mocks.TestMnemonic, derived.DefaultMnemonicLanguage, "", 1)
+	require.NoError(t, err)
+	pubKeys, err := dr.FetchValidatingPublicKeys(ctx)
+	require.NoError(t, err)
+
+	beaconClient := validatormock.NewMockValidatorClient(ctrl)
+	mockNodeClient := validatormock.NewMockNodeClient(ctrl)
+	// Any time in the past will suffice
+	genesisTime := &timestamppb.Timestamp{
+		Seconds: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Unix(),
+	}
+
+	beaconClient.EXPECT().ValidatorIndex(gomock.Any(), &eth.ValidatorIndexRequest{PublicKey: pubKeys[0][:]}).
+		Times(3).
+		Return(&eth.ValidatorIndexResponse{Index: 2}, nil)
+
+	beaconClient.EXPECT().DomainData(
+		gomock.Any(), // ctx
+		gomock.Any(), // epoch
+	).Times(3).
+		Return(&eth.DomainResponse{SignatureDomain: make([]byte, 32)}, nil /*err*/)
+
+	mockNodeClient.EXPECT().
+		GetGenesis(gomock.Any(), gomock.Any()).
+		Times(3).
+		Return(&eth.Genesis{GenesisTime: genesisTime}, nil)
+
+	s := &Server{
+		validatorService:          vs,
+		beaconNodeValidatorClient: beaconClient,
+		wallet:                    w,
+		beaconNodeClient:          mockNodeClient,
+	}
+
+	type want struct {
+		epoch          primitives.Epoch
+		validatorIndex uint64
+		signature      []byte
+	}
+
+	tests := []struct {
+		name   string
+		pubkey []byte
+		epoch  primitives.Epoch
+		w      want
+	}{
+		{
+			name:  "Ok: with epoch",
+			epoch: 30000000,
+			w: want{
+				epoch:          30000000,
+				validatorIndex: 2,
+				signature:      []uint8{175, 157, 5, 134, 253, 2, 193, 35, 176, 43, 217, 36, 39, 240, 24, 79, 207, 133, 150, 7, 237, 16, 54, 244, 64, 27, 244, 17, 8, 225, 140, 1, 172, 24, 35, 95, 178, 116, 172, 213, 113, 182, 193, 61, 192, 65, 162, 253, 19, 202, 111, 164, 195, 215, 0, 205, 95, 7, 30, 251, 244, 157, 210, 155, 238, 30, 35, 219, 177, 232, 174, 62, 218, 69, 23, 249, 180, 140, 60, 29, 190, 249, 229, 95, 235, 236, 81, 33, 60, 4, 201, 227, 70, 239, 167, 2},
+			},
+		},
+		{
+			name: "Ok: epoch not set",
+			w: want{
+				epoch:          0,
+				validatorIndex: 2,
+				signature:      []uint8{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := s.SetVoluntaryExit(ctx, &ethpbservice.SetVoluntaryExitRequest{Pubkey: pubKeys[0][:], Epoch: tt.epoch})
+			require.NoError(t, err)
+			if tt.w.epoch == 0 {
+				genesisResponse, err := s.beaconNodeClient.GetGenesis(ctx, &emptypb.Empty{})
+				require.NoError(t, err)
+				tt.w.epoch, err = client.CurrentEpoch(genesisResponse.GenesisTime)
+				require.NoError(t, err)
+				resp2, err := s.SetVoluntaryExit(ctx, &ethpbservice.SetVoluntaryExitRequest{Pubkey: pubKeys[0][:], Epoch: tt.epoch})
+				require.NoError(t, err)
+				tt.w.signature = resp2.Data.Signature
+			}
+			require.Equal(t, uint64(tt.w.epoch), resp.Data.Message.Epoch)
+			require.Equal(t, tt.w.validatorIndex, resp.Data.Message.ValidatorIndex)
+			require.NotEmpty(t, resp.Data.Signature)
+			ok = bytes.Equal(tt.w.signature, resp.Data.Signature)
+			require.Equal(t, true, ok)
 		})
 	}
 }

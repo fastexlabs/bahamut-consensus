@@ -1,3 +1,4 @@
+// todo unit act
 package deposit_test
 
 import (
@@ -41,7 +42,7 @@ func TestRegister_Below1ETH(t *testing.T) {
 func TestValidatorRegister_OK(t *testing.T) {
 	testAccount, err := mock.Setup()
 	require.NoError(t, err)
-	testAccount.TxOpts.Value = mock.Amount32Eth()
+	testAccount.TxOpts.Value = mock.Amount8192FTN()
 
 	// Generate deposit data
 	privKeys, pubKeys, err := interop.DeterministicallyGenerateKeys(0 /*startIndex*/, 1)
@@ -51,13 +52,13 @@ func TestValidatorRegister_OK(t *testing.T) {
 
 	var depositDataRoot [32]byte
 	copy(depositDataRoot[:], depositDataRoots[0])
-	_, err = testAccount.Contract.Deposit(testAccount.TxOpts, pubKeys[0].Marshal(), depositDataItems[0].WithdrawalCredentials, depositDataItems[0].Contract,depositDataItems[0].Signature, depositDataRoot)
+	_, err = testAccount.Contract.Deposit(testAccount.TxOpts, pubKeys[0].Marshal(), depositDataItems[0].WithdrawalCredentials, depositDataItems[0].Contract, depositDataItems[0].Signature, depositDataRoot)
 	testAccount.Backend.Commit()
 	require.NoError(t, err, "Validator registration failed")
-	_, err = testAccount.Contract.Deposit(testAccount.TxOpts, pubKeys[0].Marshal(), depositDataItems[0].WithdrawalCredentials, depositDataItems[0].Contract,depositDataItems[0].Signature, depositDataRoot)
+	_, err = testAccount.Contract.Deposit(testAccount.TxOpts, pubKeys[0].Marshal(), depositDataItems[0].WithdrawalCredentials, depositDataItems[0].Contract, depositDataItems[0].Signature, depositDataRoot)
 	testAccount.Backend.Commit()
 	assert.NoError(t, err, "Validator registration failed")
-	_, err = testAccount.Contract.Deposit(testAccount.TxOpts, pubKeys[0].Marshal(), depositDataItems[0].WithdrawalCredentials, depositDataItems[0].Contract,depositDataItems[0].Signature, depositDataRoot)
+	_, err = testAccount.Contract.Deposit(testAccount.TxOpts, pubKeys[0].Marshal(), depositDataItems[0].WithdrawalCredentials, depositDataItems[0].Contract, depositDataItems[0].Signature, depositDataRoot)
 	testAccount.Backend.Commit()
 	assert.NoError(t, err, "Validator registration failed")
 
@@ -78,7 +79,7 @@ func TestValidatorRegister_OK(t *testing.T) {
 		merkleTreeIndex[i] = binary.LittleEndian.Uint64(idx)
 	}
 
-	assert.Equal(t, uint64(0), merkleTreeIndex[0], "Deposit event total desposit count miss matched")
-	assert.Equal(t, uint64(1), merkleTreeIndex[1], "Deposit event total desposit count miss matched")
-	assert.Equal(t, uint64(2), merkleTreeIndex[2], "Deposit event total desposit count miss matched")
+	assert.Equal(t, uint64(0), merkleTreeIndex[0], "Deposit event total deposit count mismatched")
+	assert.Equal(t, uint64(1), merkleTreeIndex[1], "Deposit event total deposit count mismatched")
+	assert.Equal(t, uint64(2), merkleTreeIndex[2], "Deposit event total deposit count mismatched")
 }

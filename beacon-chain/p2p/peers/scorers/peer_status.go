@@ -2,7 +2,10 @@ package scorers
 
 import (
 	"errors"
+	"fmt"
 	"math"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/peers/peerdata"
@@ -10,6 +13,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	pb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/time"
+	"github.com/sirupsen/logrus"
 )
 
 var _ Scorer = (*PeerStatusScorer)(nil)
@@ -108,7 +112,8 @@ func (s *PeerStatusScorer) BadPeers() []peer.ID {
 }
 
 // SetPeerStatus sets chain state data for a given peer.
-func (s *PeerStatusScorer) SetPeerStatus(pid peer.ID, chainState *pb.Status, validationError error) {
+func (s *PeerStatusScorer) SetPeerStatus(pid peer.ID, chainState *pb.Status,
+	validationError error, reason string) {
 	s.store.Lock()
 	defer s.store.Unlock()
 
@@ -116,9 +121,56 @@ func (s *PeerStatusScorer) SetPeerStatus(pid peer.ID, chainState *pb.Status, val
 	peerData.ChainState = chainState
 	peerData.ChainStateLastUpdated = time.Now()
 	peerData.ChainStateValidationError = validationError
+	terminalErrs := []error{
+		p2ptypes.ErrWrongForkDigestVersion,
+		p2ptypes.ErrInvalidFinalizedRoot,
+		p2ptypes.ErrInvalidRequest,
+	}
+	isBad := false
+	if slices.Contains[[]error](terminalErrs, validationError) {
+		isBad = true
+	}
+
+	type status struct {
+		ForkDigest     string
+		FinalizedRoot  string
+		FinalizedEpoch uint64
+		HeadRoot       string
+		HeadSlot       uint64
+	}
+
+	var chainStateF status
+	if chainState != nil {
+		chainStateF = status{
+			ForkDigest:     fmt.Sprintf("%x", chainState.ForkDigest),
+			FinalizedRoot:  fmt.Sprintf("%x", chainState.FinalizedRoot),
+			FinalizedEpoch: uint64(chainState.FinalizedEpoch),
+			HeadRoot:       fmt.Sprintf("%x", chainState.HeadRoot),
+			HeadSlot:       uint64(chainState.HeadSlot),
+		}
+	}
+
+	logger().WithFields(logrus.Fields{
+		"scorer":                    peerStatusScorerName,
+		"chainState":                fmt.Sprintf("%+v", chainStateF),
+		"chainStateLastUpdated":     peerData.ChainStateLastUpdated.String(),
+		"chainStateValidationError": validationError,
+		"isBad":                     isBad,
+		"message":                   "Setting peer data.",
+		"peer":                      pid.Loggable(),
+		"reason":                    reason,
+	}).Debug()
 
 	// Update maximum known head slot (scores will be calculated with respect to that maximum value).
 	if chainState != nil && chainState.HeadSlot > s.highestPeerHeadSlot {
+		logger().WithFields(logrus.Fields{
+			"scorer":         peerStatusScorerName,
+			"message":        "Changing highest peer head slot.",
+			"newHighestSlot": chainState.HeadSlot,
+			"oldHighestSlot": s.highestPeerHeadSlot,
+			"peer":           pid.Loggable(),
+		}).Debug()
+
 		s.highestPeerHeadSlot = chainState.HeadSlot
 	}
 }
@@ -147,5 +199,13 @@ func (s *PeerStatusScorer) peerStatus(pid peer.ID) (*pb.Status, error) {
 func (s *PeerStatusScorer) SetHeadSlot(slot primitives.Slot) {
 	s.store.Lock()
 	defer s.store.Unlock()
+
+	logger().WithFields(logrus.Fields{
+		"scorer":  peerStatusScorerName,
+		"oldSlot": s.ourHeadSlot,
+		"newSlot": slot,
+		"message": "Changing head slot.",
+	}).Debug()
+
 	s.ourHeadSlot = slot
 }

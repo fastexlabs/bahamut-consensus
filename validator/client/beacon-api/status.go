@@ -77,7 +77,7 @@ func (c *beaconApiValidatorClient) getValidatorsStatusResponse(ctx context.Conte
 	var lastActivatedValidatorIndex uint64 = 0
 
 	for i, validatorContainer := range stateValidatorsResponse.Data {
-		stringPubKey := validatorContainer.Validator.PublicKey
+		stringPubKey := validatorContainer.Validator.Pubkey
 
 		stringRetrievedPubKeys[stringPubKey] = struct{}{}
 
@@ -121,7 +121,8 @@ func (c *beaconApiValidatorClient) getValidatorsStatusResponse(ctx context.Conte
 		case ethpb.ValidatorStatus_PENDING, ethpb.ValidatorStatus_PARTIALLY_DEPOSITED, ethpb.ValidatorStatus_DEPOSITED:
 			if !isLastActivatedValidatorIndexRetrieved {
 				isLastActivatedValidatorIndexRetrieved = true
-
+				// TODO: double check this due to potential of PENDING STATE being active..
+				// edge case https://github.com/prysmaticlabs/prysm/blob/0669050ffabe925c3d6e5e5d535a86361ae8522b/validator/client/validator.go#L1068
 				activeStateValidators, err := c.stateValidatorsProvider.GetStateValidators(ctx, nil, nil, []string{"active"})
 				if err != nil {
 					return nil, nil, nil, errors.Wrap(err, "failed to get state validators")

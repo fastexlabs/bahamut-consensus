@@ -15,6 +15,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/peers"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/peers/peerdata"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/peers/scorers"
+	"github.com/prysmaticlabs/prysm/v4/config/features"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/wrapper"
@@ -289,7 +290,7 @@ func TestPeerChainState(t *testing.T) {
 	require.NoError(t, err)
 
 	finalizedEpoch := primitives.Epoch(123)
-	p.SetChainState(id, &pb.Status{FinalizedEpoch: finalizedEpoch})
+	p.SetChainState(id, &pb.Status{FinalizedEpoch: finalizedEpoch}, "reason")
 
 	resChainState, err := p.ChainState(id)
 	require.NoError(t, err)
@@ -320,7 +321,7 @@ func TestPeerWithNilChainState(t *testing.T) {
 	direction := network.DirInbound
 	p.Add(new(enr.Record), id, address, direction)
 
-	p.SetChainState(id, nil)
+	p.SetChainState(id, nil, "reason")
 
 	resChainState, err := p.ChainState(id)
 	require.Equal(t, peerdata.ErrNoPeerStatus, err)
@@ -359,19 +360,19 @@ func TestPeerBadResponses(t *testing.T) {
 	assert.Equal(t, 0, resBadResponses, "Unexpected bad responses")
 	assert.Equal(t, false, p.IsBad(id), "Peer marked as bad when should be good")
 
-	scorer.Increment(id)
+	scorer.Increment(id, "reson")
 	resBadResponses, err = scorer.Count(id)
 	require.NoError(t, err)
 	assert.Equal(t, 1, resBadResponses, "Unexpected bad responses")
 	assert.Equal(t, false, p.IsBad(id), "Peer marked as bad when should be good")
 
-	scorer.Increment(id)
+	scorer.Increment(id, "reson")
 	resBadResponses, err = scorer.Count(id)
 	require.NoError(t, err)
 	assert.Equal(t, 2, resBadResponses, "Unexpected bad responses")
 	assert.Equal(t, true, p.IsBad(id), "Peer not marked as bad when it should be")
 
-	scorer.Increment(id)
+	scorer.Increment(id, "reson")
 	resBadResponses, err = scorer.Count(id)
 	require.NoError(t, err)
 	assert.Equal(t, 3, resBadResponses, "Unexpected bad responses")
@@ -523,11 +524,11 @@ func TestPrune(t *testing.T) {
 	scorer := p.Scorers().BadResponsesScorer()
 
 	// Make first peer a bad peer
-	scorer.Increment(firstPID)
-	scorer.Increment(firstPID)
+	scorer.Increment(firstPID, "reson")
+	scorer.Increment(firstPID, "reson")
 
 	// Add bad response for p2.
-	scorer.Increment(secondPID)
+	scorer.Increment(secondPID, "reson")
 
 	// Prune peers
 	p.Prune()
@@ -548,6 +549,10 @@ func TestPrune(t *testing.T) {
 }
 
 func TestPeerIPTracker(t *testing.T) {
+	resetCfg := features.InitWithReset(&features.Flags{
+		EnablePeerScorer: false,
+	})
+	defer resetCfg()
 	maxBadResponses := 2
 	p := peers.NewStatus(context.Background(), &peers.StatusConfig{
 		PeerLimit: 30,
@@ -577,12 +582,12 @@ func TestPeerIPTracker(t *testing.T) {
 	for i := 0; i < p.MaxPeerLimit()+100; i++ {
 		// Peer added to peer handler.
 		pid := addPeer(t, p, peers.PeerDisconnected)
-		p.Scorers().BadResponsesScorer().Increment(pid)
+		p.Scorers().BadResponsesScorer().Increment(pid, "reson")
 	}
 	p.Prune()
 
 	for _, pr := range badPeers {
-		assert.Equal(t, true, p.IsBad(pr), "peer with good ip is regarded as bad")
+		assert.Equal(t, false, p.IsBad(pr), "peer with good ip is regarded as bad")
 	}
 }
 
@@ -612,35 +617,35 @@ func TestTrimmedOrderedPeers(t *testing.T) {
 		HeadSlot:       3 * params.BeaconConfig().SlotsPerEpoch,
 		FinalizedEpoch: 3,
 		FinalizedRoot:  mockroot3[:],
-	})
+	}, "reason")
 	// Peer 2
 	pid2 := addPeer(t, p, peers.PeerConnected)
 	p.SetChainState(pid2, &pb.Status{
 		HeadSlot:       4 * params.BeaconConfig().SlotsPerEpoch,
 		FinalizedEpoch: 4,
 		FinalizedRoot:  mockroot4[:],
-	})
+	}, "reason")
 	// Peer 3
 	pid3 := addPeer(t, p, peers.PeerConnected)
 	p.SetChainState(pid3, &pb.Status{
 		HeadSlot:       5 * params.BeaconConfig().SlotsPerEpoch,
 		FinalizedEpoch: 5,
 		FinalizedRoot:  mockroot5[:],
-	})
+	}, "reason")
 	// Peer 4
 	pid4 := addPeer(t, p, peers.PeerConnected)
 	p.SetChainState(pid4, &pb.Status{
 		HeadSlot:       2 * params.BeaconConfig().SlotsPerEpoch,
 		FinalizedEpoch: 2,
 		FinalizedRoot:  mockroot2[:],
-	})
+	}, "reason")
 	// Peer 5
 	pid5 := addPeer(t, p, peers.PeerConnected)
 	p.SetChainState(pid5, &pb.Status{
 		HeadSlot:       2 * params.BeaconConfig().SlotsPerEpoch,
 		FinalizedEpoch: 2,
 		FinalizedRoot:  mockroot2[:],
-	})
+	}, "reason")
 
 	target, pids := p.BestFinalized(maxPeers, 0)
 	assert.Equal(t, expectedTarget, target, "Incorrect target epoch retrieved")
@@ -686,6 +691,10 @@ func TestAtInboundPeerLimit(t *testing.T) {
 }
 
 func TestPrunePeers(t *testing.T) {
+	resetCfg := features.InitWithReset(&features.Flags{
+		EnablePeerScorer: false,
+	})
+	defer resetCfg()
 	p := peers.NewStatus(context.Background(), &peers.StatusConfig{
 		PeerLimit: 30,
 		ScorerParams: &scorers.Config{
@@ -723,7 +732,7 @@ func TestPrunePeers(t *testing.T) {
 		modulo := i % 5
 		// Increment bad scores for peers.
 		for j := 0; j < modulo; j++ {
-			p.Scorers().BadResponsesScorer().Increment(pid)
+			p.Scorers().BadResponsesScorer().Increment(pid, "reson")
 		}
 	}
 	// Assert all peers more than max are prunable.
@@ -736,10 +745,117 @@ func TestPrunePeers(t *testing.T) {
 	}
 
 	// Ensure it is in the descending order.
+	currCount, err := p.Scorers().BadResponsesScorer().Count(peersToPrune[0])
+	require.NoError(t, err)
+	for _, pid := range peersToPrune {
+		count, err := p.Scorers().BadResponsesScorer().Count(pid)
+		require.NoError(t, err)
+		assert.Equal(t, true, currCount >= count)
+		currCount = count
+	}
+}
+
+func TestPrunePeers_TrustedPeers(t *testing.T) {
+	p := peers.NewStatus(context.Background(), &peers.StatusConfig{
+		PeerLimit: 30,
+		ScorerParams: &scorers.Config{
+			BadResponsesScorerConfig: &scorers.BadResponsesScorerConfig{
+				Threshold: 1,
+			},
+		},
+	})
+
+	for i := 0; i < 15; i++ {
+		// Peer added to peer handler.
+		createPeer(t, p, nil, network.DirOutbound, peerdata.PeerConnectionState(ethpb.ConnectionState_CONNECTED))
+	}
+	// Assert there are no prunable peers.
+	peersToPrune := p.PeersToPrune()
+	assert.Equal(t, 0, len(peersToPrune))
+
+	for i := 0; i < 18; i++ {
+		// Peer added to peer handler.
+		createPeer(t, p, nil, network.DirInbound, peerdata.PeerConnectionState(ethpb.ConnectionState_CONNECTED))
+	}
+
+	// Assert there are the correct prunable peers.
+	peersToPrune = p.PeersToPrune()
+	assert.Equal(t, 3, len(peersToPrune))
+
+	// Add in more peers.
+	for i := 0; i < 13; i++ {
+		// Peer added to peer handler.
+		createPeer(t, p, nil, network.DirInbound, peerdata.PeerConnectionState(ethpb.ConnectionState_CONNECTED))
+	}
+
+	trustedPeers := []peer.ID{}
+	// Set up bad scores for inbound peers.
+	inboundPeers := p.InboundConnected()
+	for i, pid := range inboundPeers {
+		modulo := i % 5
+		// Increment bad scores for peers.
+		for j := 0; j < modulo; j++ {
+			p.Scorers().BadResponsesScorer().Increment(pid, "reson")
+		}
+		if modulo == 4 {
+			trustedPeers = append(trustedPeers, pid)
+		}
+	}
+	p.SetTrustedPeers(trustedPeers)
+
+	// Assert we have correct trusted peers
+	trustedPeers = p.GetTrustedPeers()
+	assert.Equal(t, 6, len(trustedPeers))
+
+	// Assert all peers more than max are prunable.
+	peersToPrune = p.PeersToPrune()
+	assert.Equal(t, 16, len(peersToPrune))
+
+	// Check that trusted peers are not pruned.
+	for _, pid := range peersToPrune {
+		for _, tPid := range trustedPeers {
+			assert.NotEqual(t, pid.String(), tPid.String())
+		}
+	}
+
+	// Add more peers to check if trusted peers can be pruned after they are deleted from trusted peer set.
+	for i := 0; i < 9; i++ {
+		// Peer added to peer handler.
+		createPeer(t, p, nil, network.DirInbound, peerdata.PeerConnectionState(ethpb.ConnectionState_CONNECTED))
+	}
+
+	// Delete trusted peers.
+	p.DeleteTrustedPeers(trustedPeers)
+
+	peersToPrune = p.PeersToPrune()
+	assert.Equal(t, 25, len(peersToPrune))
+
+	// Check that trusted peers are pruned.
+	for _, tPid := range trustedPeers {
+		pruned := false
+		for _, pid := range peersToPrune {
+			if pid.String() == tPid.String() {
+				pruned = true
+			}
+		}
+		assert.Equal(t, true, pruned)
+	}
+
+	// Assert have zero trusted peers
+	trustedPeers = p.GetTrustedPeers()
+	assert.Equal(t, 0, len(trustedPeers))
+
+	for _, pid := range peersToPrune {
+		dir, err := p.Direction(pid)
+		require.NoError(t, err)
+		assert.Equal(t, network.DirInbound, dir)
+	}
+
+	// Ensure it is in the descending order.
 	currScore := p.Scorers().Score(peersToPrune[0])
 	for _, pid := range peersToPrune {
-		score := p.Scorers().BadResponsesScorer().Score(pid)
-		assert.Equal(t, true, currScore >= score)
+		score := p.Scorers().Score(pid)
+		assert.Equal(t, true, currScore <= score)
 		currScore = score
 	}
 }
@@ -889,7 +1005,7 @@ func TestStatus_BestPeer(t *testing.T) {
 				p.SetChainState(addPeer(t, p, peers.PeerConnected), &pb.Status{
 					FinalizedEpoch: peerConfig.finalizedEpoch,
 					HeadSlot:       peerConfig.headSlot,
-				})
+				}, "reason")
 			}
 			epoch, pids := p.BestFinalized(tt.limitPeers, tt.ourFinalizedEpoch)
 			assert.Equal(t, tt.targetEpoch, epoch, "Unexpected epoch retrieved")
@@ -915,7 +1031,7 @@ func TestBestFinalized_returnsMaxValue(t *testing.T) {
 		p.SetConnectionState(peer.ID(rune(i)), peers.PeerConnected)
 		p.SetChainState(peer.ID(rune(i)), &pb.Status{
 			FinalizedEpoch: 10,
-		})
+		}, "reason")
 	}
 
 	_, pids := p.BestFinalized(maxPeers, 0)
@@ -938,7 +1054,7 @@ func TestStatus_BestNonFinalized(t *testing.T) {
 		p.SetConnectionState(peer.ID(rune(i)), peers.PeerConnected)
 		p.SetChainState(peer.ID(rune(i)), &pb.Status{
 			HeadSlot: headSlot,
-		})
+		}, "reason")
 	}
 
 	expectedEpoch := primitives.Epoch(8)
@@ -961,17 +1077,17 @@ func TestStatus_CurrentEpoch(t *testing.T) {
 	pid1 := addPeer(t, p, peers.PeerConnected)
 	p.SetChainState(pid1, &pb.Status{
 		HeadSlot: params.BeaconConfig().SlotsPerEpoch * 4,
-	})
+	}, "reason")
 	// Peer 2
 	pid2 := addPeer(t, p, peers.PeerConnected)
 	p.SetChainState(pid2, &pb.Status{
 		HeadSlot: params.BeaconConfig().SlotsPerEpoch * 5,
-	})
+	}, "reason")
 	// Peer 3
 	pid3 := addPeer(t, p, peers.PeerConnected)
 	p.SetChainState(pid3, &pb.Status{
 		HeadSlot: params.BeaconConfig().SlotsPerEpoch * 4,
-	})
+	}, "reason")
 
 	assert.Equal(t, primitives.Epoch(5), p.HighestEpoch(), "Expected current epoch to be 5")
 }

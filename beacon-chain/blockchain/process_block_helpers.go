@@ -4,19 +4,20 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/pkg/errors"
 	doublylinkedtree "github.com/prysmaticlabs/prysm/v4/beacon-chain/forkchoice/doubly-linked-tree"
 	forkchoicetypes "github.com/prysmaticlabs/prysm/v4/beacon-chain/forkchoice/types"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
-	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stateutil"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 	mathutil "github.com/prysmaticlabs/prysm/v4/math"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/prysmaticlabs/prysm/v4/time"
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
 	"go.opencensus.io/trace"
 )
@@ -67,7 +68,7 @@ func (s *Service) verifyBlkPreState(ctx context.Context, b interfaces.ReadOnlyBe
 	parentRoot := b.ParentRoot()
 	// Loosen the check to HasBlock because state summary gets saved in batches
 	// during initial syncing. There's no risk given a state summary object is just a
-	// a subset of the block object.
+	// subset of the block object.
 	if !s.cfg.BeaconDB.HasStateSummary(ctx, parentRoot) && !s.cfg.BeaconDB.HasBlock(ctx, parentRoot) {
 		return errors.New("could not reconstruct parent state")
 	}
@@ -217,33 +218,45 @@ func (s *Service) fillInForkChoiceMissingBlocks(ctx context.Context, blk interfa
 	return s.cfg.ForkChoiceStore.InsertChain(ctx, pendingNodes)
 }
 
-// inserts finalized deposits into our finalized deposit trie.
-func (s *Service) insertFinalizedDeposits(ctx context.Context, fRoot [32]byte) error {
+// inserts finalized deposits into our finalized deposit trie, needs to be
+// called in the background
+func (s *Service) insertFinalizedDeposits(ctx context.Context, fRoot [32]byte) {
 	ctx, span := trace.StartSpan(ctx, "blockChain.insertFinalizedDeposits")
 	defer span.End()
+	startTime := time.Now()
 
 	// Update deposit cache.
 	finalizedState, err := s.cfg.StateGen.StateByRoot(ctx, fRoot)
 	if err != nil {
-		return errors.Wrap(err, "could not fetch finalized state")
+		log.WithError(err).Error("could not fetch finalized state")
+		return
 	}
 	// We update the cache up to the last deposit index in the finalized block's state.
 	// We can be confident that these deposits will be included in some block
 	// because the Eth1 follow distance makes such long-range reorgs extremely unlikely.
 	eth1DepositIndex, err := mathutil.Int(finalizedState.Eth1DepositIndex())
 	if err != nil {
-		return errors.Wrap(err, "could not cast eth1 deposit index")
+		log.WithError(err).Error("could not cast eth1 deposit index")
+		return
 	}
 	// The deposit index in the state is always the index of the next deposit
 	// to be included(rather than the last one to be processed). This was most likely
 	// done as the state cannot represent signed integers.
-	eth1DepositIndex -= 1
-	s.cfg.DepositCache.InsertFinalizedDeposits(ctx, int64(eth1DepositIndex))
-	// Deposit proofs are only used during state transition and can be safely removed to save space.
-	if err = s.cfg.DepositCache.PruneProofs(ctx, int64(eth1DepositIndex)); err != nil {
-		return errors.Wrap(err, "could not prune deposit proofs")
+	finalizedEth1DepIdx := eth1DepositIndex - 1
+	if err = s.cfg.DepositCache.InsertFinalizedDeposits(ctx, int64(finalizedEth1DepIdx), common.Hash(finalizedState.Eth1Data().BlockHash),
+		0 /* Setting a zero value as we have no access to block height */); err != nil {
+		log.WithError(err).Error("could not insert finalized deposits")
+		return
 	}
-	return nil
+	// Deposit proofs are only used during state transition and can be safely removed to save space.
+	if err = s.cfg.DepositCache.PruneProofs(ctx, int64(finalizedEth1DepIdx)); err != nil {
+		log.WithError(err).Error("could not prune deposit proofs")
+	}
+	// Prune deposits which have already been finalized, the below method prunes all pending deposits (non-inclusive) up
+	// to the provided eth1 deposit index.
+	s.cfg.DepositCache.PrunePendingDeposits(ctx, int64(eth1DepositIndex)) // lint:ignore uintcast -- Deposit index should not exceed int64 in your lifetime.
+
+	log.WithField("duration", time.Since(startTime).String()).Debugf("Finalized deposit insertion completed at index %d", finalizedEth1DepIdx)
 }
 
 // This ensures that the input root defaults to using genesis root instead of zero hashes. This is needed for handling
@@ -255,7 +268,8 @@ func (s *Service) ensureRootNotZeros(root [32]byte) [32]byte {
 	return root
 }
 
-func (s *Service) verifyBlockActivities(ctx context.Context, preState state.BeaconState, blk interfaces.ReadOnlyBeaconBlock) error {
+// todo unit act
+func (s *Service) verifyBlockActivities(ctx context.Context, preState state.ReadOnlyBeaconState, blk interfaces.ReadOnlyBeaconBlock) error {
 	ctx, span := trace.StartSpan(ctx, "blockChain.verifyBlockActivities")
 	defer span.End()
 
@@ -263,41 +277,51 @@ func (s *Service) verifyBlockActivities(ctx context.Context, preState state.Beac
 	if err != nil {
 		return err
 	}
-	blockHash := common.BytesToHash(latestExecutionHeader.BlockHash())
 
-	blockActivities, err := s.cfg.ExecutionEngineCaller.GetBlockActivitiesByHash(ctx, blockHash)
+	transactionsCount, err := latestExecutionHeader.TransactionsCount()
 	if err != nil {
-		return errors.Wrap(err, "could not get activities from execution layer")
+		return err
 	}
+	baseFee := bytesutil.LittleEndianBytesToBigInt(latestExecutionHeader.BaseFeePerGas()).Uint64()
 
-	if blockActivities.TxCount != blk.Body().TransactionsCount() {
+	if transactionsCount != blk.Body().TransactionsCount() {
 		return invalidBlock{error: errors.New("invalid transactions count")}
 	}
 
-	if blockActivities.BaseFee != blk.Body().BaseFee() {
+	if baseFee != blk.Body().BaseFee() {
 		return invalidBlock{error: errors.New("invalid base fee")}
 	}
 
-	if err := verifyActivityChangesRoot(blockActivities.Activities, blk.Body().ActivityChanges()); err != nil {
+	activitiesRoot, err := latestExecutionHeader.ActivitiesRoot()
+	if err != nil {
+		return err
+	}
+
+	if err := verifyActivityChangesRoot(activitiesRoot, blk.Body().ActivityChanges()); err != nil {
 		return err
 	}
 	return nil
 }
 
-func verifyActivityChangesRoot(local, proposed []*ethpb.ActivityChange) error {
-	localRoot, err := stateutil.ActivityChangesRoot(local)
-	if err != nil {
-		return errors.Wrap(err, "could not calculate local activity changes root")
-	}
+func verifyActivityChangesRoot(localRoot []byte, proposed []*ethpb.ActivityChange) error {
+	proposedRoot := types.DeriveSha(buildExecutionActivityChanges(proposed), trie.NewStackTrie(nil))
 
-	proposedRoot, err := stateutil.ActivityChangesRoot(proposed)
-	if err != nil {
-		return errors.Wrap(err, "could not calculate proposed activity changes root")
-	}
-
-	if !bytes.Equal(localRoot[:], proposedRoot[:]) {
+	if !bytes.Equal(localRoot, proposedRoot.Bytes()) {
 		return invalidBlock{error: errors.New("invalid activity changes root")}
 	}
 
 	return nil
+}
+
+func buildExecutionActivityChanges(acts []*ethpb.ActivityChange) types.Activities {
+	activities := make([]*types.Activity, len(acts))
+
+	for i, act := range acts {
+		activities[i] = &types.Activity{
+			Address:       common.Address(act.ContractAddress),
+			DeltaActivity: act.DeltaActivity,
+		}
+	}
+
+	return activities
 }

@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
+	field_params "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
@@ -79,7 +83,12 @@ func TestExecuteStateTransitionNoVerify_FullProcessWithContractsAndActivityChang
 		bytesutil.PadTo([]byte{0x2, 0x2, 0x2}, 20),
 		bytesutil.PadTo([]byte{0x3, 0x3, 0x3}, 20),
 	}
-	beaconState, privKeys := util.DeterministicGenesisStateWithContracts(t, 100, contracts)
+	beaconState, privKeys := util.DeterministicGenesisStateCapella(t, 100)
+	validators := beaconState.Validators()
+	for i := 0; i < len(contracts) && i < len(validators); i++ {
+		validators[i].Contract = contracts[i]
+	}
+	require.NoError(t, beaconState.SetValidators(validators))
 
 	eth1Data := &ethpb.Eth1Data{
 		DepositCount: 100,
@@ -94,20 +103,6 @@ func TestExecuteStateTransitionNoVerify_FullProcessWithContractsAndActivityChang
 	bh.Slot = beaconState.Slot()
 	require.NoError(t, beaconState.SetLatestBlockHeader(bh))
 	require.NoError(t, beaconState.SetEth1DataVotes([]*ethpb.Eth1Data{eth1Data}))
-
-	require.NoError(t, beaconState.SetSlot(beaconState.Slot()+1))
-	epoch := time.CurrentEpoch(beaconState)
-	randaoReveal, err := util.RandaoReveal(beaconState, epoch, privKeys)
-	require.NoError(t, err)
-	require.NoError(t, beaconState.SetSlot(beaconState.Slot()-1))
-
-	nextSlotState, err := transition.ProcessSlots(context.Background(), beaconState.Copy(), beaconState.Slot()+1)
-	require.NoError(t, err)
-	parentRoot, err := nextSlotState.LatestBlockHeader().HashTreeRoot()
-	require.NoError(t, err)
-	proposerIdx, err := helpers.BeaconProposerIndex(context.Background(), nextSlotState)
-	require.NoError(t, err)
-	block := util.NewBeaconBlock()
 	activityChanges := []*ethpb.ActivityChange{
 		{
 			ContractAddress: contracts[0],
@@ -122,13 +117,25 @@ func TestExecuteStateTransitionNoVerify_FullProcessWithContractsAndActivityChang
 			DeltaActivity:   424242,
 		},
 	}
-	block.Block.Body.ActivityChanges = activityChanges
-	block.Block.ProposerIndex = proposerIdx
-	block.Block.Slot = beaconState.Slot() + 1
-	block.Block.ParentRoot = parentRoot[:]
-	block.Block.Body.RandaoReveal = randaoReveal
-	block.Block.Body.Eth1Data = eth1Data
 
+	conf := util.DefaultBlockGenConfig()
+	conf.ActivitiesRoot = types.DeriveSha(types.Activities([]*types.Activity{
+		{
+			Address:       common.BytesToAddress(contracts[0]),
+			DeltaActivity: 42,
+		}, {
+			Address:       common.BytesToAddress(contracts[1]),
+			DeltaActivity: 4242,
+		}, {
+			Address:       common.BytesToAddress(contracts[2]),
+			DeltaActivity: 424242,
+		},
+	}), trie.NewStackTrie(nil)).Bytes()
+
+	block, err := util.GenerateFullBlockCapella(beaconState, privKeys, conf, beaconState.Slot()+1)
+	require.NoError(t, err)
+	block.Block.Body.TransactionsCount = 1
+	block.Block.Body.ActivityChanges = activityChanges
 	wsb, err := blocks.NewSignedBeaconBlock(block)
 	require.NoError(t, err)
 	stateRoot, err := transition.CalculateStateRoot(context.Background(), beaconState, wsb)
@@ -154,6 +161,8 @@ func TestExecuteStateTransitionNoVerify_FullProcessWithContractsAndActivityChang
 		require.NoError(t, err)
 		assert.Equal(t, activityChanges[i].DeltaActivity, activity, "Activity changes were not updated")
 	}
+	sharedActivitiy := newState.SharedActivity()
+	assert.Equal(t, uint64(21000), sharedActivitiy.TransactionsGasPerEpoch)
 }
 
 func TestExecuteStateTransitionNoVerifySignature_CouldNotVerifyStateRoot(t *testing.T) {
@@ -161,7 +170,8 @@ func TestExecuteStateTransitionNoVerifySignature_CouldNotVerifyStateRoot(t *test
 
 	eth1Data := &ethpb.Eth1Data{
 		DepositCount: 100,
-		DepositRoot:  bytesutil.PadTo([]byte{2}, 32), BlockHash: make([]byte, 32),
+		DepositRoot:  bytesutil.PadTo([]byte{2}, 32),
+		BlockHash:    make([]byte, 32),
 	}
 	require.NoError(t, beaconState.SetSlot(params.BeaconConfig().SlotsPerEpoch-1))
 	e := beaconState.Eth1Data()
@@ -292,4 +302,16 @@ func TestProcessBlockDifferentVersion(t *testing.T) {
 	require.NoError(t, err)
 	_, _, err = transition.ProcessBlockNoVerifyAnySig(context.Background(), beaconState, wsb)
 	require.ErrorContains(t, "state and block are different version. 0 != 1", err)
+}
+
+func TestVerifyBlobCommitmentCount(t *testing.T) {
+	b := &ethpb.BeaconBlockDeneb{Body: &ethpb.BeaconBlockBodyDeneb{}}
+	rb, err := blocks.NewBeaconBlock(b)
+	require.NoError(t, err)
+	require.NoError(t, transition.VerifyBlobCommitmentCount(rb))
+
+	b = &ethpb.BeaconBlockDeneb{Body: &ethpb.BeaconBlockBodyDeneb{BlobKzgCommitments: make([][]byte, field_params.MaxBlobsPerBlock+1)}}
+	rb, err = blocks.NewBeaconBlock(b)
+	require.NoError(t, err)
+	require.ErrorContains(t, fmt.Sprintf("too many kzg commitments in block: %d", field_params.MaxBlobsPerBlock+1), transition.VerifyBlobCommitmentCount(rb))
 }

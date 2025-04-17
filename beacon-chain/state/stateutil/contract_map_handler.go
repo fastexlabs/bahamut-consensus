@@ -12,15 +12,15 @@ import (
 // ContractMapHandler is a container to hold the map and a reference tracker for how many
 // states shared this.
 type ContractMapHandler struct {
-	valIdxMap map[[fieldparams.ContractAddressLength]byte]primitives.ValidatorIndex
-	mapRef    *Reference
-	*sync.RWMutex
+	valIdxMap     map[[fieldparams.ContractAddressLength]byte]primitives.ValidatorIndex
+	mapRef        *Reference
+	*sync.RWMutex // Todo cut external functionality of mutex. Use this variant of `guard *sync.RWMutex`.
 }
 
 // NewContractMapHandler returns a new contract map handler.
-func NewContractMapHandler(vals []*ethpb.Validator) *ContractMapHandler {
+func NewContractMapHandler(vals []*ethpb.Validator, epoch primitives.Epoch) *ContractMapHandler {
 	return &ContractMapHandler{
-		valIdxMap: coreutils.ContractIndexMap(vals),
+		valIdxMap: coreutils.ContractIndexMap(vals, epoch),
 		mapRef:    &Reference{refs: 1},
 		RWMutex:   new(sync.RWMutex),
 	}

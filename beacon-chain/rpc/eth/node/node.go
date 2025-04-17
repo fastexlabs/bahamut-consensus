@@ -228,7 +228,7 @@ func (ns *Server) ListPeers(ctx context.Context, req *ethpb.PeersRequest) (*ethp
 	return &ethpb.PeersResponse{Data: filteredPeers}, nil
 }
 
-// PeerCount retrieves retrieves number of known peers.
+// PeerCount retrieves number of known peers.
 func (ns *Server) PeerCount(ctx context.Context, _ *emptypb.Empty) (*ethpb.PeerCountResponse, error) {
 	ctx, span := trace.StartSpan(ctx, "node.PeerCount")
 	defer span.End()
@@ -259,29 +259,6 @@ func (_ *Server) GetVersion(ctx context.Context, _ *emptypb.Empty) (*ethpb.Versi
 	}, nil
 }
 
-// GetSyncStatus requests the beacon node to describe if it's currently syncing or not, and
-// if it is, what block it is up to.
-func (ns *Server) GetSyncStatus(ctx context.Context, _ *emptypb.Empty) (*ethpb.SyncingResponse, error) {
-	ctx, span := trace.StartSpan(ctx, "node.GetSyncStatus")
-	defer span.End()
-
-	isOptimistic, err := ns.OptimisticModeFetcher.IsOptimistic(ctx)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not check optimistic status: %v", err)
-	}
-
-	headSlot := ns.HeadFetcher.HeadSlot()
-	return &ethpb.SyncingResponse{
-		Data: &ethpb.SyncInfo{
-			HeadSlot:     headSlot,
-			SyncDistance: ns.GenesisTimeFetcher.CurrentSlot() - headSlot,
-			IsSyncing:    ns.SyncChecker.Syncing(),
-			IsOptimistic: isOptimistic,
-			ElOffline:    !ns.ExecutionChainInfoFetcher.ExecutionClientConnected(),
-		},
-	}, nil
-}
-
 // GetHealth returns node health status in http status codes. Useful for load balancers.
 // Response Usage:
 //
@@ -301,6 +278,7 @@ func (ns *Server) GetHealth(ctx context.Context, _ *emptypb.Empty) (*emptypb.Emp
 	if ns.SyncChecker.Syncing() || ns.SyncChecker.Initialized() {
 		if err := grpc.SetHeader(ctx, metadata.Pairs(grpcutil.HttpCodeMetadataKey, strconv.Itoa(http.StatusPartialContent))); err != nil {
 			// We return a positive result because failing to set a non-gRPC related header should not cause the gRPC call to fail.
+			//nolint:nilerr
 			return &emptypb.Empty{}, nil
 		}
 		return &emptypb.Empty{}, nil
@@ -336,6 +314,9 @@ func handleEmptyFilters(req *ethpb.PeersRequest) (emptyState, emptyDirection boo
 func peerInfo(peerStatus *peers.Status, id peer.ID) (*ethpb.Peer, error) {
 	enr, err := peerStatus.ENR(id)
 	if err != nil {
+		if errors.Is(err, peerdata.ErrPeerUnknown) {
+			return nil, nil
+		}
 		return nil, errors.Wrap(err, "could not obtain ENR")
 	}
 	var serializedEnr string
@@ -347,14 +328,23 @@ func peerInfo(peerStatus *peers.Status, id peer.ID) (*ethpb.Peer, error) {
 	}
 	address, err := peerStatus.Address(id)
 	if err != nil {
+		if errors.Is(err, peerdata.ErrPeerUnknown) {
+			return nil, nil
+		}
 		return nil, errors.Wrap(err, "could not obtain address")
 	}
 	connectionState, err := peerStatus.ConnectionState(id)
 	if err != nil {
+		if errors.Is(err, peerdata.ErrPeerUnknown) {
+			return nil, nil
+		}
 		return nil, errors.Wrap(err, "could not obtain connection state")
 	}
 	direction, err := peerStatus.Direction(id)
 	if err != nil {
+		if errors.Is(err, peerdata.ErrPeerUnknown) {
+			return nil, nil
+		}
 		return nil, errors.Wrap(err, "could not obtain direction")
 	}
 	if eth.PeerDirection(direction) == eth.PeerDirection_UNKNOWN {

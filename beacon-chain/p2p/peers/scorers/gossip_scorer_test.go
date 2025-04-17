@@ -30,7 +30,7 @@ func TestScorers_Gossip_Score(t *testing.T) {
 		{
 			name: "existent bad peer",
 			update: func(scorer *scorers.GossipScorer) {
-				scorer.SetGossipData("peer1", -101.0, 1, nil)
+				scorer.SetGossipData("peer1", -101.0, 1, nil, "reason")
 			},
 			check: func(scorer *scorers.GossipScorer) {
 				assert.Equal(t, -101.0, scorer.Score("peer1"), "Unexpected score")
@@ -40,7 +40,9 @@ func TestScorers_Gossip_Score(t *testing.T) {
 		{
 			name: "good peer",
 			update: func(scorer *scorers.GossipScorer) {
-				scorer.SetGossipData("peer1", 10.0, 0, map[string]*pbrpc.TopicScoreSnapshot{"a": {TimeInMesh: 100}})
+				scorer.SetGossipData("peer1", 10.0, 0,
+					map[string]*pbrpc.TopicScoreSnapshot{"a": {TimeInMesh: 100}},
+					"reason")
 			},
 			check: func(scorer *scorers.GossipScorer) {
 				assert.Equal(t, 10.0, scorer.Score("peer1"), "Unexpected score")

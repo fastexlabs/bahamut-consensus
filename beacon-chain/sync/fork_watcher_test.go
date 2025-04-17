@@ -9,6 +9,7 @@ import (
 	mockChain "github.com/prysmaticlabs/prysm/v4/beacon-chain/blockchain/testing"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p"
 	p2ptest "github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/testing"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/startup"
 	mockSync "github.com/prysmaticlabs/prysm/v4/beacon-chain/sync/initial-sync/testing"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
@@ -29,19 +30,21 @@ func TestService_CheckForNextEpochFork(t *testing.T) {
 			name: "no fork in the next epoch",
 			svcCreator: func(t *testing.T) *Service {
 				peer2peer := p2ptest.NewTestP2P(t)
+				gt := time.Now().Add(time.Duration(-params.BeaconConfig().SlotsPerEpoch.Mul(uint64(params.BeaconConfig().SlotsPerEpoch))) * time.Second)
+				vr := [32]byte{'A'}
 				chainService := &mockChain.ChainService{
-					Genesis:        time.Now().Add(time.Duration(-params.BeaconConfig().SlotsPerEpoch.Mul(uint64(params.BeaconConfig().SlotsPerEpoch))) * time.Second),
-					ValidatorsRoot: [32]byte{'A'},
+					Genesis:        gt,
+					ValidatorsRoot: vr,
 				}
 				ctx, cancel := context.WithCancel(context.Background())
 				r := &Service{
 					ctx:    ctx,
 					cancel: cancel,
 					cfg: &config{
-						p2p:           peer2peer,
-						chain:         chainService,
-						stateNotifier: chainService.StateNotifier(),
-						initialSync:   &mockSync.Sync{IsSyncing: false},
+						p2p:         peer2peer,
+						chain:       chainService,
+						clock:       startup.NewClock(gt, vr),
+						initialSync: &mockSync.Sync{IsSyncing: false},
 					},
 					chainStarted: abool.New(),
 					subHandler:   newSubTopicHandler(),
@@ -58,9 +61,11 @@ func TestService_CheckForNextEpochFork(t *testing.T) {
 			name: "altair fork in the next epoch",
 			svcCreator: func(t *testing.T) *Service {
 				peer2peer := p2ptest.NewTestP2P(t)
+				gt := time.Now().Add(-4 * oneEpoch())
+				vr := [32]byte{'A'}
 				chainService := &mockChain.ChainService{
-					Genesis:        time.Now().Add(-4 * oneEpoch()),
-					ValidatorsRoot: [32]byte{'A'},
+					Genesis:        gt,
+					ValidatorsRoot: vr,
 				}
 				bCfg := params.BeaconConfig().Copy()
 				bCfg.AltairForkEpoch = 5
@@ -71,10 +76,10 @@ func TestService_CheckForNextEpochFork(t *testing.T) {
 					ctx:    ctx,
 					cancel: cancel,
 					cfg: &config{
-						p2p:           peer2peer,
-						chain:         chainService,
-						stateNotifier: chainService.StateNotifier(),
-						initialSync:   &mockSync.Sync{IsSyncing: false},
+						p2p:         peer2peer,
+						chain:       chainService,
+						clock:       startup.NewClock(gt, vr),
+						initialSync: &mockSync.Sync{IsSyncing: false},
 					},
 					chainStarted: abool.New(),
 					subHandler:   newSubTopicHandler(),
@@ -84,7 +89,7 @@ func TestService_CheckForNextEpochFork(t *testing.T) {
 			currEpoch: 4,
 			wantErr:   false,
 			postSvcCheck: func(t *testing.T, s *Service) {
-				genRoot := s.cfg.chain.GenesisValidatorsRoot()
+				genRoot := s.cfg.clock.GenesisValidatorsRoot()
 				digest, err := forks.ForkDigestFromEpoch(5, genRoot[:])
 				assert.NoError(t, err)
 				assert.Equal(t, true, s.subHandler.digestExists(digest))
@@ -115,10 +120,10 @@ func TestService_CheckForNextEpochFork(t *testing.T) {
 					ctx:    ctx,
 					cancel: cancel,
 					cfg: &config{
-						p2p:           peer2peer,
-						chain:         chainService,
-						stateNotifier: chainService.StateNotifier(),
-						initialSync:   &mockSync.Sync{IsSyncing: false},
+						p2p:         peer2peer,
+						chain:       chainService,
+						clock:       startup.NewClock(chainService.Genesis, chainService.ValidatorsRoot),
+						initialSync: &mockSync.Sync{IsSyncing: false},
 					},
 					chainStarted: abool.New(),
 					subHandler:   newSubTopicHandler(),
@@ -128,7 +133,7 @@ func TestService_CheckForNextEpochFork(t *testing.T) {
 			currEpoch: 4,
 			wantErr:   false,
 			postSvcCheck: func(t *testing.T, s *Service) {
-				genRoot := s.cfg.chain.GenesisValidatorsRoot()
+				genRoot := s.cfg.clock.GenesisValidatorsRoot()
 				digest, err := forks.ForkDigestFromEpoch(5, genRoot[:])
 				assert.NoError(t, err)
 				assert.Equal(t, true, s.subHandler.digestExists(digest))
@@ -136,6 +141,50 @@ func TestService_CheckForNextEpochFork(t *testing.T) {
 				for _, p := range s.cfg.p2p.Host().Mux().Protocols() {
 					rpcMap[string(p)] = true
 				}
+			},
+		},
+		{
+			name: "deneb fork in the next epoch",
+			svcCreator: func(t *testing.T) *Service {
+				peer2peer := p2ptest.NewTestP2P(t)
+				gt := time.Now().Add(-4 * oneEpoch())
+				vr := [32]byte{'A'}
+				chainService := &mockChain.ChainService{
+					Genesis:        gt,
+					ValidatorsRoot: vr,
+				}
+				bCfg := params.BeaconConfig().Copy()
+				bCfg.DenebForkEpoch = 5
+				params.OverrideBeaconConfig(bCfg)
+				params.BeaconConfig().InitializeForkSchedule()
+				ctx, cancel := context.WithCancel(context.Background())
+				r := &Service{
+					ctx:    ctx,
+					cancel: cancel,
+					cfg: &config{
+						p2p:         peer2peer,
+						chain:       chainService,
+						clock:       startup.NewClock(gt, vr),
+						initialSync: &mockSync.Sync{IsSyncing: false},
+					},
+					chainStarted: abool.New(),
+					subHandler:   newSubTopicHandler(),
+				}
+				return r
+			},
+			currEpoch: 4,
+			wantErr:   false,
+			postSvcCheck: func(t *testing.T, s *Service) {
+				genRoot := s.cfg.clock.GenesisValidatorsRoot()
+				digest, err := forks.ForkDigestFromEpoch(5, genRoot[:])
+				assert.NoError(t, err)
+				assert.Equal(t, true, s.subHandler.digestExists(digest))
+				rpcMap := make(map[string]bool)
+				for _, p := range s.cfg.p2p.Host().Mux().Protocols() {
+					rpcMap[string(p)] = true
+				}
+				assert.Equal(t, true, rpcMap[p2p.RPCBlobSidecarsByRangeTopicV1+s.cfg.p2p.Encoding().ProtocolSuffix()], "topic doesn't exist")
+				assert.Equal(t, true, rpcMap[p2p.RPCBlobSidecarsByRootTopicV1+s.cfg.p2p.Encoding().ProtocolSuffix()], "topic doesn't exist")
 			},
 		},
 	}
@@ -162,20 +211,33 @@ func TestService_CheckForPreviousEpochFork(t *testing.T) {
 		{
 			name: "no fork in the previous epoch",
 			svcCreator: func(t *testing.T) *Service {
+				bCfgCopy := params.BeaconConfig().Copy()
+				defer func() {
+					params.OverrideBeaconConfig(bCfgCopy)
+					params.BeaconConfig().InitializeForkSchedule()
+				}()
+
+				cfg := params.BeaconConfig()
+				cfg.AltairForkEpoch = cfg.FarFutureEpoch
+				cfg.BellatrixForkEpoch = cfg.FarFutureEpoch
+				params.OverrideBeaconConfig(cfg)
+				params.BeaconConfig().InitializeForkSchedule()
+
 				peer2peer := p2ptest.NewTestP2P(t)
 				chainService := &mockChain.ChainService{
 					Genesis:        time.Now().Add(-oneEpoch()),
 					ValidatorsRoot: [32]byte{'A'},
 				}
+				clock := startup.NewClock(chainService.Genesis, chainService.ValidatorsRoot)
 				ctx, cancel := context.WithCancel(context.Background())
 				r := &Service{
 					ctx:    ctx,
 					cancel: cancel,
 					cfg: &config{
-						p2p:           peer2peer,
-						chain:         chainService,
-						stateNotifier: chainService.StateNotifier(),
-						initialSync:   &mockSync.Sync{IsSyncing: false},
+						p2p:         peer2peer,
+						chain:       chainService,
+						clock:       clock,
+						initialSync: &mockSync.Sync{IsSyncing: false},
 					},
 					chainStarted: abool.New(),
 					subHandler:   newSubTopicHandler(),
@@ -202,24 +264,34 @@ func TestService_CheckForPreviousEpochFork(t *testing.T) {
 		{
 			name: "altair fork in the previous epoch",
 			svcCreator: func(t *testing.T) *Service {
+				bCfgCopy := params.BeaconConfig().Copy()
+				defer func() {
+					params.OverrideBeaconConfig(bCfgCopy)
+					params.BeaconConfig().InitializeForkSchedule()
+				}()
+
+				cfg := params.BeaconConfig()
+				cfg.AltairForkEpoch = 1
+				cfg.BellatrixForkEpoch = 3
+				params.OverrideBeaconConfig(cfg)
+				params.BeaconConfig().InitializeForkSchedule()
+
 				peer2peer := p2ptest.NewTestP2P(t)
 				chainService := &mockChain.ChainService{
 					Genesis:        time.Now().Add(-4 * oneEpoch()),
 					ValidatorsRoot: [32]byte{'A'},
 				}
-				bCfg := params.BeaconConfig().Copy()
-				bCfg.AltairForkEpoch = 3
-				params.OverrideBeaconConfig(bCfg)
-				params.BeaconConfig().InitializeForkSchedule()
+				clock := startup.NewClock(chainService.Genesis, chainService.ValidatorsRoot)
+
 				ctx, cancel := context.WithCancel(context.Background())
 				r := &Service{
 					ctx:    ctx,
 					cancel: cancel,
 					cfg: &config{
-						p2p:           peer2peer,
-						chain:         chainService,
-						stateNotifier: chainService.StateNotifier(),
-						initialSync:   &mockSync.Sync{IsSyncing: false},
+						p2p:         peer2peer,
+						chain:       chainService,
+						clock:       clock,
+						initialSync: &mockSync.Sync{IsSyncing: false},
 					},
 					chainStarted: abool.New(),
 					subHandler:   newSubTopicHandler(),
@@ -232,7 +304,7 @@ func TestService_CheckForPreviousEpochFork(t *testing.T) {
 				chainService.Genesis = prevGenesis
 				r.registerRPCHandlersAltair()
 
-				genRoot := r.cfg.chain.GenesisValidatorsRoot()
+				genRoot := r.cfg.clock.GenesisValidatorsRoot()
 				digest, err := forks.ForkDigestFromEpoch(0, genRoot[:])
 				assert.NoError(t, err)
 				r.registerSubscribers(0, digest)
@@ -248,10 +320,10 @@ func TestService_CheckForPreviousEpochFork(t *testing.T) {
 			currEpoch: 4,
 			wantErr:   false,
 			postSvcCheck: func(t *testing.T, s *Service) {
-				genRoot := s.cfg.chain.GenesisValidatorsRoot()
+				genRoot := s.cfg.clock.GenesisValidatorsRoot()
 				digest, err := forks.ForkDigestFromEpoch(0, genRoot[:])
 				assert.NoError(t, err)
-				assert.Equal(t, false, s.subHandler.digestExists(digest))
+				assert.Equal(t, true, s.subHandler.digestExists(digest))
 				digest, err = forks.ForkDigestFromEpoch(3, genRoot[:])
 				assert.NoError(t, err)
 				assert.Equal(t, true, s.subHandler.digestExists(digest))
@@ -261,6 +333,7 @@ func TestService_CheckForPreviousEpochFork(t *testing.T) {
 				for _, p := range ptcls {
 					pMap[string(p)] = true
 				}
+
 				assert.Equal(t, true, pMap[p2p.RPCGoodByeTopicV1+s.cfg.p2p.Encoding().ProtocolSuffix()])
 				assert.Equal(t, true, pMap[p2p.RPCStatusTopicV1+s.cfg.p2p.Encoding().ProtocolSuffix()])
 				assert.Equal(t, true, pMap[p2p.RPCPingTopicV1+s.cfg.p2p.Encoding().ProtocolSuffix()])
@@ -276,30 +349,39 @@ func TestService_CheckForPreviousEpochFork(t *testing.T) {
 		{
 			name: "bellatrix fork in the previous epoch",
 			svcCreator: func(t *testing.T) *Service {
+				bCfgCopy := params.BeaconConfig().Copy()
+				defer func() {
+					params.OverrideBeaconConfig(bCfgCopy)
+					params.BeaconConfig().InitializeForkSchedule()
+				}()
+
+				cfg := params.BeaconConfig()
+				cfg.AltairForkEpoch = 1
+				cfg.BellatrixForkEpoch = 3
+				params.OverrideBeaconConfig(cfg)
+				params.BeaconConfig().InitializeForkSchedule()
+
 				peer2peer := p2ptest.NewTestP2P(t)
 				chainService := &mockChain.ChainService{
 					Genesis:        time.Now().Add(-4 * oneEpoch()),
 					ValidatorsRoot: [32]byte{'A'},
 				}
-				bCfg := params.BeaconConfig().Copy()
-				bCfg.AltairForkEpoch = 1
-				bCfg.BellatrixForkEpoch = 3
-				params.OverrideBeaconConfig(bCfg)
-				params.BeaconConfig().InitializeForkSchedule()
+				clock := startup.NewClock(chainService.Genesis, chainService.ValidatorsRoot)
+
 				ctx, cancel := context.WithCancel(context.Background())
 				r := &Service{
 					ctx:    ctx,
 					cancel: cancel,
 					cfg: &config{
-						p2p:           peer2peer,
-						chain:         chainService,
-						stateNotifier: chainService.StateNotifier(),
-						initialSync:   &mockSync.Sync{IsSyncing: false},
+						p2p:         peer2peer,
+						chain:       chainService,
+						clock:       clock,
+						initialSync: &mockSync.Sync{IsSyncing: false},
 					},
 					chainStarted: abool.New(),
 					subHandler:   newSubTopicHandler(),
 				}
-				genRoot := r.cfg.chain.GenesisValidatorsRoot()
+				genRoot := r.cfg.clock.GenesisValidatorsRoot()
 				digest, err := forks.ForkDigestFromEpoch(1, genRoot[:])
 				assert.NoError(t, err)
 				r.registerSubscribers(1, digest)
@@ -315,10 +397,10 @@ func TestService_CheckForPreviousEpochFork(t *testing.T) {
 			currEpoch: 4,
 			wantErr:   false,
 			postSvcCheck: func(t *testing.T, s *Service) {
-				genRoot := s.cfg.chain.GenesisValidatorsRoot()
+				genRoot := s.cfg.clock.GenesisValidatorsRoot()
 				digest, err := forks.ForkDigestFromEpoch(1, genRoot[:])
 				assert.NoError(t, err)
-				assert.Equal(t, false, s.subHandler.digestExists(digest))
+				assert.Equal(t, true, s.subHandler.digestExists(digest))
 				digest, err = forks.ForkDigestFromEpoch(3, genRoot[:])
 				assert.NoError(t, err)
 				assert.Equal(t, true, s.subHandler.digestExists(digest))

@@ -1,3 +1,4 @@
+// todo unit act
 package util
 
 import (
@@ -68,6 +69,7 @@ func emptyGenesisStateCapella() (state.BeaconState, error) {
 		// Validator registry fields.
 		Validators:       []*ethpb.Validator{},
 		Balances:         []uint64{},
+		Activities:       []uint64{},
 		InactivityScores: []uint64{},
 
 		JustificationBits:          []byte{0},
@@ -149,6 +151,7 @@ func buildGenesisBeaconStateCapella(genesisTime uint64, preState state.BeaconSta
 		// Validator registry fields.
 		Validators:                 preState.Validators(),
 		Balances:                   preState.Balances(),
+		Activities:                 preState.Activities(),
 		PreviousEpochParticipation: prevEpochParticipation,
 		CurrentEpochParticipation:  currEpochParticipation,
 		InactivityScores:           scores,
@@ -196,14 +199,15 @@ func buildGenesisBeaconStateCapella(genesisTime uint64, preState state.BeaconSta
 			SyncCommitteeSignature: make([]byte, 96),
 		},
 		ExecutionPayload: &enginev1.ExecutionPayloadCapella{
-			ParentHash:    make([]byte, 32),
-			FeeRecipient:  make([]byte, 20),
-			StateRoot:     make([]byte, 32),
-			ReceiptsRoot:  make([]byte, 32),
-			LogsBloom:     make([]byte, 256),
-			PrevRandao:    make([]byte, 32),
-			BaseFeePerGas: make([]byte, 32),
-			BlockHash:     make([]byte, 32),
+			ParentHash:     make([]byte, 32),
+			FeeRecipient:   make([]byte, 20),
+			StateRoot:      make([]byte, 32),
+			ReceiptsRoot:   make([]byte, 32),
+			ActivitiesRoot: make([]byte, 32),
+			LogsBloom:      make([]byte, 256),
+			PrevRandao:     make([]byte, 32),
+			BaseFeePerGas:  make([]byte, 32),
+			BlockHash:      make([]byte, 32),
 		},
 	}).HashTreeRoot()
 	if err != nil {
@@ -240,6 +244,7 @@ func buildGenesisBeaconStateCapella(genesisTime uint64, preState state.BeaconSta
 		FeeRecipient:     make([]byte, 20),
 		StateRoot:        make([]byte, 32),
 		ReceiptsRoot:     make([]byte, 32),
+		ActivitiesRoot:   make([]byte, 32),
 		LogsBloom:        make([]byte, 256),
 		PrevRandao:       make([]byte, 32),
 		BaseFeePerGas:    make([]byte, 32),

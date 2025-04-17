@@ -1,7 +1,7 @@
 package payloadattribute
 
 import (
-	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	consensus_types "github.com/prysmaticlabs/prysm/v4/consensus-types"
 	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
 	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
@@ -33,7 +33,7 @@ func (a *data) Withdrawals() ([]*enginev1.Withdrawal, error) {
 		return nil, errNilPayloadAttribute
 	}
 	if a.version < version.Capella {
-		return nil, blocks.ErrNotSupported("Withdrawals", a.version)
+		return nil, consensus_types.ErrNotSupported("Withdrawals", a.version)
 	}
 	return a.withdrawals, nil
 }
@@ -44,7 +44,7 @@ func (a *data) PbV1() (*enginev1.PayloadAttributes, error) {
 		return nil, errNilPayloadAttribute
 	}
 	if a.version != version.Bellatrix {
-		return nil, blocks.ErrNotSupported("PayloadAttributePbV1", a.version)
+		return nil, consensus_types.ErrNotSupported("PbV1", a.version)
 	}
 	if a.timeStamp == 0 && len(a.prevRandao) == 0 {
 		return nil, nil
@@ -62,7 +62,7 @@ func (a *data) PbV2() (*enginev1.PayloadAttributesV2, error) {
 		return nil, errNilPayloadAttribute
 	}
 	if a.version != version.Capella {
-		return nil, blocks.ErrNotSupported("PayloadAttributePbV2", a.version)
+		return nil, consensus_types.ErrNotSupported("PbV2", a.version)
 	}
 	if a.timeStamp == 0 && len(a.prevRandao) == 0 {
 		return nil, nil
@@ -72,5 +72,25 @@ func (a *data) PbV2() (*enginev1.PayloadAttributesV2, error) {
 		PrevRandao:            a.prevRandao,
 		SuggestedFeeRecipient: a.suggestedFeeRecipient,
 		Withdrawals:           a.withdrawals,
+	}, nil
+}
+
+// PbV3 returns the payload attribute in version 3.
+func (a *data) PbV3() (*enginev1.PayloadAttributesV3, error) {
+	if a == nil {
+		return nil, errNilPayloadAttribute
+	}
+	if a.version != version.Deneb {
+		return nil, consensus_types.ErrNotSupported("PbV3", a.version)
+	}
+	if a.timeStamp == 0 && len(a.prevRandao) == 0 && len(a.parentBeaconBlockRoot) == 0 {
+		return nil, nil
+	}
+	return &enginev1.PayloadAttributesV3{
+		Timestamp:             a.timeStamp,
+		PrevRandao:            a.prevRandao,
+		SuggestedFeeRecipient: a.suggestedFeeRecipient,
+		Withdrawals:           a.withdrawals,
+		ParentBeaconBlockRoot: a.parentBeaconBlockRoot,
 	}, nil
 }

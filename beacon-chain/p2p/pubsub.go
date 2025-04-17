@@ -126,7 +126,7 @@ func (s *Service) peerInspector(peerMap map[peer.ID]*pubsub.PeerScoreSnapshot) {
 	// relevant topics.
 	for pid, snap := range peerMap {
 		s.peers.Scorers().GossipScorer().SetGossipData(pid, snap.Score,
-			snap.BehaviourPenalty, convertTopicScores(snap.Topics))
+			snap.BehaviourPenalty, convertTopicScores(snap.Topics), "Scoring peers by topics.")
 	}
 }
 

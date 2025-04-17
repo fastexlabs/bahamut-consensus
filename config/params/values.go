@@ -10,6 +10,9 @@ const (
 	MinimalName         = "minimal"
 	PraterName          = "prater"
 	OasisName           = "oasis"
+	OceanName           = "ocean"
+	HorizonName         = "horizon"
 	GoerliName          = "goerli"
 	SepoliaName         = "sepolia"
+	HoleskyName         = "holesky"
 )

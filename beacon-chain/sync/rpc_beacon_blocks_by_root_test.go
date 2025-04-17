@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	gcache "github.com/patrickmn/go-cache"
@@ -17,8 +18,10 @@ import (
 	db "github.com/prysmaticlabs/prysm/v4/beacon-chain/db/testing"
 	mockExecution "github.com/prysmaticlabs/prysm/v4/beacon-chain/execution/testing"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/peers"
 	p2ptest "github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/testing"
 	p2pTypes "github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/types"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/startup"
 	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
@@ -50,7 +53,7 @@ func TestRecentBeaconBlocksRPCHandler_ReturnsBlocks(t *testing.T) {
 		blkRoots = append(blkRoots, root)
 	}
 
-	r := &Service{cfg: &config{p2p: p1, beaconDB: d}, rateLimiter: newRateLimiter(p1)}
+	r := &Service{cfg: &config{p2p: p1, beaconDB: d, clock: startup.NewClock(time.Unix(0, 0), [32]byte{})}, rateLimiter: newRateLimiter(p1)}
 	r.cfg.chain = &mock.ChainService{ValidatorsRoot: [32]byte{}}
 	pcl := protocol.ID(p2p.RPCBlocksByRootTopicV1)
 	topic := string(pcl)
@@ -148,8 +151,9 @@ func TestRecentBeaconBlocksRPCHandler_ReturnsBlocks_ReconstructsPayload(t *testi
 		p2p:                           p1,
 		beaconDB:                      d,
 		executionPayloadReconstructor: mockEngine,
+		chain:                         &mock.ChainService{ValidatorsRoot: [32]byte{}},
+		clock:                         startup.NewClock(time.Unix(0, 0), [32]byte{}),
 	}, rateLimiter: newRateLimiter(p1)}
-	r.cfg.chain = &mock.ChainService{ValidatorsRoot: [32]byte{}}
 	pcl := protocol.ID(p2p.RPCBlocksByRootTopicV1)
 	topic := string(pcl)
 	r.rateLimiter.limiterMap[topic] = leakybucket.NewCollector(10000, 10000, time.Second, false)
@@ -204,16 +208,18 @@ func TestRecentBeaconBlocks_RPCRequestSent(t *testing.T) {
 
 	expectedRoots := p2pTypes.BeaconBlockByRootsReq{blockBRoot, blockARoot}
 
+	chain := &mock.ChainService{
+		State:               genesisState,
+		FinalizedCheckPoint: finalizedCheckpt,
+		Root:                blockARoot[:],
+		Genesis:             time.Now(),
+		ValidatorsRoot:      [32]byte{},
+	}
 	r := &Service{
 		cfg: &config{
-			p2p: p1,
-			chain: &mock.ChainService{
-				State:               genesisState,
-				FinalizedCheckPoint: finalizedCheckpt,
-				Root:                blockARoot[:],
-				Genesis:             time.Now(),
-				ValidatorsRoot:      [32]byte{},
-			},
+			p2p:   p1,
+			chain: chain,
+			clock: startup.NewClock(chain.Genesis, chain.ValidatorsRoot),
 		},
 		slotToPendingBlocks: gcache.New(time.Second, 2*time.Second),
 		seenPendingBlocks:   make(map[[32]byte]bool),
@@ -283,4 +289,47 @@ func TestRecentBeaconBlocksRPCHandler_HandleZeroBlocks(t *testing.T) {
 	lter, err := r.rateLimiter.retrieveCollector(topic)
 	require.NoError(t, err)
 	assert.Equal(t, 1, int(lter.Count(stream1.Conn().RemotePeer().String())))
+}
+
+func TestRequestPendingBlobs(t *testing.T) {
+	s := &Service{}
+	t.Run("old block should not fail", func(t *testing.T) {
+		b, err := blocks.NewBeaconBlock(util.NewBeaconBlock().Block)
+		require.NoError(t, err)
+		require.NoError(t, s.requestPendingBlobs(context.Background(), b, []byte{}, "test"))
+	})
+	t.Run("empty commitment block should not fail", func(t *testing.T) {
+		b, err := blocks.NewBeaconBlock(util.NewBeaconBlockDeneb().Block)
+		require.NoError(t, err)
+		require.NoError(t, s.requestPendingBlobs(context.Background(), b, []byte{}, "test"))
+	})
+	t.Run("unsupported protocol", func(t *testing.T) {
+		p1 := p2ptest.NewTestP2P(t)
+		p2 := p2ptest.NewTestP2P(t)
+		p1.Connect(p2)
+		require.Equal(t, 1, len(p1.BHost.Network().Peers()))
+		chain := &mock.ChainService{
+			FinalizedCheckPoint: &ethpb.Checkpoint{
+				Epoch: 1,
+				Root:  make([]byte, 32),
+			},
+			ValidatorsRoot: [32]byte{},
+			Genesis:        time.Now(),
+		}
+		p1.Peers().Add(new(enr.Record), p2.PeerID(), nil, network.DirOutbound)
+		p1.Peers().SetConnectionState(p2.PeerID(), peers.PeerConnected)
+		p1.Peers().SetChainState(p2.PeerID(), &ethpb.Status{FinalizedEpoch: 1}, "reason")
+		s := &Service{
+			cfg: &config{
+				p2p:   p1,
+				chain: chain,
+				clock: startup.NewClock(time.Unix(0, 0), [32]byte{}),
+			},
+		}
+		b := util.NewBeaconBlockDeneb()
+		b.Block.Body.BlobKzgCommitments = make([][]byte, 1)
+		b1, err := blocks.NewBeaconBlock(b.Block)
+		require.NoError(t, err)
+		require.ErrorContains(t, "protocols not supported", s.requestPendingBlobs(context.Background(), b1, []byte{}, p2.PeerID()))
+	})
 }

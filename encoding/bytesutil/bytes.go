@@ -3,6 +3,8 @@ package bytesutil
 
 import (
 	"fmt"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 // ToBytes48Array is a convenience method for converting an array of
@@ -71,6 +73,10 @@ func SafeCopyRootAtIndex(input [][]byte, idx uint64) ([]byte, error) {
 // SafeCopyBytes will copy and return a non-nil byte slice, otherwise it returns nil.
 func SafeCopyBytes(cp []byte) []byte {
 	if cp != nil {
+		if len(cp) == 32 {
+			copied := [32]byte(cp)
+			return copied[:]
+		}
 		copied := make([]byte, len(cp))
 		copy(copied, cp)
 		return copied
@@ -95,6 +101,18 @@ func SafeCopy2d32Bytes(ary [][32]byte) [][32]byte {
 	if ary != nil {
 		copied := make([][32]byte, len(ary))
 		copy(copied, ary)
+		return copied
+	}
+	return nil
+}
+
+// SafeCopy2dHexUtilBytes will copy and return a non-nil 2d hex util byte slice, otherwise it returns nil.
+func SafeCopy2dHexUtilBytes(ary []hexutil.Bytes) [][]byte {
+	if ary != nil {
+		copied := make([][]byte, len(ary))
+		for i, a := range ary {
+			copied[i] = SafeCopyBytes(a)
+		}
 		return copied
 	}
 	return nil

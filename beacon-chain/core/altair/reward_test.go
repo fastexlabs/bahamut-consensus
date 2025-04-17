@@ -1,6 +1,7 @@
 package altair_test
 
 import (
+	mathC "github.com/prysmaticlabs/prysm/v4/math"
 	"math"
 	"testing"
 
@@ -31,27 +32,27 @@ func Test_BaseReward(t *testing.T) {
 			valIdx:    2,
 			st:        genState(1),
 			want:      0,
-			errString: "index 2 out of range",
+			errString: "validator index 2 does not exist",
 		},
 		{
-			name:      "active balance is 32eth",
+			name:      "active balance is 8192ftn",
 			valIdx:    0,
 			st:        genState(1),
-			want:      11448672,
+			want:      8192 * (1e9 * 156 / mathC.CachedSquareRoot(8192*1e9)),
 			errString: "",
 		},
 		{
-			name:      "active balance is 32eth * target committee size",
+			name:      "active balance is 8192ftn * target committee size",
 			valIdx:    0,
 			st:        genState(params.BeaconConfig().TargetCommitteeSize),
-			want:      1011904,
+			want:      8192 * (1e9 * 156 / mathC.CachedSquareRoot(8192*1e9*params.BeaconConfig().TargetCommitteeSize)),
 			errString: "",
 		},
 		{
-			name:      "active balance is 32eth * max validator per  committee size",
+			name:      "active balance is 8192ftn * max validator per  committee size",
 			valIdx:    0,
 			st:        genState(params.BeaconConfig().MaxValidatorsPerCommittee),
-			want:      252960,
+			want:      8192 * (1e9 * 156 / mathC.CachedSquareRoot(8192*1e9*params.BeaconConfig().MaxValidatorsPerCommittee)),
 			errString: "",
 		},
 	}
@@ -89,41 +90,41 @@ func Test_BaseRewardWithTotalBalance(t *testing.T) {
 			valIdx:        2,
 			activeBalance: 1,
 			want:          0,
-			errString:     "index 2 out of range",
+			errString:     "validator index 2 does not exist",
 		},
 		{
 			name:          "active balance is 1",
 			valIdx:        0,
 			activeBalance: 1,
-			want:          2048000000000,
+			want:          8192 * (1e9 * 156 / 1),
 			errString:     "",
 		},
 		{
-			name:          "active balance is 1eth",
+			name:          "active balance is 1ftn",
 			valIdx:        0,
 			activeBalance: params.BeaconConfig().EffectiveBalanceIncrement,
-			want:          64765024,
+			want:          8192 * (1e9 * 156 / mathC.CachedSquareRoot(params.BeaconConfig().EffectiveBalanceIncrement)),
 			errString:     "",
 		},
 		{
-			name:          "active balance is 32eth",
+			name:          "active balance is 8192ftn",
 			valIdx:        0,
 			activeBalance: params.BeaconConfig().MaxEffectiveBalance,
-			want:          11448672,
+			want:          8192 * (1e9 * 156 / mathC.CachedSquareRoot(params.BeaconConfig().MaxEffectiveBalance)),
 			errString:     "",
 		},
 		{
-			name:          "active balance is 32eth * 1m validators",
+			name:          "active balance is 8192ftn * 1m validators",
 			valIdx:        0,
 			activeBalance: params.BeaconConfig().MaxEffectiveBalance * 1e9,
-			want:          544,
+			want:          8192 * (1e9 * 156 / mathC.CachedSquareRoot(params.BeaconConfig().MaxEffectiveBalance*1e9)),
 			errString:     "",
 		},
 		{
 			name:          "active balance is max uint64",
 			valIdx:        0,
 			activeBalance: math.MaxUint64,
-			want:          448,
+			want:          8192 * (1e9 * 156 / mathC.CachedSquareRoot(math.MaxUint64)),
 			errString:     "",
 		},
 	}
@@ -156,31 +157,31 @@ func Test_BaseRewardPerIncrement(t *testing.T) {
 		{
 			name:          "active balance is 1",
 			activeBalance: 1,
-			want:          64000000000,
+			want:          156 * 1e9 / 1,
 			errString:     "",
 		},
 		{
-			name:          "active balance is 1eth",
+			name:          "active balance is 1ftn ",
 			activeBalance: params.BeaconConfig().EffectiveBalanceIncrement,
-			want:          2023907,
+			want:          156 * 1e9 / mathC.CachedSquareRoot(params.BeaconConfig().EffectiveBalanceIncrement),
 			errString:     "",
 		},
 		{
-			name:          "active balance is 32eth",
+			name:          "active balance is 8192ftn",
 			activeBalance: params.BeaconConfig().MaxEffectiveBalance,
-			want:          357771,
+			want:          156 * 1e9 / mathC.CachedSquareRoot(params.BeaconConfig().MaxEffectiveBalance),
 			errString:     "",
 		},
 		{
-			name:          "active balance is 32eth * 1m validators",
+			name:          "active balance is 8192ftn * 1m validators",
 			activeBalance: params.BeaconConfig().MaxEffectiveBalance * 1e9,
-			want:          17,
+			want:          156 * 1e9 / mathC.CachedSquareRoot(params.BeaconConfig().MaxEffectiveBalance*1e9),
 			errString:     "",
 		},
 		{
 			name:          "active balance is max uint64",
 			activeBalance: math.MaxUint64,
-			want:          14,
+			want:          156 * 1e9 / mathC.CachedSquareRoot(math.MaxUint64),
 			errString:     "",
 		},
 	}

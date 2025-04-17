@@ -24,7 +24,6 @@ import (
 	beaconChainClientFactory "github.com/prysmaticlabs/prysm/v4/validator/client/beacon-chain-client-factory"
 	"github.com/prysmaticlabs/prysm/v4/validator/client/iface"
 	nodeClientFactory "github.com/prysmaticlabs/prysm/v4/validator/client/node-client-factory"
-	slasherClientFactory "github.com/prysmaticlabs/prysm/v4/validator/client/slasher-client-factory"
 	validatorClientFactory "github.com/prysmaticlabs/prysm/v4/validator/client/validator-client-factory"
 	"github.com/prysmaticlabs/prysm/v4/validator/db"
 	"github.com/prysmaticlabs/prysm/v4/validator/graffiti"
@@ -188,11 +187,13 @@ func (v *ValidatorService) Start() {
 		return
 	}
 
+	validatorClient := validatorClientFactory.NewValidatorClient(v.conn)
+	beaconClient := beaconChainClientFactory.NewBeaconChainClient(v.conn)
+
 	valStruct := &validator{
 		db:                             v.db,
-		validatorClient:                validatorClientFactory.NewValidatorClient(v.conn),
-		beaconClient:                   beaconChainClientFactory.NewBeaconChainClient(v.conn),
-		slashingProtectionClient:       slasherClientFactory.NewSlasherClient(v.conn),
+		validatorClient:                validatorClient,
+		beaconClient:                   beaconClient,
 		node:                           nodeClientFactory.NewNodeClient(v.conn),
 		graffiti:                       v.graffiti,
 		logValidatorBalances:           v.logValidatorBalances,
@@ -218,6 +219,7 @@ func (v *ValidatorService) Start() {
 		proposerSettings:               v.proposerSettings,
 		walletInitializedChannel:       make(chan *wallet.Wallet, 1),
 	}
+
 	// To resolve a race condition at startup due to the interface
 	// nature of the abstracted block type. We initialize
 	// the inner type of the feed before hand. So that
@@ -255,17 +257,29 @@ func (v *ValidatorService) InteropKeysConfig() *local.InteropKeymanagerConfig {
 	return v.interopKeysConfig
 }
 
+// Keymanager returns the underlying keymanager in the validator
 func (v *ValidatorService) Keymanager() (keymanager.IKeymanager, error) {
 	return v.validator.Keymanager()
 }
 
+// ProposerSettings returns a deep copy of the underlying proposer settings in the validator
 func (v *ValidatorService) ProposerSettings() *validatorserviceconfig.ProposerSettings {
-	return v.validator.ProposerSettings()
+	settings := v.validator.ProposerSettings()
+	if settings != nil {
+		return settings.Clone()
+	}
+	return nil
 }
 
-func (v *ValidatorService) SetProposerSettings(settings *validatorserviceconfig.ProposerSettings) {
+// SetProposerSettings sets the proposer settings on the validator service as well as the underlying validator
+func (v *ValidatorService) SetProposerSettings(ctx context.Context, settings *validatorserviceconfig.ProposerSettings) error {
+	// validator service proposer settings is only used for pass through from node -> validator service -> validator.
+	// in memory use of proposer settings happens on validator.
 	v.proposerSettings = settings
-	v.validator.SetProposerSettings(settings)
+
+	// passes settings down to be updated in database and saved in memory.
+	// updates to validator porposer settings will be in the validator object and not validator service.
+	return v.validator.SetProposerSettings(ctx, settings)
 }
 
 // ConstructDialOptions constructs a list of grpc dial options

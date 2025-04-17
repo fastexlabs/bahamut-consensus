@@ -11,12 +11,20 @@ var (
 	Mainnet = &cli.BoolFlag{
 		Value:   true,
 		Name:    "mainnet",
-		Aliases: []string{"sahara"},
+		Aliases: []string{"sahara", "bahamut"},
 		Usage:   "Run on Ethereum Beacon Chain Main Net. This is the default and can be omitted.",
 	}
 	OasisTestnet = &cli.BoolFlag{
 		Name:  "oasis",
 		Usage: "Run beacon node configured for the Oasis test network",
+	}
+	OceanTestnet = &cli.BoolFlag{
+		Name:  "ocean",
+		Usage: "Run beacon node configured for the Ocean test network",
+	}
+	HorizonTestnet = &cli.BoolFlag{
+		Name:  "horizon", 
+		Usage: "Run beacon node configured for the Horizon test network",
 	}
 
 	// PraterTestnet flag for the multiclient Ethereum consensus testnet.
@@ -32,18 +40,23 @@ var (
 		Usage:  "Run Prysm configured for the Sepolia beacon chain test network",
 		Hidden: true,
 	}
+	// HoleskyTestnet flag for the multiclient Ethereum consensus testnet.
+	HoleskyTestnet = &cli.BoolFlag{
+		Name:   "holesky",
+		Usage:  "Run Prysm configured for the Holesky beacon chain test network",
+		Hidden: true,
+	}
 	devModeFlag = &cli.BoolFlag{
 		Name:  "dev",
 		Usage: "Enable experimental features still in development. These features may not be stable.",
 	}
+	enableExperimentalState = &cli.BoolFlag{
+		Name:  "enable-experimental-state",
+		Usage: "Turn on the latest and greatest (but potentially unstable) changes to the beacon state",
+	}
 	writeSSZStateTransitionsFlag = &cli.BoolFlag{
 		Name:  "interop-write-ssz-state-transitions",
 		Usage: "Write ssz states to disk after attempted state transition",
-	}
-	enableExternalSlasherProtectionFlag = &cli.BoolFlag{
-		Name: "enable-external-slasher-protection",
-		Usage: "Enables the validator to connect to a beacon node using the --slasher flag" +
-			"for remote slashing protection",
 	}
 	disableGRPCConnectionLogging = &cli.BoolFlag{
 		Name:  "disable-grpc-connection-logging",
@@ -53,10 +66,32 @@ var (
 		Name:  "disable-reorg-late-blocks",
 		Usage: "Disables reorgs of late blocks",
 	}
+	disablePeerScorer = &cli.BoolFlag{
+		Name:  "disable-peer-scorer",
+		Usage: "(Danger): Disables P2P peer scorer. Do NOT use this in production!",
+	}
 	writeWalletPasswordOnWebOnboarding = &cli.BoolFlag{
 		Name: "write-wallet-password-on-web-onboarding",
 		Usage: "(Danger): Writes the wallet password to the wallet directory on completing Prysm web onboarding. " +
 			"We recommend against this flag unless you are an advanced user.",
+	}
+	aggregateFirstInterval = &cli.DurationFlag{
+		Name:   "aggregate-first-interval",
+		Usage:  "(Advanced): Specifies the first interval in which attestations are aggregated in the slot (typically unnaggregated attestations are aggregated in this interval)",
+		Value:  7000 * time.Millisecond,
+		Hidden: true,
+	}
+	aggregateSecondInterval = &cli.DurationFlag{
+		Name:   "aggregate-second-interval",
+		Usage:  "(Advanced): Specifies the second interval in which attestations are aggregated in the slot",
+		Value:  9500 * time.Millisecond,
+		Hidden: true,
+	}
+	aggregateThirdInterval = &cli.DurationFlag{
+		Name:   "aggregate-third-interval",
+		Usage:  "(Advanced): Specifies the third interval in which attestations are aggregated in the slot",
+		Value:  11800 * time.Millisecond,
+		Hidden: true,
 	}
 	dynamicKeyReloadDebounceInterval = &cli.DurationFlag{
 		Name: "dynamic-key-reload-debounce-interval",
@@ -118,27 +153,56 @@ var (
 		Name:  "enable-verbose-sig-verification",
 		Usage: "Enables identifying invalid signatures if batch verification fails when processing block",
 	}
-	enableOptionalEngineMethods = &cli.BoolFlag{
-		Name:  "enable-optional-engine-methods",
-		Usage: "Enables the optional engine methods",
+	disableOptionalEngineMethods = &cli.BoolFlag{
+		Name:  "disable-optional-engine-methods",
+		Usage: "Disables the optional engine methods",
 	}
 	prepareAllPayloads = &cli.BoolFlag{
 		Name:  "prepare-all-payloads",
 		Usage: "Informs the engine to prepare all local payloads. Useful for relayers and builders",
+	}
+	enableEIP4881 = &cli.BoolFlag{
+		Name:  "enable-eip-4881",
+		Usage: "Enables the deposit tree specified in EIP4881",
+	}
+	disableResourceManager = &cli.BoolFlag{
+		Name:  "disable-resource-manager",
+		Usage: "Disables running the libp2p resource manager",
+	}
+
+	// DisableRegistrationCache a flag for disabling the validator registration cache and use db instead.
+	DisableRegistrationCache = &cli.BoolFlag{
+		Name:  "disable-registration-cache",
+		Usage: "A temporary flag for disabling the validator registration cache instead of using the db. note: registrations do not clear on restart while using the db",
+	}
+
+	disableAggregateParallel = &cli.BoolFlag{
+		Name:  "disable-aggregate-parallel",
+		Usage: "Disables parallel aggregation of attestations",
+	}
+
+	EnableScorerLogging = &cli.BoolFlag{
+		Name:   "enable-scorer-logging",
+		Usage:  "Enable scorers logging for connected peers.",
+		Value:  false,
+		Hidden: true,
 	}
 )
 
 // devModeFlags holds list of flags that are set when development mode is on.
 var devModeFlags = []cli.Flag{
 	enableVerboseSigVerification,
-	enableOptionalEngineMethods,
+	enableEIP4881,
+	enableExperimentalState,
 }
 
 // ValidatorFlags contains a list of all the feature flags that apply to the validator client.
 var ValidatorFlags = append(deprecatedFlags, []cli.Flag{
 	writeWalletPasswordOnWebOnboarding,
-	enableExternalSlasherProtectionFlag,
+	HoleskyTestnet,
 	OasisTestnet,
+	OceanTestnet,
+	HorizonTestnet,
 	PraterTestnet,
 	SepoliaTestnet,
 	Mainnet,
@@ -157,12 +221,17 @@ var E2EValidatorFlags = []string{
 // BeaconChainFlags contains a list of all the feature flags that apply to the beacon-chain client.
 var BeaconChainFlags = append(deprecatedBeaconFlags, append(deprecatedFlags, []cli.Flag{
 	devModeFlag,
+	enableExperimentalState,
 	writeSSZStateTransitionsFlag,
 	disableGRPCConnectionLogging,
+	HoleskyTestnet,
 	OasisTestnet,
+	OceanTestnet,
+	HorizonTestnet,
 	PraterTestnet,
 	SepoliaTestnet,
 	Mainnet,
+	disablePeerScorer,
 	disableBroadcastSlashingFlag,
 	enableSlasherFlag,
 	enableHistoricalSpaceRepresentation,
@@ -172,8 +241,16 @@ var BeaconChainFlags = append(deprecatedBeaconFlags, append(deprecatedFlags, []c
 	enableStartupOptimistic,
 	enableFullSSZDataLogging,
 	enableVerboseSigVerification,
-	enableOptionalEngineMethods,
+	disableOptionalEngineMethods,
 	prepareAllPayloads,
+	aggregateFirstInterval,
+	aggregateSecondInterval,
+	aggregateThirdInterval,
+	enableEIP4881,
+	disableResourceManager,
+	DisableRegistrationCache,
+	disableAggregateParallel,
+	EnableScorerLogging,
 }...)...)
 
 // E2EBeaconChainFlags contains a list of the beacon chain feature flags to be tested in E2E.
@@ -185,6 +262,9 @@ var E2EBeaconChainFlags = []string{
 var NetworkFlags = []cli.Flag{
 	Mainnet,
 	OasisTestnet,
+	OceanTestnet,
+	HorizonTestnet,
 	PraterTestnet,
 	SepoliaTestnet,
+	HoleskyTestnet,
 }

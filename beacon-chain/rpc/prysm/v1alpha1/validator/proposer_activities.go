@@ -1,3 +1,4 @@
+// todo unit act
 package validator
 
 import (
@@ -17,12 +18,12 @@ func (vs *Server) setActivities(
 	blk interfaces.SignedBeaconBlock,
 	beaconState state.BeaconState,
 ) error {
-	mergeComplete, err := blocks.IsMergeTransitionComplete(beaconState)
+	capellaComplete, err := blocks.IsCapellaTransitionComplete(beaconState)
 	if err != nil {
 		return err
 	}
 
-	if !mergeComplete {
+	if !capellaComplete {
 		return nil
 	}
 

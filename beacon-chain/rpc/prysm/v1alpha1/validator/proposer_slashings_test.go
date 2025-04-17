@@ -13,6 +13,7 @@ import (
 )
 
 func TestServer_getSlashings(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	beaconState, privKeys := util.DeterministicGenesisState(t, 64)
 
 	proposerServer := &Server{

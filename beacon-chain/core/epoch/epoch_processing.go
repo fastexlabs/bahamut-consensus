@@ -5,6 +5,7 @@
 package epoch
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sort"
@@ -22,6 +23,8 @@ import (
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1/attestation"
 	"github.com/prysmaticlabs/prysm/v4/runtime/version"
+	"github.com/prysmaticlabs/prysm/v4/time/slots"
+	"github.com/sirupsen/logrus"
 )
 
 // sortableIndices implements the Sort interface to sort newly activated validator indices
@@ -110,8 +113,11 @@ func ProcessRegistryUpdates(ctx context.Context, state state.BeaconState) (state
 		isActive := helpers.IsActiveValidator(validator, currentEpoch)
 		belowEjectionBalance := validator.EffectiveBalance <= ejectionBal
 		if isActive && belowEjectionBalance {
-			state, err = validators.InitiateValidatorExit(ctx, state, primitives.ValidatorIndex(idx))
-			if err != nil {
+			// Here is fine to do a quadratic loop since this should
+			// barely happen
+			maxExitEpoch, churn := validators.ValidatorsMaxExitEpochAndChurn(state)
+			state, _, err = validators.InitiateValidatorExit(ctx, state, primitives.ValidatorIndex(idx), maxExitEpoch, churn)
+			if err != nil && !errors.Is(err, validators.ValidatorAlreadyExitedErr) {
 				return nil, errors.Wrapf(err, "could not initiate exit for validator %d", idx)
 			}
 		}
@@ -134,9 +140,10 @@ func ProcessRegistryUpdates(ctx context.Context, state state.BeaconState) (state
 		return nil, errors.Wrap(err, "could not get active validator count")
 	}
 
-	churnLimit, err := helpers.ValidatorChurnLimit(activeValidatorCount)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get churn limit")
+	churnLimit := helpers.ValidatorActivationChurnLimit(activeValidatorCount)
+
+	if state.Version() >= version.Deneb {
+		churnLimit = helpers.ValidatorActivationChurnLimitDeneb(activeValidatorCount)
 	}
 
 	// Prevent churn limit cause index out of bound.
@@ -289,11 +296,63 @@ func ProcessEffectiveBalanceUpdates(state state.BeaconState) (state.BeaconState,
 	return state, nil
 }
 
+// missingSlotProposers returns the proposers and the count of missing blocks that the proposers did not propose.
+func missingSlotProposers(ctx context.Context, st state.BeaconState) (map[primitives.ValidatorIndex]uint64, error) {
+	noBlockIndices := make(map[primitives.ValidatorIndex]uint64, 0)
+
+	epochStartSlot, err := slots.EpochStart(time.CurrentEpoch(st))
+	if err != nil {
+		return nil, err
+	}
+	if epochStartSlot == 0 {
+		return nil, nil
+	}
+	indices, err := helpers.GetProposerIndices(ctx, st)
+	if err != nil {
+		return nil, err
+	}
+
+	prevRoot, err := helpers.BlockRootAtSlot(st, epochStartSlot.Sub(1))
+	if err != nil {
+		return nil, fmt.Errorf("can't retrieve root at slot %d", epochStartSlot)
+	}
+
+	i := 0
+	for epochSlot := epochStartSlot; !slots.IsEpochEnd(epochSlot); epochSlot++ {
+		root, err := helpers.BlockRootAtSlot(st, epochSlot)
+		if err != nil {
+			return nil, fmt.Errorf("can't retrieve root at slot %d", epochSlot)
+		}
+		if bytes.Equal(prevRoot, root) && len(indices) > i {
+			noBlockIndices[indices[i]]++
+		}
+		prevRoot = root
+		i++
+	}
+	return noBlockIndices, nil
+}
+
 // ProcessEffectiveActivityUpdates processes effective activity updates during epoch processing.
-func ProcessEffectiveActivityUpdates(state state.BeaconState) (state.BeaconState, error) {
+// Decreasing activity of the validators which must propose block(s) on previous epoch, but did not.
+// def process_effective_activity_updates(state :BeaconState, activities :list ) -> BeaconState:
+//
+//	previous_epoch_idle_proposers =  missing_slot_proposers(state)
+//	for index, missing_score in previous_epoch_idle_proposers:
+//		validator = state.get_validator_by_index(index)
+//		activity = activities[index]
+//		if missing_score > 0:
+//			activity = 0
+//		effective_activity = ((validator.effective_activity+activity)*PERIOD - validator.effective_activity) / PERIOD
+//		validator.effective_activity = effective_activity>>missing_score
+//
+//	return state
+func ProcessEffectiveActivityUpdates(ctx context.Context, state state.BeaconState) (state.BeaconState, error) {
 	activities := state.Activities()
 	period := uint64(params.BeaconConfig().EpochsPerActivityPeriod)
-
+	inactiveProposers, err := missingSlotProposers(ctx, state)
+	if err != nil {
+		return nil, err
+	}
 	validatorFunc := func(idx int, val *ethpb.Validator) (bool, *ethpb.Validator, error) {
 		if val == nil {
 			return false, nil, fmt.Errorf("validator %d is nil in state", idx)
@@ -301,17 +360,32 @@ func ProcessEffectiveActivityUpdates(state state.BeaconState) (state.BeaconState
 		if idx >= len(activities) {
 			return false, nil, fmt.Errorf("validator index exceeds activities length in state %d >= %d", idx, len(activities))
 		}
+		var effectiveActivity uint64
 		activity := activities[idx]
+		shift := inactiveProposers[primitives.ValidatorIndex(idx)]
+		if shift > 0 {
+			activity = 0
+		}
 
 		// EA - validator's effective activity
 		// dA - validator's delta (epoch) activity
 		// P - activity period.
 		// newEA = EA - EA / P + dA = ((EA + dA) * P - EA) / P
-		effectiveActivity := ((val.EffectiveActivity+activity)*period - val.EffectiveActivity) / period
+		effectiveActivity = ((val.EffectiveActivity+activity)*period - val.EffectiveActivity) / period
+		effectiveActivity >>= shift
+
+		if shift > 0 {
+			logrus.WithFields(logrus.Fields{
+				"public_key":                  fmt.Sprintf("0x%x", val.PublicKey),
+				"index":                       idx,
+				"skipped_blocks":              shift,
+				"effective_activity":          val.EffectiveActivity,
+				"computed_effective_activity": effectiveActivity,
+			}).Warn("Slashing validator activity.")
+		}
 
 		newVal := ethpb.CopyValidator(val)
 		newVal.EffectiveActivity = effectiveActivity
-
 		return true, newVal, nil
 	}
 
@@ -346,7 +420,7 @@ func ProcessSharedActivityUpdates(state state.BeaconState) (state.BeaconState, e
 	gasPerEpoch := sharedActivity.TransactionsGasPerEpoch
 
 	baseFeePerPeriod := sharedActivity.BaseFeePerPeriod
-	baseFeePerEpoch := math.Max(1, sharedActivity.BaseFeePerEpoch / params.BeaconConfig().WeiPerGwei)
+	baseFeePerEpoch := math.Max(1, sharedActivity.BaseFeePerEpoch/params.BeaconConfig().WeiPerGwei)
 
 	sharedActivity.TransactionsGasPerPeriod = ((gasPerPeriod+gasPerEpoch)*period - gasPerPeriod) / period
 	sharedActivity.TransactionsGasPerEpoch = 0
@@ -416,7 +490,7 @@ func ProcessRandaoMixesReset(state state.BeaconState) (state.BeaconState, error)
 	if err != nil {
 		return nil, err
 	}
-	if err := state.UpdateRandaoMixesAtIndex(uint64(nextEpoch%randaoMixLength), mix); err != nil {
+	if err := state.UpdateRandaoMixesAtIndex(uint64(nextEpoch%randaoMixLength), [32]byte(mix)); err != nil {
 		return nil, err
 	}
 
@@ -464,6 +538,7 @@ func ProcessHistoricalDataUpdate(state state.BeaconState) (state.BeaconState, er
 
 // ProcessParticipationRecordUpdates rotates current/previous epoch attestations during epoch processing.
 //
+// nolint:dupword
 // Spec pseudocode definition:
 //
 //	def process_participation_record_updates(state: BeaconState) -> None:
@@ -478,7 +553,7 @@ func ProcessParticipationRecordUpdates(state state.BeaconState) (state.BeaconSta
 }
 
 // ProcessFinalUpdates processes the final updates during epoch processing.
-func ProcessFinalUpdates(state state.BeaconState) (state.BeaconState, error) {
+func ProcessFinalUpdates(ctx context.Context, state state.BeaconState) (state.BeaconState, error) {
 	var err error
 
 	// Reset ETH1 data votes.
@@ -494,11 +569,11 @@ func ProcessFinalUpdates(state state.BeaconState) (state.BeaconState, error) {
 	}
 
 	// Update effective activities with current epoch activities.
-	state, err = ProcessEffectiveActivityUpdates(state)
+	state, err = ProcessEffectiveActivityUpdates(ctx, state)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Update transactions gas per epoch and base fee per epoch.
 	state, err = ProcessSharedActivityUpdates(state)
 	if err != nil {

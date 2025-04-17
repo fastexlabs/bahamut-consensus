@@ -1,6 +1,5 @@
 // Code generated - DO NOT EDIT.
 // This file is a generated binding and any manual changes will be lost.
-
 package deposit
 
 import (
@@ -179,6 +178,7 @@ func (_DepositContract *DepositContractTransactorRaw) Transact(opts *bind.Transa
 	return _DepositContract.Contract.contract.Transact(opts, method, params...)
 }
 
+// todo unit act
 // GetContractOwner is a free data retrieval call binding the contract method 0x847dbe4d.
 //
 // Solidity: function get_contract_owner(address contract_address) view returns(address)
@@ -303,6 +303,7 @@ func (_DepositContract *DepositContractCallerSession) SupportsInterface(interfac
 	return _DepositContract.Contract.SupportsInterface(&_DepositContract.CallOpts, interfaceId)
 }
 
+// todo unit act
 // Deposit is a paid mutator transaction binding the contract method 0xc1da06e2.
 //
 // Solidity: function deposit(bytes pubkey, bytes withdrawal_credentials, bytes contract_address, bytes signature, bytes32 deposit_data_root) payable returns()
@@ -310,6 +311,7 @@ func (_DepositContract *DepositContractTransactor) Deposit(opts *bind.TransactOp
 	return _DepositContract.contract.Transact(opts, "deposit", pubkey, withdrawal_credentials, contract_address, signature, deposit_data_root)
 }
 
+// todo unit act
 // Deposit is a paid mutator transaction binding the contract method 0xc1da06e2.
 //
 // Solidity: function deposit(bytes pubkey, bytes withdrawal_credentials, bytes contract_address, bytes signature, bytes32 deposit_data_root) payable returns()
@@ -317,6 +319,7 @@ func (_DepositContract *DepositContractSession) Deposit(pubkey []byte, withdrawa
 	return _DepositContract.Contract.Deposit(&_DepositContract.TransactOpts, pubkey, withdrawal_credentials, contract_address, signature, deposit_data_root)
 }
 
+// todo unit act
 // Deposit is a paid mutator transaction binding the contract method 0xc1da06e2.
 //
 // Solidity: function deposit(bytes pubkey, bytes withdrawal_credentials, bytes contract_address, bytes signature, bytes32 deposit_data_root) payable returns()
@@ -324,6 +327,7 @@ func (_DepositContract *DepositContractTransactorSession) Deposit(pubkey []byte,
 	return _DepositContract.Contract.Deposit(&_DepositContract.TransactOpts, pubkey, withdrawal_credentials, contract_address, signature, deposit_data_root)
 }
 
+// todo unit act
 // TransferContractOwnership is a paid mutator transaction binding the contract method 0x36a8d230.
 //
 // Solidity: function transfer_contract_ownership(address contract_address, address new_owner_address) returns()
@@ -331,6 +335,7 @@ func (_DepositContract *DepositContractTransactor) TransferContractOwnership(opt
 	return _DepositContract.contract.Transact(opts, "transfer_contract_ownership", contract_address, new_owner_address)
 }
 
+// todo unit act
 // TransferContractOwnership is a paid mutator transaction binding the contract method 0x36a8d230.
 //
 // Solidity: function transfer_contract_ownership(address contract_address, address new_owner_address) returns()
@@ -338,6 +343,7 @@ func (_DepositContract *DepositContractSession) TransferContractOwnership(contra
 	return _DepositContract.Contract.TransferContractOwnership(&_DepositContract.TransactOpts, contract_address, new_owner_address)
 }
 
+// todo unit act
 // TransferContractOwnership is a paid mutator transaction binding the contract method 0x36a8d230.
 //
 // Solidity: function transfer_contract_ownership(address contract_address, address new_owner_address) returns()
@@ -412,6 +418,7 @@ func (it *DepositContractDepositEventIterator) Close() error {
 	return nil
 }
 
+// todo unit act
 // DepositContractDepositEvent represents a DepositEvent event raised by the DepositContract contract.
 type DepositContractDepositEvent struct {
 	Pubkey                []byte
@@ -423,6 +430,7 @@ type DepositContractDepositEvent struct {
 	Raw                   types.Log // Blockchain specific contextual infos
 }
 
+// todo unit act
 // FilterDepositEvent is a free log retrieval operation binding the contract event 0x9690c6325860650852f0f0bd0e7d47145a3d0c2c5c92cba852bad61c02928b09.
 //
 // Solidity: event DepositEvent(bytes pubkey, bytes withdrawal_credentials, bytes contract_address, bytes amount, bytes signature, bytes index)
@@ -435,6 +443,7 @@ func (_DepositContract *DepositContractFilterer) FilterDepositEvent(opts *bind.F
 	return &DepositContractDepositEventIterator{contract: _DepositContract.contract, event: "DepositEvent", logs: logs, sub: sub}, nil
 }
 
+// todo unit act
 // WatchDepositEvent is a free log subscription operation binding the contract event 0x9690c6325860650852f0f0bd0e7d47145a3d0c2c5c92cba852bad61c02928b09.
 //
 // Solidity: event DepositEvent(bytes pubkey, bytes withdrawal_credentials, bytes contract_address, bytes amount, bytes signature, bytes index)
@@ -472,6 +481,7 @@ func (_DepositContract *DepositContractFilterer) WatchDepositEvent(opts *bind.Wa
 	}), nil
 }
 
+// todo unit act
 // ParseDepositEvent is a log parse operation binding the contract event 0x9690c6325860650852f0f0bd0e7d47145a3d0c2c5c92cba852bad61c02928b09.
 //
 // Solidity: event DepositEvent(bytes pubkey, bytes withdrawal_credentials, bytes contract_address, bytes amount, bytes signature, bytes index)

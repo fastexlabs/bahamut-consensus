@@ -56,6 +56,7 @@ func e2eMinimal(t *testing.T, v int, cfgo ...types.E2EConfigOpt) *testRunner {
 		ev.AltairForkTransition,
 		ev.BellatrixForkTransition,
 		ev.CapellaForkTransition,
+		// ev.DenebForkTransition, // TODO(12750): Enable this when geth main branch's engine API support.
 		ev.APIMiddlewareVerifyIntegrity,
 		ev.APIGatewayV1Alpha1VerifyIntegrity,
 		ev.FinishedSyncing,
@@ -85,6 +86,9 @@ func e2eMinimal(t *testing.T, v int, cfgo ...types.E2EConfigOpt) *testRunner {
 	}
 	for _, o := range cfgo {
 		o(testConfig)
+	}
+	if testConfig.UseBuilder {
+		testConfig.Evaluators = append(testConfig.Evaluators, ev.BuilderIsActive)
 	}
 
 	return newTestRunner(t, testConfig)
@@ -129,6 +133,7 @@ func e2eMainnet(t *testing.T, usePrysmSh, useMultiClient bool, cfg *params.Beaco
 		ev.AltairForkTransition,
 		ev.BellatrixForkTransition,
 		ev.CapellaForkTransition,
+		// ev.DenebForkTransition, // TODO(12750): Enable this when geth main branch's engine API support.
 		ev.APIMiddlewareVerifyIntegrity,
 		ev.APIGatewayV1Alpha1VerifyIntegrity,
 		ev.FinishedSyncing,
@@ -165,6 +170,9 @@ func e2eMainnet(t *testing.T, usePrysmSh, useMultiClient bool, cfg *params.Beaco
 	if testConfig.UseValidatorCrossClient {
 		testConfig.Evaluators = append(testConfig.Evaluators, beaconapi_evaluators.BeaconAPIMultiClientVerifyIntegrity)
 	}
+	if testConfig.UseBuilder {
+		testConfig.Evaluators = append(testConfig.Evaluators, ev.BuilderIsActive)
+	}
 	return newTestRunner(t, testConfig)
 }
 
@@ -182,6 +190,7 @@ func scenarioEvals() []types.Evaluator {
 		ev.AltairForkTransition,
 		ev.BellatrixForkTransition,
 		ev.CapellaForkTransition,
+		// ev.DenebForkTransition, // TODO(12750): Enable this when geth main branch's engine API support.
 		ev.APIMiddlewareVerifyIntegrity,
 		ev.APIGatewayV1Alpha1VerifyIntegrity,
 		ev.FinishedSyncing,
@@ -203,6 +212,7 @@ func scenarioEvalsMulti() []types.Evaluator {
 		ev.AltairForkTransition,
 		ev.BellatrixForkTransition,
 		ev.CapellaForkTransition,
+		// ev.DenebForkTransition, // TODO(12750): Enable this when geth main branch's engine API support.
 		ev.APIMiddlewareVerifyIntegrity,
 		ev.APIGatewayV1Alpha1VerifyIntegrity,
 		ev.FinishedSyncing,

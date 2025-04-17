@@ -34,6 +34,7 @@ var (
 		ConfigName         string
 		NumValidators      uint64
 		GenesisTime        uint64
+		GenesisTimeDelay   uint64
 		OutputSSZ          string
 		OutputJSON         string
 		OutputYaml         string
@@ -99,6 +100,11 @@ var (
 				Destination: &generateGenesisStateFlags.GenesisTime,
 				Usage:       "Unix timestamp seconds used as the genesis time in the genesis state. If unset, defaults to now()",
 			},
+			&cli.Uint64Flag{
+				Name:        "genesis-time-delay",
+				Destination: &generateGenesisStateFlags.GenesisTimeDelay,
+				Usage:       "Delay genesis time by N seconds",
+			},
 			&cli.BoolFlag{
 				Name:        "override-eth1data",
 				Destination: &generateGenesisStateFlags.OverrideEth1Data,
@@ -146,10 +152,12 @@ func versionNames() []string {
 
 // Represents a json object of hex string and uint64 values for
 // validators on Ethereum. This file can be generated using the official staking-deposit-cli.
+// todo unit act
 type depositDataJSON struct {
 	PubKey                string `json:"pubkey"`
 	Amount                uint64 `json:"amount"`
 	WithdrawalCredentials string `json:"withdrawal_credentials"`
+	Contract              string `json:"contract_address"`
 	DepositDataRoot       string `json:"deposit_data_root"`
 	Signature             string `json:"signature"`
 }
@@ -223,6 +231,9 @@ func generateGenesis(ctx context.Context) (state.BeaconState, error) {
 		f.GenesisTime = uint64(time.Now().Unix())
 		log.Info("No genesis time specified, defaulting to now()")
 	}
+	log.Infof("Delaying genesis %v by %v seconds", f.GenesisTime, f.GenesisTimeDelay)
+	f.GenesisTime += f.GenesisTimeDelay
+	log.Infof("Genesis is now %v", f.GenesisTime)
 
 	v, err := version.FromString(f.ForkName)
 	if err != nil {
@@ -263,9 +274,16 @@ func generateGenesis(ctx context.Context) (state.BeaconState, error) {
 		// set timestamps for genesis and shanghai fork
 		gen.Timestamp = f.GenesisTime
 		gen.Config.ShanghaiTime = interop.GethShanghaiTime(f.GenesisTime, params.BeaconConfig())
+		//gen.Config.CancunTime = interop.GethCancunTime(f.GenesisTime, params.BeaconConfig())
+		gen.Config.CancunTime = interop.GethCancunTime(f.GenesisTime, params.BeaconConfig())
+		log.
+			WithField("shanghai", fmt.Sprintf("%d", *gen.Config.ShanghaiTime)).
+			WithField("cancun", fmt.Sprintf("%d", *gen.Config.CancunTime)).
+			Info("setting fork geth times")
 		if v > version.Altair {
 			// set ttd to zero so EL goes post-merge immediately
 			gen.Config.TerminalTotalDifficulty = big.NewInt(0)
+			gen.Config.TerminalTotalDifficultyPassed = true
 		}
 	} else {
 		gen = interop.GethTestnetGenesis(f.GenesisTime, params.BeaconConfig())
@@ -345,6 +363,7 @@ func depositEntriesFromJSON(enc []byte) ([][]byte, []*ethpb.Deposit_Data, error)
 	return roots, dds, nil
 }
 
+// todo unit act
 func depositJSONToDepositData(input *depositDataJSON) ([]byte, *ethpb.Deposit_Data, error) {
 	root, err := hex.DecodeString(strings.TrimPrefix(input.DepositDataRoot, "0x"))
 	if err != nil {
@@ -358,6 +377,10 @@ func depositJSONToDepositData(input *depositDataJSON) ([]byte, *ethpb.Deposit_Da
 	if err != nil {
 		return nil, nil, err
 	}
+	contract, err := hex.DecodeString(strings.TrimPrefix(input.Contract, "0x"))
+	if err != nil {
+		return nil, nil, err
+	}
 	sig, err := hex.DecodeString(strings.TrimPrefix(input.Signature, "0x"))
 	if err != nil {
 		return nil, nil, err
@@ -365,6 +388,7 @@ func depositJSONToDepositData(input *depositDataJSON) ([]byte, *ethpb.Deposit_Da
 	return root, &ethpb.Deposit_Data{
 		PublicKey:             pk,
 		WithdrawalCredentials: creds,
+		Contract:              contract,
 		Amount:                input.Amount,
 		Signature:             sig,
 	}, nil

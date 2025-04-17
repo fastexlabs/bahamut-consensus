@@ -94,7 +94,8 @@
   },
   "logruswitherror": {
     "exclude_files": {
-      "external/.*": "Third party code"
+      "external/.*": "Third party code",
+      ".*/testmain.go": "Generated/test code"
     }
   },
   "cryptorand": {
@@ -147,11 +148,11 @@
     }
   },
   "ineffassign": {
-    "only_files": {
-      "beacon-chain/.*": "",
-      "shared/.*": "",
-      "slasher/.*": "",
-      "validator/.*": ""
+    "exclude_files": {
+      "external/.*": "Third party code",
+      "rules_go_work-.*": "Third party code",
+      ".*\\.pb.*.go": "Generated code is ok",
+      ".*generated\\.ssz\\.go": "Generated code is ok"
     }
   },
   "properpermissions": {

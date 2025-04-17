@@ -113,8 +113,15 @@ func main() {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/p2p", handler.httpHandler)
+	mux.HandleFunc("/enr", handler.enrHandler)
 
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", *metricsPort), mux); err != nil {
+	srv := &http.Server{
+		Addr:              fmt.Sprintf(":%d", *metricsPort),
+		ReadHeaderTimeout: 3 * time.Second,
+		Handler:           mux,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
 		log.WithError(err).Fatal("Failed to start server")
 	}
 
@@ -180,6 +187,13 @@ func (h *handler) httpHandler(w http.ResponseWriter, _ *http.Request) {
 		write(w, []byte("IP: "+n.IP().String()+"\n"))
 		write(w, []byte(fmt.Sprintf("UDP Port: %d", n.UDP())+"\n"))
 		write(w, []byte(fmt.Sprintf("TCP Port: %d", n.UDP())+"\n\n"))
+	}
+}
+
+func (h *handler) enrHandler(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write([]byte(h.listener.Self().String())); err != nil {
+		log.WithError(err).Error("Failed to write ENR to http response")
 	}
 }
 
@@ -253,7 +267,6 @@ func extractPrivateKey() *ecdsa.PrivateKey {
 		if err != nil {
 			panic(err)
 		}
-
 	} else {
 		privInterfaceKey, _, err := crypto.GenerateSecp256k1Key(rand.Reader)
 		if err != nil {

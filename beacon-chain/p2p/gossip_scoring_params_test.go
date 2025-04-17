@@ -1,3 +1,4 @@
+// todo unit act
 package p2p
 
 import (
@@ -31,6 +32,7 @@ func TestCorrect_ActiveValidatorsCount(t *testing.T) {
 			validators[i] = &ethpb.Validator{
 				PublicKey:             make([]byte, 48),
 				WithdrawalCredentials: make([]byte, 32),
+				Contract:              make([]byte, 20),
 				ExitEpoch:             params.BeaconConfig().FarFutureEpoch,
 				Slashed:               false,
 			}
@@ -48,6 +50,7 @@ func TestCorrect_ActiveValidatorsCount(t *testing.T) {
 		require.NoError(t, bState.AppendValidator(&ethpb.Validator{
 			PublicKey:             make([]byte, 48),
 			WithdrawalCredentials: make([]byte, 32),
+			Contract:              make([]byte, 20),
 			ExitEpoch:             params.BeaconConfig().FarFutureEpoch,
 			Slashed:               false,
 		}))

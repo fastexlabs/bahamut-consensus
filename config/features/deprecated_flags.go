@@ -12,11 +12,6 @@ var (
 		Usage:  deprecatedUsage,
 		Hidden: true,
 	}
-	deprecatedDisablePeerScorer = &cli.BoolFlag{
-		Name:   "disable-peer-scorer",
-		Usage:  deprecatedUsage,
-		Hidden: true,
-	}
 	deprecatedDisableVecHTR = &cli.BoolFlag{
 		Name:   "disable-vectorized-htr",
 		Usage:  deprecatedUsage,
@@ -32,15 +27,45 @@ var (
 		Usage:  deprecatedUsage,
 		Hidden: true,
 	}
+	deprecatedBuildBlockParallel = &cli.BoolFlag{
+		Name:   "build-block-parallel",
+		Usage:  deprecatedUsage,
+		Hidden: true,
+	}
+
+	deprecatedEnableRegistrationCache = &cli.BoolFlag{
+		Name:   "enable-registration-cache",
+		Usage:  deprecatedUsage,
+		Hidden: true,
+	}
+	deprecatedAggregateParallel = &cli.BoolFlag{
+		Name:   "aggregate-parallel",
+		Usage:  deprecatedUsage,
+		Hidden: true,
+	}
+	deprecatedEnableOptionalEngineMethods = &cli.BoolFlag{
+		Name:   "enable-optional-engine-methods",
+		Usage:  deprecatedUsage,
+		Hidden: true,
+	}
+	deprecatedDisableBuildBlockParallel = &cli.BoolFlag{
+		Name:   "disable-build-block-parallel",
+		Usage:  deprecatedUsage,
+		Hidden: true,
+	}
 )
 
 // Deprecated flags for both the beacon node and validator client.
 var deprecatedFlags = []cli.Flag{
 	exampleDeprecatedFeatureFlag,
-	deprecatedDisablePeerScorer,
 	deprecatedDisableVecHTR,
 	deprecatedEnableReorgLateBlocks,
 	deprecatedDisableGossipBatchAggregation,
+	deprecatedBuildBlockParallel,
+	deprecatedEnableRegistrationCache,
+	deprecatedAggregateParallel,
+	deprecatedEnableOptionalEngineMethods,
+	deprecatedDisableBuildBlockParallel,
 }
 
 // deprecatedBeaconFlags contains flags that are still used by other components

@@ -1,3 +1,4 @@
+// todo unit act
 package testing
 
 import (
@@ -14,6 +15,7 @@ import (
 	payloadattribute "github.com/prysmaticlabs/prysm/v4/consensus-types/payload-attribute"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
+	"github.com/prysmaticlabs/prysm/v4/math"
 	pb "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
@@ -26,6 +28,7 @@ type EngineClient struct {
 	ForkChoiceUpdatedResp       []byte
 	ExecutionPayload            *pb.ExecutionPayload
 	ExecutionPayloadCapella     *pb.ExecutionPayloadCapella
+	ExecutionPayloadDeneb       *pb.ExecutionPayloadDeneb
 	ExecutionBlock              *pb.ExecutionBlock
 	Err                         error
 	ErrLatestExecBlock          error
@@ -38,12 +41,14 @@ type EngineClient struct {
 	NumReconstructedPayloads    uint64
 	TerminalBlockHash           []byte
 	TerminalBlockHashExists     bool
+	BuilderOverride             bool
 	OverrideValidHash           [32]byte
-	BlockValue                  *big.Int
+	BlockValue                  uint64
+	BlobsBundle                 *pb.BlobsBundle
 }
 
 // NewPayload --
-func (e *EngineClient) NewPayload(_ context.Context, _ interfaces.ExecutionData) ([]byte, error) {
+func (e *EngineClient) NewPayload(_ context.Context, _ interfaces.ExecutionData, _ []common.Hash, _ *common.Hash) ([]byte, error) {
 	return e.NewPayloadResp, e.ErrNewPayload
 }
 
@@ -58,15 +63,26 @@ func (e *EngineClient) ForkchoiceUpdated(
 }
 
 // GetPayload --
-func (e *EngineClient) GetPayload(_ context.Context, _ [8]byte, s primitives.Slot) (interfaces.ExecutionData, error) {
+func (e *EngineClient) GetPayload(_ context.Context, _ [8]byte, s primitives.Slot) (interfaces.ExecutionData, *pb.BlobsBundle, bool, error) {
+	if slots.ToEpoch(s) >= params.BeaconConfig().DenebForkEpoch {
+		ed, err := blocks.WrappedExecutionPayloadDeneb(e.ExecutionPayloadDeneb, math.Gwei(e.BlockValue))
+		if err != nil {
+			return nil, nil, false, err
+		}
+		return ed, e.BlobsBundle, e.BuilderOverride, nil
+	}
 	if slots.ToEpoch(s) >= params.BeaconConfig().CapellaForkEpoch {
-		return blocks.WrappedExecutionPayloadCapella(e.ExecutionPayloadCapella, e.BlockValue)
+		ed, err := blocks.WrappedExecutionPayloadCapella(e.ExecutionPayloadCapella, math.Gwei(e.BlockValue))
+		if err != nil {
+			return nil, nil, false, err
+		}
+		return ed, nil, e.BuilderOverride, nil
 	}
 	p, err := blocks.WrappedExecutionPayload(e.ExecutionPayload)
 	if err != nil {
-		return nil, err
+		return nil, nil, false, err
 	}
-	return p, e.ErrGetPayload
+	return p, nil, e.BuilderOverride, e.ErrGetPayload
 }
 
 // ExchangeTransitionConfiguration --

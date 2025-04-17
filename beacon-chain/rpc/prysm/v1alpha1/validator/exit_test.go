@@ -24,6 +24,7 @@ import (
 )
 
 func TestProposeExit_Notification(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	ctx := context.Background()
 
 	deposits, keys, err := util.DeterministicDepositsAndKeys(params.BeaconConfig().MinGenesisActiveValidatorCount)
@@ -91,6 +92,7 @@ func TestProposeExit_Notification(t *testing.T) {
 }
 
 func TestProposeExit_NoPanic(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	ctx := context.Background()
 
 	deposits, keys, err := util.DeterministicDepositsAndKeys(params.BeaconConfig().MinGenesisActiveValidatorCount)

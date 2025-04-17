@@ -4,6 +4,8 @@ func init() {
 	defaults := []*BeaconChainConfig{
 		MainnetConfig(),
 		OasisConfig(),
+		OceanConfig(),
+		HorizonConfig(),
 		MinimalSpecConfig(),
 		E2ETestConfig(),
 		E2EMainnetTestConfig(),

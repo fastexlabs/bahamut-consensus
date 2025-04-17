@@ -8,26 +8,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/prysmaticlabs/prysm/v4/api"
 	"github.com/prysmaticlabs/prysm/v4/api/gateway/apimiddleware"
 	"github.com/prysmaticlabs/prysm/v4/api/grpc"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/eth/events"
+	http2 "github.com/prysmaticlabs/prysm/v4/network/http"
 	"github.com/prysmaticlabs/prysm/v4/runtime/version"
-	"github.com/r3labs/sse"
+	"github.com/r3labs/sse/v2"
 )
-
-const (
-	versionHeader        = "Eth-Consensus-Version"
-	grpcVersionHeader    = "Grpc-metadata-Eth-Consensus-Version"
-	jsonMediaType        = "application/json"
-	octetStreamMediaType = "application/octet-stream"
-)
-
-// match a number with optional decimals
-var priorityRegex = regexp.MustCompile(`q=(\d+(?:\.\d+)?)`)
 
 type sszConfig struct {
 	fileName     string
@@ -79,19 +70,6 @@ func handleGetBlindedBeaconBlockSSZ(
 	return handleGetSSZ(m, endpoint, w, req, config)
 }
 
-func handleSubmitBlockSSZ(m *apimiddleware.ApiProxyMiddleware, endpoint apimiddleware.Endpoint, w http.ResponseWriter, req *http.Request) (handled bool) {
-	return handlePostSSZ(m, endpoint, w, req)
-}
-
-func handleSubmitBlindedBlockSSZ(
-	m *apimiddleware.ApiProxyMiddleware,
-	endpoint apimiddleware.Endpoint,
-	w http.ResponseWriter,
-	req *http.Request,
-) (handled bool) {
-	return handlePostSSZ(m, endpoint, w, req)
-}
-
 func handleProduceBlockSSZ(m *apimiddleware.ApiProxyMiddleware, endpoint apimiddleware.Endpoint, w http.ResponseWriter, req *http.Request) (handled bool) {
 	config := sszConfig{
 		fileName:     "produce_beacon_block.ssz",
@@ -120,11 +98,7 @@ func handleGetSSZ(
 	req *http.Request,
 	config sszConfig,
 ) (handled bool) {
-	ssz, err := sszRequested(req)
-	if err != nil {
-		apimiddleware.WriteError(w, apimiddleware.InternalServerError(err), nil)
-		return true
-	}
+	ssz := http2.SszRequested(req)
 	if !ssz {
 		return false
 	}
@@ -172,96 +146,6 @@ func handleGetSSZ(
 	return true
 }
 
-func handlePostSSZ(m *apimiddleware.ApiProxyMiddleware, endpoint apimiddleware.Endpoint, w http.ResponseWriter, req *http.Request) (handled bool) {
-	if !sszPosted(req) {
-		return false
-	}
-
-	if errJson := prepareSSZRequestForProxying(m, endpoint, req); errJson != nil {
-		apimiddleware.WriteError(w, errJson, nil)
-		return true
-	}
-	prepareCustomHeaders(req)
-	if errJson := preparePostedSSZData(req); errJson != nil {
-		apimiddleware.WriteError(w, errJson, nil)
-		return true
-	}
-
-	grpcResponse, errJson := m.ProxyRequest(req)
-	if errJson != nil {
-		apimiddleware.WriteError(w, errJson, nil)
-		return true
-	}
-	grpcResponseBody, errJson := apimiddleware.ReadGrpcResponseBody(grpcResponse.Body)
-	if errJson != nil {
-		apimiddleware.WriteError(w, errJson, nil)
-		return true
-	}
-	respHasError, errJson := apimiddleware.HandleGrpcResponseError(endpoint.Err, grpcResponse, grpcResponseBody, w)
-	if errJson != nil {
-		apimiddleware.WriteError(w, errJson, nil)
-		return true
-	}
-	if respHasError {
-		return true
-	}
-	if errJson := apimiddleware.Cleanup(grpcResponse.Body); errJson != nil {
-		apimiddleware.WriteError(w, errJson, nil)
-		return true
-	}
-
-	return true
-}
-
-func sszRequested(req *http.Request) (bool, error) {
-	accept := req.Header.Values("Accept")
-	if len(accept) == 0 {
-		return false, nil
-	}
-	types := strings.Split(accept[0], ",")
-	currentType, currentPriority := "", 0.0
-	for _, t := range types {
-		values := strings.Split(t, ";")
-		name := values[0]
-		if name != jsonMediaType && name != octetStreamMediaType {
-			continue
-		}
-		// no params specified
-		if len(values) == 1 {
-			priority := 1.0
-			if priority > currentPriority {
-				currentType, currentPriority = name, priority
-			}
-			continue
-		}
-		params := values[1]
-		match := priorityRegex.FindAllStringSubmatch(params, 1)
-		if len(match) != 1 {
-			continue
-		}
-		priority, err := strconv.ParseFloat(match[0][1], 32)
-		if err != nil {
-			return false, err
-		}
-		if priority > currentPriority {
-			currentType, currentPriority = name, priority
-		}
-	}
-
-	return currentType == octetStreamMediaType, nil
-}
-
-func sszPosted(req *http.Request) bool {
-	ct, ok := req.Header["Content-Type"]
-	if !ok {
-		return false
-	}
-	if len(ct) != 1 {
-		return false
-	}
-	return ct[0] == octetStreamMediaType
-}
-
 func prepareSSZRequestForProxying(m *apimiddleware.ApiProxyMiddleware, endpoint apimiddleware.Endpoint, req *http.Request) apimiddleware.ErrorJson {
 	req.URL.Scheme = "http"
 	req.URL.Host = m.GatewayAddress
@@ -277,14 +161,6 @@ func prepareSSZRequestForProxying(m *apimiddleware.ApiProxyMiddleware, endpoint 
 	return nil
 }
 
-func prepareCustomHeaders(req *http.Request) {
-	ver := req.Header.Get(versionHeader)
-	if ver != "" {
-		req.Header.Del(versionHeader)
-		req.Header.Add(grpcVersionHeader, ver)
-	}
-}
-
 func preparePostedSSZData(req *http.Request) apimiddleware.ErrorJson {
 	buf, err := io.ReadAll(req.Body)
 	if err != nil {
@@ -297,7 +173,7 @@ func preparePostedSSZData(req *http.Request) apimiddleware.ErrorJson {
 	}
 	req.Body = io.NopCloser(bytes.NewBuffer(data))
 	req.ContentLength = int64(len(data))
-	req.Header.Set("Content-Type", jsonMediaType)
+	req.Header.Set("Content-Type", api.JsonMediaType)
 	return nil
 }
 
@@ -325,9 +201,9 @@ func writeSSZResponseHeaderAndBody(grpcResp *http.Response, w http.ResponseWrite
 		}
 	}
 	w.Header().Set("Content-Length", strconv.Itoa(len(respSsz)))
-	w.Header().Set("Content-Type", octetStreamMediaType)
+	w.Header().Set("Content-Type", api.OctetStreamMediaType)
 	w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
-	w.Header().Set(versionHeader, respVersion)
+	w.Header().Set(api.VersionHeader, respVersion)
 	if statusCodeHeader != "" {
 		code, err := strconv.Atoi(statusCodeHeader)
 		if err != nil {

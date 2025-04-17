@@ -6,9 +6,9 @@ import (
 )
 
 // Merkleize.go is mostly a directly copy of the same filename from
-// 	https://github.com/protolambda/zssz/blob/master/merkle/merkleize.go.
+// https://github.com/protolambda/zssz/blob/master/merkle/merkleize.go.
 // The reason the method is copied instead of imported is due to us using a
-// a custom hasher interface for a reduced memory footprint when using
+// custom hasher interface for a reduced memory footprint when using
 // 'Merkleize'.
 
 const (
@@ -213,9 +213,7 @@ func MerkleizeVector(elements [][32]byte, length uint64) [32]byte {
 			zerohash := trie.ZeroHashes[i]
 			elements = append(elements, zerohash)
 		}
-		outputLen := len(elements) / 2
-		htr.VectorizedSha256(elements, elements)
-		elements = elements[:outputLen]
+		elements = htr.VectorizedSha256(elements)
 	}
 	return elements[0]
 }

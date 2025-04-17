@@ -5,13 +5,14 @@ import (
 
 	gwpb "github.com/grpc-ecosystem/grpc-gateway/v2/proto/gateway"
 	"github.com/pkg/errors"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/blockchain"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed"
-	blockfeed "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/block"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/operation"
 	statefeed "github.com/prysmaticlabs/prysm/v4/beacon-chain/core/feed/state"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
+	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
 	ethpbservice "github.com/prysmaticlabs/prysm/v4/proto/eth/service"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/eth/v1"
@@ -44,6 +45,8 @@ const (
 	BLSToExecutionChangeTopic = "bls_to_execution_change"
 	// PayloadAttributesTopic represents a new payload attributes for execution payload building event topic.
 	PayloadAttributesTopic = "payload_attributes"
+	// BlobSidecarTopic represents a new blob sidecar event topic
+	BlobSidecarTopic = "blob_sidecar"
 )
 
 var casesHandled = map[string]bool{
@@ -56,6 +59,7 @@ var casesHandled = map[string]bool{
 	SyncCommitteeContributionTopic: true,
 	BLSToExecutionChangeTopic:      true,
 	PayloadAttributesTopic:         true,
+	BlobSidecarTopic:               true,
 }
 
 // StreamEvents allows requesting all events from a set of topics defined in the Ethereum consensus API standard.
@@ -80,26 +84,18 @@ func (s *Server) StreamEvents(
 	}
 
 	// Subscribe to event feeds from information received in the beacon node runtime.
-	blockChan := make(chan *feed.Event, 1)
-	blockSub := s.BlockNotifier.BlockFeed().Subscribe(blockChan)
-
 	opsChan := make(chan *feed.Event, 1)
 	opsSub := s.OperationNotifier.OperationFeed().Subscribe(opsChan)
 
 	stateChan := make(chan *feed.Event, 1)
 	stateSub := s.StateNotifier.StateFeed().Subscribe(stateChan)
 
-	defer blockSub.Unsubscribe()
 	defer opsSub.Unsubscribe()
 	defer stateSub.Unsubscribe()
 
 	// Handle each event received and context cancelation.
 	for {
 		select {
-		case event := <-blockChan:
-			if err := handleBlockEvents(stream, requestedTopics, event); err != nil {
-				return status.Errorf(codes.Internal, "Could not handle block event: %v", err)
-			}
 		case event := <-opsChan:
 			if err := handleBlockOperationEvents(stream, requestedTopics, event); err != nil {
 				return status.Errorf(codes.Internal, "Could not handle block operations event: %v", err)
@@ -113,37 +109,6 @@ func (s *Server) StreamEvents(
 		case <-stream.Context().Done():
 			return status.Errorf(codes.Canceled, "Context canceled")
 		}
-	}
-}
-
-func handleBlockEvents(
-	stream ethpbservice.Events_StreamEventsServer, requestedTopics map[string]bool, event *feed.Event,
-) error {
-	switch event.Type {
-	case blockfeed.ReceivedBlock:
-		if _, ok := requestedTopics[BlockTopic]; !ok {
-			return nil
-		}
-		blkData, ok := event.Data.(*blockfeed.ReceivedBlockData)
-		if !ok {
-			return nil
-		}
-		v1Data, err := migration.BlockIfaceToV1BlockHeader(blkData.SignedBlock)
-		if err != nil {
-			return err
-		}
-		item, err := v1Data.Message.HashTreeRoot()
-		if err != nil {
-			return errors.Wrap(err, "could not hash tree root block")
-		}
-		eventBlock := &ethpb.EventBlock{
-			Slot:                v1Data.Message.Slot,
-			Block:               item[:],
-			ExecutionOptimistic: blkData.IsOptimistic,
-		}
-		return streamData(stream, BlockTopic, eventBlock)
-	default:
-		return nil
 	}
 }
 
@@ -201,7 +166,26 @@ func handleBlockOperationEvents(
 		}
 		v2Change := migration.V1Alpha1SignedBLSToExecChangeToV2(changeData.Change)
 		return streamData(stream, BLSToExecutionChangeTopic, v2Change)
-
+	case operation.BlobSidecarReceived:
+		if _, ok := requestedTopics[BlobSidecarTopic]; !ok {
+			return nil
+		}
+		blobData, ok := event.Data.(*operation.BlobSidecarReceivedData)
+		if !ok {
+			return nil
+		}
+		if blobData == nil || blobData.Blob == nil {
+			return nil
+		}
+		versionedHash := blockchain.ConvertKzgCommitmentToVersionedHash(blobData.Blob.Message.KzgCommitment)
+		blobEvent := &ethpb.EventBlobSidecar{
+			BlockRoot:     bytesutil.SafeCopyBytes(blobData.Blob.Message.BlockRoot),
+			Index:         blobData.Blob.Message.Index,
+			Slot:          blobData.Blob.Message.Slot,
+			VersionedHash: bytesutil.SafeCopyBytes(versionedHash.Bytes()),
+			KzgCommitment: bytesutil.SafeCopyBytes(blobData.Blob.Message.KzgCommitment),
+		}
+		return streamData(stream, BlobSidecarTopic, blobEvent)
 	default:
 		return nil
 	}
@@ -252,6 +236,28 @@ func (s *Server) handleStateEvents(
 			return nil
 		}
 		return streamData(stream, ChainReorgTopic, reorg)
+	case statefeed.BlockProcessed:
+		if _, ok := requestedTopics[BlockTopic]; !ok {
+			return nil
+		}
+		blkData, ok := event.Data.(*statefeed.BlockProcessedData)
+		if !ok {
+			return nil
+		}
+		v1Data, err := migration.BlockIfaceToV1BlockHeader(blkData.SignedBlock)
+		if err != nil {
+			return err
+		}
+		item, err := v1Data.Message.HashTreeRoot()
+		if err != nil {
+			return errors.Wrap(err, "could not hash tree root block")
+		}
+		eventBlock := &ethpb.EventBlock{
+			Slot:                blkData.Slot,
+			Block:               item[:],
+			ExecutionOptimistic: blkData.Optimistic,
+		}
+		return streamData(stream, BlockTopic, eventBlock)
 	default:
 		return nil
 	}
@@ -317,7 +323,7 @@ func (s *Server) streamPayloadAttributes(stream ethpbservice.Events_StreamEvents
 				},
 			},
 		})
-	case version.Capella:
+	case version.Capella, version.Deneb:
 		withdrawals, err := headState.ExpectedWithdrawals()
 		if err != nil {
 			return err

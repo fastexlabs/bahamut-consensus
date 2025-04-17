@@ -5,6 +5,7 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/prysmaticlabs/go-bitfield"
 	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
@@ -20,8 +21,10 @@ type BeaconState interface {
 	ReadOnlyBeaconState
 	WriteOnlyBeaconState
 	Copy() BeaconState
+	CopyAllTries()
 	HashTreeRoot(ctx context.Context) ([32]byte, error)
 	StateProver
+	json.Marshaler
 }
 
 // SpecParametersProvider provides fork-specific configuration parameters as
@@ -106,6 +109,7 @@ type ReadOnlyValidator interface {
 	ActivationEligibilityEpoch() primitives.Epoch
 	ActivationEpoch() primitives.Epoch
 	WithdrawableEpoch() primitives.Epoch
+	Contract() [fieldparams.ContractAddressLength]byte
 	ExitEpoch() primitives.Epoch
 	PublicKey() [fieldparams.BLSPubkeyLength]byte
 	WithdrawalCredentials() []byte
@@ -255,7 +259,7 @@ type WriteOnlyActivities interface {
 // WriteOnlyRandaoMixes defines a struct which only has write access to randao mixes methods.
 type WriteOnlyRandaoMixes interface {
 	SetRandaoMixes(val [][]byte) error
-	UpdateRandaoMixesAtIndex(idx uint64, val []byte) error
+	UpdateRandaoMixesAtIndex(idx uint64, val [32]byte) error
 }
 
 // WriteOnlyCheckpoint defines a struct which only has write access to check point methods.

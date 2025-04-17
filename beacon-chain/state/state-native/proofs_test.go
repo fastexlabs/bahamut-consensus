@@ -35,17 +35,18 @@ func TestBeaconStateMerkleProofs_altair(t *testing.T) {
 	require.NoError(t, err)
 	results := []string{
 		"0x173669ae8794c057def63b20372114a628abb029354a2ef50d7a1aaa9a3dab4a",
-		"0xe8facaa9be1c488207092f135ca6159f7998f313459b4198f46a9433f8b346e6",
-		"0x0a7910590f2a08faa740a5c40e919722b80a786d18d146318309926a6b2ab95e",
-		"0xc78009fdf07fc56a11f122370658a353aaa542ed63e44c4bc15ff4cd105ab33c",
-		"0x4616e1d9312a92eb228e8cd5483fa1fca64d99781d62129bc53718d194b98c45",
+		"0xf5a5fd42d16a20302798ef6ed309979b43003d2320d9f0e8ea9831a92759fb4b",
+		"0xdb56114e00fdd4c1f85c892bf35ac9a89289aaecb1ebd0a96cde606a748b5d71",
+		"0xa07848503b66e6c6c699d31177115a1446c76dced4b85476e75707b10ee53189",
+		"0x36b127a953720f642c5e1cd6a24081c9e21b80ff5f21b08367f76f8e3e9dd71d",
 	}
 	t.Run("current sync committee", func(t *testing.T) {
 		cscp, err := altair.CurrentSyncCommitteeProof(ctx)
 		require.NoError(t, err)
 		require.Equal(t, len(cscp), 5)
 		for i, bytes := range cscp {
-			require.Equal(t, hexutil.Encode(bytes), results[i])
+			res := hexutil.Encode(bytes)
+			require.Equal(t, results[i], res)
 		}
 	})
 	t.Run("next sync committee", func(t *testing.T) {
@@ -56,6 +57,7 @@ func TestBeaconStateMerkleProofs_altair(t *testing.T) {
 			require.Equal(t, hexutil.Encode(bytes), results[i])
 		}
 	})
+	// TODO: Values are not equal, want: true (bool), got: false (bool).
 	t.Run("finalized root", func(t *testing.T) {
 		finalizedRoot := altair.FinalizedCheckpoint().Root
 		proof, err := altair.FinalizedRootProof(ctx)
@@ -64,6 +66,7 @@ func TestBeaconStateMerkleProofs_altair(t *testing.T) {
 		valid := trie.VerifyMerkleProof(htr[:], finalizedRoot, gIndex, proof)
 		require.Equal(t, true, valid)
 	})
+	// TODO: Values are not equal, want: true (bool), got: false (bool).
 	t.Run("recomputes root on dirty fields", func(t *testing.T) {
 		currentRoot, err := altair.HashTreeRoot(ctx)
 		require.NoError(t, err)
@@ -104,15 +107,16 @@ func TestBeaconStateMerkleProofs_bellatrix(t *testing.T) {
 	require.NoError(t, err)
 	results := []string{
 		"0x173669ae8794c057def63b20372114a628abb029354a2ef50d7a1aaa9a3dab4a",
-		"0xe8facaa9be1c488207092f135ca6159f7998f313459b4198f46a9433f8b346e6",
-		"0x0a7910590f2a08faa740a5c40e919722b80a786d18d146318309926a6b2ab95e",
-		"0xa83dc5a6222b6e5d5f11115ec4ba4035512c060e74908c56ebc25ad74dd25c18",
-		"0x4616e1d9312a92eb228e8cd5483fa1fca64d99781d62129bc53718d194b98c45",
+		"0xb68b2f519878bcdc8fce2bba633a841e89e757c901224e731ec16a2397fdca74",
+		"0xdb56114e00fdd4c1f85c892bf35ac9a89289aaecb1ebd0a96cde606a748b5d71",
+		"0xa07848503b66e6c6c699d31177115a1446c76dced4b85476e75707b10ee53189",
+		"0x36b127a953720f642c5e1cd6a24081c9e21b80ff5f21b08367f76f8e3e9dd71d",
 	}
 	t.Run("current sync committee", func(t *testing.T) {
 		cscp, err := bellatrix.CurrentSyncCommitteeProof(ctx)
 		require.NoError(t, err)
 		require.Equal(t, len(cscp), 5)
+
 		for i, bytes := range cscp {
 			require.Equal(t, hexutil.Encode(bytes), results[i])
 		}
@@ -125,6 +129,7 @@ func TestBeaconStateMerkleProofs_bellatrix(t *testing.T) {
 			require.Equal(t, hexutil.Encode(bytes), results[i])
 		}
 	})
+	// TODO: Values are not equal, want: true (bool), got: false (bool).
 	t.Run("finalized root", func(t *testing.T) {
 		finalizedRoot := bellatrix.FinalizedCheckpoint().Root
 		proof, err := bellatrix.FinalizedRootProof(ctx)
@@ -133,6 +138,7 @@ func TestBeaconStateMerkleProofs_bellatrix(t *testing.T) {
 		valid := trie.VerifyMerkleProof(htr[:], finalizedRoot, gIndex, proof)
 		require.Equal(t, true, valid)
 	})
+	// TODO: Values are not equal, want: true (bool), got: false (bool).
 	t.Run("recomputes root on dirty fields", func(t *testing.T) {
 		currentRoot, err := bellatrix.HashTreeRoot(ctx)
 		require.NoError(t, err)

@@ -7,6 +7,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/time"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state"
+	consensus_types "github.com/prysmaticlabs/prysm/v4/consensus-types"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
@@ -48,6 +49,34 @@ func IsMergeTransitionComplete(st state.BeaconState) (bool, error) {
 	return !isEmpty, nil
 }
 
+// IsCapellaTransitionComplete returns true if the transition to Capella has completed.
+// Meaning the activities root in payload header in beacon state is not `ExecutionPayloadHeader().ActivitiesRoot()` (i.e. not empty).
+//
+// Spec code:
+// def is_capella_transition_complete(state: BeaconState) -> bool:
+//
+//	return state.latest_execution_payload_header.activities_root != ExecutionPayloadHeader().ActivitiesRoot()
+func IsCapellaTransitionComplete(st state.BeaconState) (bool, error) {
+	if st == nil {
+		return false, errors.New("nil state")
+	}
+	if IsPreCapellaVersion(st.Version()) {
+		return false, nil
+	}
+	if st.Version() > version.Capella {
+		return true, nil
+	}
+	h, err := st.LatestExecutionPayloadHeader()
+	if err != nil {
+		return false, err
+	}
+	empty, err := blocks.IsEmptyActivityChanges(h)
+	if err != nil {
+		return false, err
+	}
+	return !empty, nil
+}
+
 // IsExecutionBlock returns whether the block has a non-empty ExecutionPayload.
 //
 // Spec code:
@@ -60,7 +89,7 @@ func IsExecutionBlock(body interfaces.ReadOnlyBeaconBlockBody) (bool, error) {
 	}
 	payload, err := body.Execution()
 	switch {
-	case errors.Is(err, blocks.ErrUnsupportedGetter):
+	case errors.Is(err, consensus_types.ErrUnsupportedField):
 		return false, nil
 	case err != nil:
 		return false, err
@@ -110,6 +139,11 @@ func IsExecutionEnabledUsingHeader(header interfaces.ExecutionData, body interfa
 // IsPreBellatrixVersion returns true if input version is before bellatrix fork.
 func IsPreBellatrixVersion(v int) bool {
 	return v < version.Bellatrix
+}
+
+// IsPreCapellaVersion returns true if input version is before capella fork.
+func IsPreCapellaVersion(v int) bool {
+	return v < version.Capella
 }
 
 // ValidatePayloadWhenMergeCompletes validates if payload is valid versus input beacon state.

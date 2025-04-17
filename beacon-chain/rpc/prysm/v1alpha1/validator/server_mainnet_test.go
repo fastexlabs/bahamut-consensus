@@ -43,6 +43,7 @@ func TestWaitForActivation_ValidatorOriginallyExists(t *testing.T) {
 				ExitEpoch:             params.BeaconConfig().FarFutureEpoch,
 				PublicKey:             pubKey1,
 				WithdrawalCredentials: make([]byte, 32),
+				Contract:              make([]byte, 20),
 			},
 		},
 	}
@@ -53,6 +54,7 @@ func TestWaitForActivation_ValidatorOriginallyExists(t *testing.T) {
 		PublicKey:             pubKey1,
 		WithdrawalCredentials: bytesutil.PadTo([]byte("hey"), 32),
 		Signature:             make([]byte, 96),
+		Contract:              make([]byte, 20),
 	}
 	domain, err := signing.ComputeDomain(params.BeaconConfig().DomainDeposit, nil, nil)
 	require.NoError(t, err)
