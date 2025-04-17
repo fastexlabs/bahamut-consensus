@@ -59,9 +59,9 @@ func TestProcessDepositLog_OK(t *testing.T) {
 	require.NoError(t, err)
 	data := deposits[0].Data
 
-	testAcc.TxOpts.Value = mock.Amount32Eth()
+	testAcc.TxOpts.Value = mock.Amount8192FTN()
 	testAcc.TxOpts.GasLimit = 1000000
-	_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Signature, depositRoots[0])
+	_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Contract, data.Signature, depositRoots[0])
 	require.NoError(t, err, "Could not deposit to deposit contract")
 
 	testAcc.Backend.Commit()
@@ -79,7 +79,7 @@ func TestProcessDepositLog_OK(t *testing.T) {
 		t.Fatal("no logs")
 	}
 
-	err = web3Service.ProcessLog(context.Background(), logs[0])
+	err = web3Service.ProcessLog(context.Background(), &logs[0])
 	require.NoError(t, err)
 
 	require.LogsDoNotContain(t, hook, "Could not unpack log")
@@ -127,13 +127,13 @@ func TestProcessDepositLog_InsertsPendingDeposit(t *testing.T) {
 	require.NoError(t, err)
 	data := deposits[0].Data
 
-	testAcc.TxOpts.Value = mock.Amount32Eth()
+	testAcc.TxOpts.Value = mock.Amount8192FTN()
 	testAcc.TxOpts.GasLimit = 1000000
 
-	_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Signature, depositRoots[0])
+	_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Contract, data.Signature, depositRoots[0])
 	require.NoError(t, err, "Could not deposit to deposit contract")
 
-	_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Signature, depositRoots[0])
+	_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Contract, data.Signature, depositRoots[0])
 	require.NoError(t, err, "Could not deposit to deposit contract")
 
 	testAcc.Backend.Commit()
@@ -149,9 +149,9 @@ func TestProcessDepositLog_InsertsPendingDeposit(t *testing.T) {
 
 	web3Service.chainStartData.Chainstarted = true
 
-	err = web3Service.ProcessDepositLog(context.Background(), logs[0])
+	err = web3Service.ProcessDepositLog(context.Background(), &logs[0])
 	require.NoError(t, err)
-	err = web3Service.ProcessDepositLog(context.Background(), logs[1])
+	err = web3Service.ProcessDepositLog(context.Background(), &logs[1])
 	require.NoError(t, err)
 
 	pendingDeposits := web3Service.cfg.depositCache.PendingDeposits(context.Background(), nil /*blockNum*/)
@@ -187,9 +187,9 @@ func TestUnpackDepositLogData_OK(t *testing.T) {
 	require.NoError(t, err)
 	data := deposits[0].Data
 
-	testAcc.TxOpts.Value = mock.Amount32Eth()
+	testAcc.TxOpts.Value = mock.Amount8192FTN()
 	testAcc.TxOpts.GasLimit = 1000000
-	_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Signature, depositRoots[0])
+	_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Contract, data.Signature, depositRoots[0])
 	require.NoError(t, err, "Could not deposit to deposit contract")
 	testAcc.Backend.Commit()
 
@@ -202,7 +202,7 @@ func TestUnpackDepositLogData_OK(t *testing.T) {
 	logz, err := testAcc.Backend.FilterLogs(web3Service.ctx, query)
 	require.NoError(t, err, "Unable to retrieve logs")
 
-	loggedPubkey, withCreds, _, loggedSig, index, err := contracts.UnpackDepositLogData(logz[0].Data)
+	loggedPubkey, withCreds, _, _, loggedSig, index, err := contracts.UnpackDepositLogData(logz[0].Data)
 	require.NoError(t, err, "Unable to unpack logs")
 
 	require.Equal(t, uint64(0), binary.LittleEndian.Uint64(index), "Retrieved merkle tree index is incorrect")
@@ -249,15 +249,15 @@ func TestProcessETH2GenesisLog_8DuplicatePubkeys(t *testing.T) {
 	require.NoError(t, err)
 	data := deposits[0].Data
 
-	testAcc.TxOpts.Value = mock.Amount32Eth()
+	testAcc.TxOpts.Value = mock.Amount8192FTN()
 	testAcc.TxOpts.GasLimit = 1000000
 
 	// 64 Validators are used as size required for beacon-chain to start. This number
 	// is defined in the deposit contract as the number required for the testnet. The actual number
 	// is 2**14
 	for i := 0; i < depositsReqForChainStart; i++ {
-		testAcc.TxOpts.Value = mock.Amount32Eth()
-		_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Signature, depositRoots[0])
+		testAcc.TxOpts.Value = mock.Amount8192FTN()
+		_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, testAcc.ContractAddr[:], data.Signature, depositRoots[0])
 		require.NoError(t, err, "Could not deposit to deposit contract")
 
 		testAcc.Backend.Commit()
@@ -272,8 +272,8 @@ func TestProcessETH2GenesisLog_8DuplicatePubkeys(t *testing.T) {
 	logs, err := testAcc.Backend.FilterLogs(web3Service.ctx, query)
 	require.NoError(t, err, "Unable to retrieve logs")
 
-	for _, log := range logs {
-		err = web3Service.ProcessLog(context.Background(), log)
+	for i := range logs {
+		err = web3Service.ProcessLog(context.Background(), &logs[i])
 		require.NoError(t, err)
 	}
 	assert.Equal(t, false, web3Service.chainStartData.Chainstarted, "Genesis has been triggered despite being 8 duplicate keys")
@@ -328,9 +328,9 @@ func TestProcessETH2GenesisLog(t *testing.T) {
 	// is 2**14
 	for i := 0; i < depositsReqForChainStart; i++ {
 		data := deposits[i].Data
-		testAcc.TxOpts.Value = mock.Amount32Eth()
+		testAcc.TxOpts.Value = mock.Amount8192FTN()
 		testAcc.TxOpts.GasLimit = 1000000
-		_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Signature, roots[i])
+		_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Contract, data.Signature, roots[i])
 		require.NoError(t, err, "Could not deposit to deposit contract")
 
 		testAcc.Backend.Commit()
@@ -351,8 +351,8 @@ func TestProcessETH2GenesisLog(t *testing.T) {
 	stateSub := web3Service.cfg.stateNotifier.StateFeed().Subscribe(stateChannel)
 	defer stateSub.Unsubscribe()
 
-	for _, log := range logs {
-		err = web3Service.ProcessLog(context.Background(), log)
+	for i := range logs {
+		err = web3Service.ProcessLog(context.Background(), &logs[i])
 		require.NoError(t, err)
 	}
 
@@ -430,9 +430,9 @@ func TestProcessETH2GenesisLog_CorrectNumOfDeposits(t *testing.T) {
 	// is 2**14
 	for i := 0; i < totalNumOfDeposits; i++ {
 		data := deposits[i].Data
-		testAcc.TxOpts.Value = mock.Amount32Eth()
+		testAcc.TxOpts.Value = mock.Amount8192FTN()
 		testAcc.TxOpts.GasLimit = 1000000
-		_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Signature, depositRoots[i])
+		_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Contract, data.Signature, depositRoots[i])
 		require.NoError(t, err, "Could not deposit to deposit contract")
 		// pack 8 deposits into a block with an offset of
 		// 5
@@ -526,9 +526,9 @@ func TestProcessETH2GenesisLog_LargePeriodOfNoLogs(t *testing.T) {
 	// is 2**14
 	for i := 0; i < totalNumOfDeposits; i++ {
 		data := deposits[i].Data
-		testAcc.TxOpts.Value = mock.Amount32Eth()
+		testAcc.TxOpts.Value = mock.Amount8192FTN()
 		testAcc.TxOpts.GasLimit = 1000000
-		_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Signature, depositRoots[i])
+		_, err = testAcc.Contract.Deposit(testAcc.TxOpts, data.PublicKey, data.WithdrawalCredentials, data.Contract, data.Signature, depositRoots[i])
 		require.NoError(t, err, "Could not deposit to deposit contract")
 		// pack 8 deposits into a block with an offset of
 		// 5

@@ -1,3 +1,4 @@
+// todo unit act
 package helpers
 
 import (
@@ -176,9 +177,11 @@ func TestIsSlashableValidator_OK(t *testing.T) {
 	}
 }
 
+// TODO(fastex): figure out how to test proposer indices calculation
 func TestBeaconProposerIndex_OK(t *testing.T) {
 	params.SetupTestConfigCleanup(t)
 	ClearCache()
+	defer ClearCache()
 	c := params.BeaconConfig()
 	c.MinGenesisActiveValidatorCount = 16384
 	params.OverrideBeaconConfig(c)
@@ -190,9 +193,10 @@ func TestBeaconProposerIndex_OK(t *testing.T) {
 	}
 
 	state, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
-		Validators:  validators,
-		Slot:        0,
-		RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+		Validators:     validators,
+		Slot:           0,
+		RandaoMixes:    make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+		SharedActivity: &ethpb.SharedActivity{},
 	})
 	require.NoError(t, err)
 
@@ -222,6 +226,7 @@ func TestBeaconProposerIndex_OK(t *testing.T) {
 		},
 	}
 
+	defer ClearCache()
 	for _, tt := range tests {
 		ClearCache()
 		require.NoError(t, state.SetSlot(tt.slot))
@@ -234,6 +239,7 @@ func TestBeaconProposerIndex_OK(t *testing.T) {
 func TestBeaconProposerIndex_BadState(t *testing.T) {
 	params.SetupTestConfigCleanup(t)
 	ClearCache()
+	defer ClearCache()
 	c := params.BeaconConfig()
 	c.MinGenesisActiveValidatorCount = 16384
 	params.OverrideBeaconConfig(c)
@@ -249,11 +255,12 @@ func TestBeaconProposerIndex_BadState(t *testing.T) {
 	}
 
 	state, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
-		Validators:  validators,
-		Slot:        0,
-		RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
-		BlockRoots:  roots,
-		StateRoots:  roots,
+		Validators:     validators,
+		Slot:           0,
+		RandaoMixes:    make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+		SharedActivity: &ethpb.SharedActivity{},
+		BlockRoots:     roots,
+		StateRoots:     roots,
 	})
 	require.NoError(t, err)
 	// Set a very high slot, so that retrieved block root will be
@@ -264,6 +271,7 @@ func TestBeaconProposerIndex_BadState(t *testing.T) {
 	assert.Equal(t, 0, proposerIndicesCache.Len())
 }
 
+// TODO(fastex): figure out how to test proposer indices calculation
 func TestComputeProposerIndex_Compatibility(t *testing.T) {
 	validators := make([]*ethpb.Validator, params.BeaconConfig().MinGenesisActiveValidatorCount)
 	for i := 0; i < len(validators); i++ {
@@ -273,8 +281,9 @@ func TestComputeProposerIndex_Compatibility(t *testing.T) {
 	}
 
 	state, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
-		Validators:  validators,
-		RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+		Validators:     validators,
+		RandaoMixes:    make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+		SharedActivity: &ethpb.SharedActivity{},
 	})
 	require.NoError(t, err)
 
@@ -320,9 +329,10 @@ func TestActiveValidatorCount_Genesis(t *testing.T) {
 		}
 	}
 	beaconState, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
-		Slot:        0,
-		Validators:  validators,
-		RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+		Slot:           0,
+		Validators:     validators,
+		RandaoMixes:    make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+		SharedActivity: &ethpb.SharedActivity{},
 	})
 	require.NoError(t, err)
 
@@ -345,6 +355,7 @@ func TestChurnLimit_OK(t *testing.T) {
 		{validatorCount: 1000000, wantedChurn: 15 /* validatorCount/churnLimitQuotient */},
 		{validatorCount: 2000000, wantedChurn: 30 /* validatorCount/churnLimitQuotient */},
 	}
+	defer ClearCache()
 	for _, test := range tests {
 		ClearCache()
 
@@ -356,16 +367,59 @@ func TestChurnLimit_OK(t *testing.T) {
 		}
 
 		beaconState, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
-			Slot:        1,
-			Validators:  validators,
-			RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+			Slot:           1,
+			Validators:     validators,
+			RandaoMixes:    make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+			SharedActivity: &ethpb.SharedActivity{},
 		})
 		require.NoError(t, err)
 		validatorCount, err := ActiveValidatorCount(context.Background(), beaconState, time.CurrentEpoch(beaconState))
 		require.NoError(t, err)
-		resultChurn, err := ValidatorChurnLimit(validatorCount)
+		resultChurn := ValidatorActivationChurnLimit(validatorCount)
+		assert.Equal(t, test.wantedChurn, resultChurn, "ValidatorActivationChurnLimit(%d)", test.validatorCount)
+	}
+}
+
+func TestChurnLimitDeneb_OK(t *testing.T) {
+	tests := []struct {
+		validatorCount int
+		wantedChurn    uint64
+	}{
+		{1000, 4},
+		{100000, 4},
+		{1000000, params.BeaconConfig().MaxPerEpochActivationChurnLimit},
+		{2000000, params.BeaconConfig().MaxPerEpochActivationChurnLimit},
+	}
+
+	defer ClearCache()
+
+	for _, test := range tests {
+		ClearCache()
+
+		// Create validators
+		validators := make([]*ethpb.Validator, test.validatorCount)
+		for i := range validators {
+			validators[i] = &ethpb.Validator{
+				ExitEpoch: params.BeaconConfig().FarFutureEpoch,
+			}
+		}
+
+		// Initialize beacon state
+		beaconState, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
+			Slot:           1,
+			Validators:     validators,
+			RandaoMixes:    make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+			SharedActivity: &ethpb.SharedActivity{},
+		})
 		require.NoError(t, err)
-		assert.Equal(t, test.wantedChurn, resultChurn, "ValidatorChurnLimit(%d)", test.validatorCount)
+
+		// Get active validator count
+		validatorCount, err := ActiveValidatorCount(context.Background(), beaconState, time.CurrentEpoch(beaconState))
+		require.NoError(t, err)
+		// assert.Equal(t, test.wantedChurn, resultChurn, "ValidatorChurnLimit(%d)", test.validatorCount)
+		// Test churn limit calculation
+		resultChurn := ValidatorActivationChurnLimitDeneb(validatorCount)
+		assert.Equal(t, test.wantedChurn, resultChurn)
 	}
 }
 
@@ -387,7 +441,8 @@ func TestActiveValidatorIndices(t *testing.T) {
 			name: "all_active_epoch_10",
 			args: args{
 				state: &ethpb.BeaconState{
-					RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+					RandaoMixes:    make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+					SharedActivity: &ethpb.SharedActivity{},
 					Validators: []*ethpb.Validator{
 						{
 							ActivationEpoch: 0,
@@ -411,7 +466,8 @@ func TestActiveValidatorIndices(t *testing.T) {
 			name: "some_active_epoch_10",
 			args: args{
 				state: &ethpb.BeaconState{
-					RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+					RandaoMixes:    make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+					SharedActivity: &ethpb.SharedActivity{},
 					Validators: []*ethpb.Validator{
 						{
 							ActivationEpoch: 0,
@@ -435,7 +491,8 @@ func TestActiveValidatorIndices(t *testing.T) {
 			name: "some_active_with_recent_new_epoch_10",
 			args: args{
 				state: &ethpb.BeaconState{
-					RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+					RandaoMixes:    make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+					SharedActivity: &ethpb.SharedActivity{},
 					Validators: []*ethpb.Validator{
 						{
 							ActivationEpoch: 0,
@@ -463,7 +520,8 @@ func TestActiveValidatorIndices(t *testing.T) {
 			name: "some_active_with_recent_new_epoch_10",
 			args: args{
 				state: &ethpb.BeaconState{
-					RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+					RandaoMixes:    make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+					SharedActivity: &ethpb.SharedActivity{},
 					Validators: []*ethpb.Validator{
 						{
 							ActivationEpoch: 0,
@@ -491,7 +549,8 @@ func TestActiveValidatorIndices(t *testing.T) {
 			name: "some_active_with_recent_new_epoch_10",
 			args: args{
 				state: &ethpb.BeaconState{
-					RandaoMixes: make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+					RandaoMixes:    make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
+					SharedActivity: &ethpb.SharedActivity{},
 					Validators: []*ethpb.Validator{
 						{
 							ActivationEpoch: 0,
@@ -516,6 +575,7 @@ func TestActiveValidatorIndices(t *testing.T) {
 			want: []primitives.ValidatorIndex{0, 2, 3},
 		},
 	}
+	defer ClearCache()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s, err := state_native.InitializeFromProtoPhase0(tt.args.state)
@@ -602,7 +662,7 @@ func TestComputeProposerIndex(t *testing.T) {
 				indices: []primitives.ValidatorIndex{100},
 				seed:    seed,
 			},
-			wantedErr: "active index out of range",
+			wantedErr: "index out of bounds",
 		},
 		{
 			name: "second_half_active",
@@ -627,7 +687,7 @@ func TestComputeProposerIndex(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bState := &ethpb.BeaconState{Validators: tt.args.validators}
+			bState := &ethpb.BeaconState{Validators: tt.args.validators, SharedActivity: &ethpb.SharedActivity{}}
 			stTrie, err := state_native.InitializeFromProtoUnsafePhase0(bState)
 			require.NoError(t, err)
 			got, err := ComputeProposerIndex(stTrie, tt.args.indices, tt.args.seed)
@@ -735,6 +795,29 @@ func computeProposerIndexWithValidators(validators []*ethpb.Validator, activeInd
 	}
 }
 
+func TestLastActivatedValidatorIndex_OK(t *testing.T) {
+	beaconState, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{})
+	require.NoError(t, err)
+
+	validators := make([]*ethpb.Validator, 4)
+	balances := make([]uint64, len(validators))
+	for i := uint64(0); i < 4; i++ {
+		validators[i] = &ethpb.Validator{
+			PublicKey:             make([]byte, params.BeaconConfig().BLSPubkeyLength),
+			WithdrawalCredentials: make([]byte, 32),
+			EffectiveBalance:      8129 * 1e9,
+			ExitEpoch:             params.BeaconConfig().FarFutureEpoch,
+		}
+		balances[i] = validators[i].EffectiveBalance
+	}
+	require.NoError(t, beaconState.SetValidators(validators))
+	require.NoError(t, beaconState.SetBalances(balances))
+
+	index, err := LastActivatedValidatorIndex(context.Background(), beaconState)
+	require.NoError(t, err)
+	require.Equal(t, index, primitives.ValidatorIndex(3))
+}
+
 func TestPowers(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -749,13 +832,13 @@ func TestPowers(t *testing.T) {
 				{
 					ActivationEpoch:   0,
 					ExitEpoch:         2,
-					EffectiveBalance:  32 * 1e9,
+					EffectiveBalance:  8192 * 1e9,
 					EffectiveActivity: 128,
 				},
 				{
 					ActivationEpoch:   10,
 					ExitEpoch:         1000,
-					EffectiveBalance:  16 * 1e9,
+					EffectiveBalance:  8192 * 1e9,
 					EffectiveActivity: 128,
 				},
 			},
@@ -769,13 +852,13 @@ func TestPowers(t *testing.T) {
 				{
 					ActivationEpoch:   0,
 					ExitEpoch:         1000,
-					EffectiveBalance:  32 * 1e9,
+					EffectiveBalance:  8192 * 1e9,
 					EffectiveActivity: 128,
 				},
 				{
 					ActivationEpoch:   0,
 					ExitEpoch:         1000,
-					EffectiveBalance:  32 * 1e9,
+					EffectiveBalance:  8192 * 1e9,
 					EffectiveActivity: 128,
 				},
 			},
@@ -789,13 +872,13 @@ func TestPowers(t *testing.T) {
 				{
 					ActivationEpoch:   0,
 					ExitEpoch:         1000,
-					EffectiveBalance:  32 * 1e9,
+					EffectiveBalance:  8192 * 1e9,
 					EffectiveActivity: 128,
 				},
 				{
 					ActivationEpoch:   0,
 					ExitEpoch:         1000,
-					EffectiveBalance:  16 * 1e9,
+					EffectiveBalance:  4096 * 1e9,
 					EffectiveActivity: 128,
 				},
 			},
@@ -807,18 +890,267 @@ func TestPowers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			committeeCache = cache.NewCommitteesCache()
-			state := &ethpb.BeaconState{
+			state := &ethpb.BeaconStateCapella{
 				Validators: tt.validators,
 				SharedActivity: &ethpb.SharedActivity{
 					TransactionsGasPerPeriod: tt.txGas,
 				},
 			}
-			s, err := state_native.InitializeFromProtoPhase0(state)
+			s, err := state_native.InitializeFromProtoCapella(state)
 			require.NoError(t, err)
 			power, effectivePower, err := Powers(context.Background(), s)
 			require.NoError(t, err)
 			assert.Equal(t, tt.power, power)
 			assert.Equal(t, tt.effectivePower, effectivePower)
+		})
+	}
+}
+
+func TestTotalEffectiveActivity(t *testing.T) {
+	tests := []struct {
+		name              string
+		validators        []*ethpb.Validator
+		effectiveActivity uint64
+	}{
+		{
+			name: "only one active validator",
+			validators: []*ethpb.Validator{
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         2,
+					EffectiveBalance:  8192 * 1e9,
+					EffectiveActivity: 128,
+				},
+				{
+					ActivationEpoch:   10,
+					ExitEpoch:         1000,
+					EffectiveBalance:  8192 * 1e9,
+					EffectiveActivity: 128,
+				},
+			},
+			effectiveActivity: 128,
+		},
+		{
+			name: "equal power and effective power",
+			validators: []*ethpb.Validator{
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         1000,
+					EffectiveBalance:  8192 * 1e9,
+					EffectiveActivity: 128,
+				},
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         1000,
+					EffectiveBalance:  8192 * 1e9,
+					EffectiveActivity: 128,
+				},
+			},
+			effectiveActivity: 128 * 2,
+		},
+		{
+			name: "one validator has slashing",
+			validators: []*ethpb.Validator{
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         1000,
+					EffectiveBalance:  8192 * 1e9,
+					EffectiveActivity: 128,
+				},
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         1000,
+					EffectiveBalance:  4096 * 1e9,
+					EffectiveActivity: 128,
+				},
+			},
+			effectiveActivity: 128 * 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			committeeCache = cache.NewCommitteesCache()
+			state := &ethpb.BeaconStateCapella{
+				Validators:     tt.validators,
+				SharedActivity: &ethpb.SharedActivity{},
+			}
+			s, err := state_native.InitializeFromProtoCapella(state)
+			require.NoError(t, err)
+			effectiveActivity, err := TotalEffectiveActivity(s)
+			require.NoError(t, err)
+			assert.Equal(t, tt.effectiveActivity, effectiveActivity)
+		})
+	}
+}
+
+func TestTotalEffectivePower(t *testing.T) {
+	tests := []struct {
+		name           string
+		validators     []*ethpb.Validator
+		txGas          uint64
+		effectivePower uint64
+	}{
+		{
+			name: "only one active validator",
+			validators: []*ethpb.Validator{
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         2,
+					EffectiveBalance:  8192 * 1e9,
+					EffectiveActivity: 128,
+				},
+				{
+					ActivationEpoch:   10,
+					ExitEpoch:         1000,
+					EffectiveBalance:  8192 * 1e9,
+					EffectiveActivity: 128,
+				},
+			},
+			txGas:          128,
+			effectivePower: 128 * 2,
+		},
+		{
+			name: "equal power and effective power",
+			validators: []*ethpb.Validator{
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         1000,
+					EffectiveBalance:  8192 * 1e9,
+					EffectiveActivity: 128,
+				},
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         1000,
+					EffectiveBalance:  8192 * 1e9,
+					EffectiveActivity: 128,
+				},
+			},
+			txGas:          128,
+			effectivePower: 128 * 3,
+		},
+		{
+			name: "one validator has slashing",
+			validators: []*ethpb.Validator{
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         1000,
+					EffectiveBalance:  8192 * 1e9,
+					EffectiveActivity: 128,
+				},
+				{
+					ActivationEpoch:   0,
+					ExitEpoch:         1000,
+					EffectiveBalance:  4096 * 1e9,
+					EffectiveActivity: 128,
+				},
+			},
+			txGas:          128,
+			effectivePower: (128+128/2)/2 + 128 + 128/2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			committeeCache = cache.NewCommitteesCache()
+			state := &ethpb.BeaconStateCapella{
+				Validators: tt.validators,
+				SharedActivity: &ethpb.SharedActivity{
+					TransactionsGasPerPeriod: tt.txGas,
+				},
+			}
+			s, err := state_native.InitializeFromProtoCapella(state)
+			require.NoError(t, err)
+			indices, err := ActiveValidatorIndices(context.Background(), s, 1)
+			require.NoError(t, err)
+			length := uint64(len(indices))
+			effectivePower, err := TotalEffectivePower(s, indices, tt.txGas/length)
+			require.NoError(t, err)
+			assert.Equal(t, tt.effectivePower, effectivePower)
+		})
+	}
+}
+
+func TestUpdateContract(t *testing.T) {
+	tests := []struct {
+		name         string
+		validators   []*ethpb.Validator
+		idx          primitives.ValidatorIndex
+		contract     []byte
+		wantContract []byte
+		wantError    string
+	}{
+		{
+			name: "Update zero contract",
+			validators: []*ethpb.Validator{
+				{
+					Contract: make([]byte, 20),
+				},
+				{
+					Contract: make([]byte, 20),
+				},
+			},
+			idx:          0,
+			contract:     bytesutil.PadTo([]byte("contract_0"), 20),
+			wantContract: bytesutil.PadTo([]byte("contract_0"), 20),
+		},
+		{
+			name: "Update non zero contract",
+			validators: []*ethpb.Validator{
+				{
+					Contract: bytesutil.PadTo([]byte("contract_0"), 20),
+				},
+				{
+					Contract: make([]byte, 20),
+				},
+			},
+			idx:          0,
+			contract:     bytesutil.PadTo([]byte("contract_1"), 20),
+			wantContract: bytesutil.PadTo([]byte("contract_0"), 20),
+		},
+		{
+			name: "Update non zero contract to zero",
+			validators: []*ethpb.Validator{
+				{
+					Contract: bytesutil.PadTo([]byte("contract_0"), 20),
+				},
+				{
+					Contract: make([]byte, 20),
+				},
+			},
+			idx:          0,
+			contract:     make([]byte, 20),
+			wantContract: bytesutil.PadTo([]byte("contract_0"), 20),
+		},
+		{
+			name: "Update non existing validator",
+			validators: []*ethpb.Validator{
+				{
+					Contract: bytesutil.PadTo([]byte("contract_0"), 20),
+				},
+				{
+					Contract: make([]byte, 20),
+				},
+			},
+			idx:       100,
+			wantError: "index out of bounds",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st, err := state_native.InitializeFromProtoPhase0(&ethpb.BeaconState{
+				Validators:     tt.validators,
+				SharedActivity: &ethpb.SharedActivity{},
+			})
+			require.NoError(t, err)
+			err = UpdateContract(st, tt.idx, tt.contract)
+			if tt.wantError != "" {
+				assert.ErrorContains(t, tt.wantError, err)
+			} else {
+				assert.NoError(t, err)
+				contract, ok := st.ContractAtIndex(tt.idx)
+				assert.Equal(t, true, ok)
+				assert.DeepEqual(t, tt.wantContract, contract[:])
+			}
 		})
 	}
 }

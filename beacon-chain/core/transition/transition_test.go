@@ -3,6 +3,7 @@ package transition_test
 import (
 	"context"
 	"fmt"
+	enginev1 "github.com/prysmaticlabs/prysm/v4/proto/engine/v1"
 	"testing"
 
 	"github.com/prysmaticlabs/go-bitfield"
@@ -26,6 +27,22 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/testing/require"
 	"github.com/prysmaticlabs/prysm/v4/testing/util"
 )
+
+func TestMain(m *testing.M) {
+	// Use minimal config to reduce test setup time.
+	prevConfig := params.BeaconConfig().Copy()
+	defer params.OverrideBeaconConfig(prevConfig)
+	config := params.BeaconConfig().Copy()
+
+	config.AltairForkEpoch = config.FarFutureEpoch
+	config.BellatrixForkEpoch = config.FarFutureEpoch
+	config.CapellaForkEpoch = config.FarFutureEpoch
+	config.DenebForkEpoch = config.FarFutureEpoch
+
+	params.OverrideBeaconConfig(config)
+
+	m.Run()
+}
 
 func init() {
 	transition.SkipSlotCache.Disable()
@@ -197,7 +214,8 @@ func TestProcessBlock_IncorrectProcessExits(t *testing.T) {
 }
 
 func createFullBlockWithOperations(t *testing.T) (state.BeaconState,
-	*ethpb.SignedBeaconBlock, []*ethpb.Attestation, []*ethpb.ProposerSlashing, []*ethpb.SignedVoluntaryExit) {
+	*ethpb.SignedBeaconBlock, []*ethpb.Attestation, []*ethpb.ProposerSlashing, []*ethpb.SignedVoluntaryExit,
+) {
 	beaconState, privKeys := util.DeterministicGenesisState(t, 32)
 	genesisBlock := blocks.NewGenesisBlock([]byte{})
 	bodyRoot, err := genesisBlock.Block.HashTreeRoot()
@@ -305,7 +323,8 @@ func createFullBlockWithOperations(t *testing.T) (state.BeaconState,
 		Data: &ethpb.AttestationData{
 			Slot:   beaconState.Slot(),
 			Target: &ethpb.Checkpoint{Epoch: time.CurrentEpoch(beaconState)},
-			Source: &ethpb.Checkpoint{Root: mockRoot[:]}},
+			Source: &ethpb.Checkpoint{Root: mockRoot[:]},
+		},
 		AggregationBits: aggBits,
 	})
 
@@ -379,6 +398,7 @@ func TestProcessEpochPrecompute_CanProcess(t *testing.T) {
 		Slashings:                  slashing,
 		RandaoMixes:                make([][]byte, params.BeaconConfig().EpochsPerHistoricalVector),
 		CurrentEpochAttestations:   atts,
+		SharedActivity:             &ethpb.SharedActivity{},
 		FinalizedCheckpoint:        &ethpb.Checkpoint{Root: make([]byte, fieldparams.RootLength)},
 		JustificationBits:          bitfield.Bitvector4{0x00},
 		CurrentJustifiedCheckpoint: &ethpb.Checkpoint{Root: make([]byte, fieldparams.RootLength)},
@@ -486,6 +506,73 @@ func TestProcessBlock_IncorrectDeposits(t *testing.T) {
 	require.NoError(t, err)
 	_, err = transition.VerifyOperationLengths(context.Background(), s, wsb)
 	assert.ErrorContains(t, want, err)
+}
+
+func TestProcessBlock_ActivitiesBeforeCapellaTransitionComplete(t *testing.T) {
+	b := &ethpb.SignedBeaconBlockBellatrix{
+		Block: &ethpb.BeaconBlockBellatrix{
+			Body: &ethpb.BeaconBlockBodyBellatrix{
+				ActivityChanges: make([]*ethpb.ActivityChange, 1),
+			},
+		},
+	}
+	want := "activity changes are not allowed for inclusion before Capella transition"
+	s, err := state_native.InitializeFromProtoUnsafeBellatrix(&ethpb.BeaconStateBellatrix{})
+	require.NoError(t, err)
+	wsb, err := consensusblocks.NewSignedBeaconBlock(b)
+	require.NoError(t, err)
+	assert.ErrorContains(t, want, transition.ValidateActivitiesLengths(context.Background(), s, wsb.Block().Body()))
+}
+
+func TestProcessBlock_TransactionsCountBeforeCapellaTransitionComplete(t *testing.T) {
+	b := &ethpb.SignedBeaconBlockBellatrix{
+		Block: &ethpb.BeaconBlockBellatrix{
+			Body: &ethpb.BeaconBlockBodyBellatrix{
+				TransactionsCount: 10,
+			},
+		},
+	}
+	want := "transactions count is not allowed for inclusion before Capella transition"
+	s, err := state_native.InitializeFromProtoUnsafeBellatrix(&ethpb.BeaconStateBellatrix{})
+	require.NoError(t, err)
+	wsb, err := consensusblocks.NewSignedBeaconBlock(b)
+	require.NoError(t, err)
+	assert.ErrorContains(t, want, transition.ValidateActivitiesLengths(context.Background(), s, wsb.Block().Body()))
+}
+
+func TestProcessBlock_BaseFeeBeforeCapellaTransitionComplete(t *testing.T) {
+	b := &ethpb.SignedBeaconBlockBellatrix{
+		Block: &ethpb.BeaconBlockBellatrix{
+			Body: &ethpb.BeaconBlockBodyBellatrix{
+				BaseFee: 1_000_000_000,
+			},
+		},
+	}
+	want := "base fee is not allowed for inclusion before Capella transition"
+	s, err := state_native.InitializeFromProtoUnsafeBellatrix(&ethpb.BeaconStateBellatrix{})
+	require.NoError(t, err)
+	wsb, err := consensusblocks.NewSignedBeaconBlock(b)
+	require.NoError(t, err)
+	assert.ErrorContains(t, want, transition.ValidateActivitiesLengths(context.Background(), s, wsb.Block().Body()))
+}
+
+func TestProcessBlock_ActivitiesCapellaTransitionComplete(t *testing.T) {
+	b := &ethpb.SignedBeaconBlockCapella{
+		Block: &ethpb.BeaconBlockCapella{
+			Body: &ethpb.BeaconBlockBodyCapella{
+				ActivityChanges: make([]*ethpb.ActivityChange, 1),
+			},
+		},
+	}
+	s, err := state_native.InitializeFromProtoUnsafeCapella(&ethpb.BeaconStateCapella{
+		LatestExecutionPayloadHeader: &enginev1.ExecutionPayloadHeaderCapella{
+			TransactionsCount: 1,
+		},
+	})
+	require.NoError(t, err)
+	wsb, err := consensusblocks.NewSignedBeaconBlock(b)
+	require.NoError(t, err)
+	assert.NoError(t, transition.ValidateActivitiesLengths(context.Background(), s, wsb.Block().Body()))
 }
 
 func TestProcessSlots_SameSlotAsParentState(t *testing.T) {
@@ -618,6 +705,7 @@ func TestProcessSlots_ThroughBellatrixEpoch(t *testing.T) {
 	transition.SkipSlotCache.Disable()
 	params.SetupTestConfigCleanup(t)
 	conf := params.BeaconConfig()
+	conf.AltairForkEpoch = 0
 	conf.BellatrixForkEpoch = 5
 	params.OverrideBeaconConfig(conf)
 
@@ -626,6 +714,23 @@ func TestProcessSlots_ThroughBellatrixEpoch(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, version.Bellatrix, st.Version())
 
+	require.Equal(t, params.BeaconConfig().SlotsPerEpoch*10, st.Slot())
+}
+
+func TestProcessSlots_ThroughDenebEpoch(t *testing.T) {
+	transition.SkipSlotCache.Disable()
+	params.SetupTestConfigCleanup(t)
+	conf := params.BeaconConfig()
+	conf.AltairForkEpoch = 0
+	conf.BellatrixForkEpoch = 0
+	conf.CapellaForkEpoch = 0
+	conf.DenebForkEpoch = 5
+	params.OverrideBeaconConfig(conf)
+
+	st, _ := util.DeterministicGenesisStateCapella(t, params.BeaconConfig().MaxValidatorsPerCommittee)
+	st, err := transition.ProcessSlots(context.Background(), st, params.BeaconConfig().SlotsPerEpoch*10)
+	require.NoError(t, err)
+	require.Equal(t, version.Deneb, st.Version())
 	require.Equal(t, params.BeaconConfig().SlotsPerEpoch*10, st.Slot())
 }
 

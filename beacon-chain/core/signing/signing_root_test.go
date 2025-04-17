@@ -3,6 +3,7 @@ package signing_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -33,14 +34,19 @@ func TestSigningRoot_ComputeDomain(t *testing.T) {
 		domainType [4]byte
 		domain     []byte
 	}{
-		{epoch: 1, domainType: [4]byte{4, 0, 0, 0}, domain: []byte{4, 0, 0, 0, 245, 165, 253, 66, 209, 106, 32, 48, 39, 152, 239, 110, 211, 9, 151, 155, 67, 0, 61, 35, 32, 217, 240, 232, 234, 152, 49, 169}},
-		{epoch: 2, domainType: [4]byte{4, 0, 0, 0}, domain: []byte{4, 0, 0, 0, 245, 165, 253, 66, 209, 106, 32, 48, 39, 152, 239, 110, 211, 9, 151, 155, 67, 0, 61, 35, 32, 217, 240, 232, 234, 152, 49, 169}},
-		{epoch: 2, domainType: [4]byte{5, 0, 0, 0}, domain: []byte{5, 0, 0, 0, 245, 165, 253, 66, 209, 106, 32, 48, 39, 152, 239, 110, 211, 9, 151, 155, 67, 0, 61, 35, 32, 217, 240, 232, 234, 152, 49, 169}},
-		{epoch: 3, domainType: [4]byte{4, 0, 0, 0}, domain: []byte{4, 0, 0, 0, 245, 165, 253, 66, 209, 106, 32, 48, 39, 152, 239, 110, 211, 9, 151, 155, 67, 0, 61, 35, 32, 217, 240, 232, 234, 152, 49, 169}},
-		{epoch: 3, domainType: [4]byte{5, 0, 0, 0}, domain: []byte{5, 0, 0, 0, 245, 165, 253, 66, 209, 106, 32, 48, 39, 152, 239, 110, 211, 9, 151, 155, 67, 0, 61, 35, 32, 217, 240, 232, 234, 152, 49, 169}},
+		{epoch: 1, domainType: [4]byte{4, 0, 0, 0}, domain: []byte{4, 0, 0, 0, 241, 112, 183, 223, 38, 124, 53, 21, 214, 1, 170, 167, 228, 7, 165, 16, 124, 211, 224, 138, 209, 19, 112, 224, 204, 43, 212, 150}},
+		{epoch: 2, domainType: [4]byte{4, 0, 0, 0}, domain: []byte{4, 0, 0, 0, 241, 112, 183, 223, 38, 124, 53, 21, 214, 1, 170, 167, 228, 7, 165, 16, 124, 211, 224, 138, 209, 19, 112, 224, 204, 43, 212, 150}},
+		{epoch: 2, domainType: [4]byte{5, 0, 0, 0}, domain: []byte{5, 0, 0, 0, 241, 112, 183, 223, 38, 124, 53, 21, 214, 1, 170, 167, 228, 7, 165, 16, 124, 211, 224, 138, 209, 19, 112, 224, 204, 43, 212, 150}},
+		{epoch: 3, domainType: [4]byte{4, 0, 0, 0}, domain: []byte{4, 0, 0, 0, 241, 112, 183, 223, 38, 124, 53, 21, 214, 1, 170, 167, 228, 7, 165, 16, 124, 211, 224, 138, 209, 19, 112, 224, 204, 43, 212, 150}},
+		{epoch: 3, domainType: [4]byte{5, 0, 0, 0}, domain: []byte{5, 0, 0, 0, 241, 112, 183, 223, 38, 124, 53, 21, 214, 1, 170, 167, 228, 7, 165, 16, 124, 211, 224, 138, 209, 19, 112, 224, 204, 43, 212, 150}},
 	}
 	for _, tt := range tests {
 		if got, err := signing.ComputeDomain(tt.domainType, nil, nil); !bytes.Equal(got, tt.domain) {
+			str := ""
+			for _, b := range got {
+				str = fmt.Sprintf("%s %v,", str, b)
+			}
+			fmt.Println(str)
 			t.Errorf("wanted domain version: %d, got: %d", tt.domain, got)
 		} else {
 			require.NoError(t, err)
@@ -70,12 +76,12 @@ func TestSigningRoot_ComputeDomainAndSign(t *testing.T) {
 			},
 			domainType: params.BeaconConfig().DomainBeaconProposer,
 			want: []byte{
-				0xad, 0xd8, 0xf0, 0xd1, 0xae, 0x82, 0xaa, 0x3, 0x9a, 0xcd, 0x8e, 0xb7, 0x84, 0x14, 0x1c, 0x21, 0x81,
-				0xbc, 0x1b, 0x2, 0xb5, 0x6d, 0x4c, 0x76, 0x36, 0x5f, 0xba, 0x6e, 0x33, 0x9e, 0xda, 0xe, 0x36, 0xe1,
-				0xf, 0x30, 0xae, 0x6, 0x44, 0xd4, 0x38, 0x21, 0xf0, 0x45, 0xc2, 0x54, 0x68, 0x2f, 0x12, 0xcc, 0x27,
-				0x45, 0x72, 0x5, 0xaf, 0xb4, 0x85, 0x60, 0xdb, 0x7a, 0x1f, 0xe7, 0xa8, 0x62, 0xf5, 0x71, 0xac, 0x88,
-				0x8c, 0xd3, 0xba, 0x4d, 0xa3, 0x3d, 0x3b, 0x87, 0x9b, 0x23, 0xae, 0xe4, 0x46, 0xc6, 0x36, 0xca, 0xa5,
-				0xa1, 0x2d, 0x9e, 0x7, 0xc1, 0x40, 0xed, 0x99, 0xfd, 0xae, 0xce,
+				0x83, 0xc8, 0xb2, 0x17, 0x1f, 0x8f, 0xe7, 0x21, 0xf3, 0xdf, 0x69, 0xad, 0x3d, 0x6d, 0xa8, 0x0, 0xcb, 0x47,
+				0xae, 0xfb, 0x24, 0xb3, 0x31, 0x65, 0xa9, 0xa9, 0x7a, 0x41, 0x13, 0x58, 0x14, 0x43, 0xd6, 0xb5, 0x1, 0xa6,
+				0xc4, 0xb6, 0x45, 0x49, 0x38, 0x61, 0xc5, 0x73, 0xde, 0x28, 0x14, 0xe3, 0x8, 0x56, 0x5e, 0xac, 0x7c, 0x4b,
+				0x27, 0x73, 0x97, 0xdf, 0x18, 0x2a, 0xb1, 0x11, 0xe2, 0xd8, 0xa4, 0xaf, 0xeb, 0x2f, 0x8d, 0xfb, 0xfa, 0x4a,
+				0x18, 0x93, 0xab, 0xff, 0xaf, 0x6f, 0x61, 0x4a, 0xe0, 0xd2, 0xa0, 0xd9, 0xd1, 0x21, 0x60, 0x71, 0xda, 0xa5,
+				0x40, 0x93, 0xf4, 0x8f, 0x58, 0x85,
 			},
 		},
 	}
@@ -166,7 +172,7 @@ func TestBlockSignatureBatch_NoSigVerification(t *testing.T) {
 			pubkey:          []byte{0xa9, 0x9a, 0x76, 0xed, 0x77, 0x96, 0xf7, 0xbe, 0x22, 0xd5, 0xb7, 0xe8, 0x5d, 0xee, 0xb7, 0xc5, 0x67, 0x7e, 0x88, 0xe5, 0x11, 0xe0, 0xb3, 0x37, 0x61, 0x8f, 0x8c, 0x4e, 0xb6, 0x13, 0x49, 0xb4, 0xbf, 0x2d, 0x15, 0x3f, 0x64, 0x9f, 0x7b, 0x53, 0x35, 0x9f, 0xe8, 0xb9, 0x4a, 0x38, 0xe4, 0x4c},
 			mockSignature:   []byte{0xa9, 0x9a, 0x76, 0xed, 0x77},
 			domain:          []byte{4, 0, 0, 0, 245, 165, 253, 66, 209, 106, 32, 48, 39, 152, 239, 110, 211, 9, 151, 155, 67, 0, 61, 35, 32, 217, 240, 232, 234, 152, 49, 169},
-			wantMessageHexs: []string{"0xe6012bc68e112797a91ed6889e7453f8e304fb76fbffcec1c62eef280a93f7ba"},
+			wantMessageHexs: []string{"0x1de7311af9b968e32357219755722ed170e8f5cb4d9e848e03aa941b54ea98a7"},
 		},
 	}
 	for _, tt := range tests {
@@ -174,7 +180,7 @@ func TestBlockSignatureBatch_NoSigVerification(t *testing.T) {
 		got, err := signing.BlockSignatureBatch(tt.pubkey, tt.mockSignature, tt.domain, block.Block.HashTreeRoot)
 		require.NoError(t, err)
 		for i, message := range got.Messages {
-			require.Equal(t, hexutil.Encode(message[:]), tt.wantMessageHexs[i])
+			require.Equal(t, tt.wantMessageHexs[i], hexutil.Encode(message[:]))
 		}
 	}
 }

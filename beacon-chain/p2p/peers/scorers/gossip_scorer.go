@@ -1,9 +1,12 @@
 package scorers
 
 import (
+	"fmt"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/peers/peerdata"
 	pbrpc "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
+	"github.com/sirupsen/logrus"
 )
 
 var _ Scorer = (*GossipScorer)(nil)
@@ -82,7 +85,7 @@ func (s *GossipScorer) BadPeers() []peer.ID {
 
 // SetGossipData sets the gossip related data of a peer.
 func (s *GossipScorer) SetGossipData(pid peer.ID, gScore float64,
-	bPenalty float64, topicScores map[string]*pbrpc.TopicScoreSnapshot) {
+	bPenalty float64, topicScores map[string]*pbrpc.TopicScoreSnapshot, reason string) {
 	s.store.Lock()
 	defer s.store.Unlock()
 
@@ -90,6 +93,18 @@ func (s *GossipScorer) SetGossipData(pid peer.ID, gScore float64,
 	peerData.GossipScore = gScore
 	peerData.BehaviourPenalty = bPenalty
 	peerData.TopicScores = topicScores
+
+	logger().WithFields(logrus.Fields{
+		"scorer":           gossipScorerName,
+		"gossipScore":      peerData.GossipScore,
+		"behaviourPenalty": peerData.BehaviourPenalty,
+		"topicScores":      fmt.Sprintf("%+v", peerData.TopicScores),
+		"delta":            gScore,
+		"message":          "Setting gossip data.",
+		"peer":             pid.Loggable(),
+		"reason":           reason,
+	}).Debug("Setting gossip data.")
+
 }
 
 // GossipData gets the gossip related information of the given remote peer.

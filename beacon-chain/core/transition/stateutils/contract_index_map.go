@@ -13,13 +13,13 @@ import (
 
 // ContractIndexMap builds a lookup map for quickly determining the index of
 // a validator by their deployed contract address.
-func ContractIndexMap(validators []*ethpb.Validator) map[[fieldparams.ContractAddressLength]byte]primitives.ValidatorIndex {
+func ContractIndexMap(validators []*ethpb.Validator, epoch primitives.Epoch) map[[fieldparams.ContractAddressLength]byte]primitives.ValidatorIndex {
 	m := make(map[[fieldparams.ContractAddressLength]byte]primitives.ValidatorIndex, len(validators))
 	if validators == nil {
 		return m
 	}
 	for idx, record := range validators {
-		if record == nil {
+		if record == nil || record.ExitEpoch < epoch {
 			continue
 		}
 		key := bytesutil.ToBytes20(record.Contract)

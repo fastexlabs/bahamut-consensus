@@ -165,7 +165,7 @@ func TestFieldTrie_NativeState_fieldConvertersNative(t *testing.T) {
 				convertAll: true,
 			},
 			wantHex: nil,
-			errMsg:  "Incorrect type used for block roots",
+			errMsg:  "Wanted type of customtypes.BlockRoots but got int",
 		},
 		{
 			name: "BlockRoots [][]bytes",
@@ -207,7 +207,7 @@ func TestFieldTrie_NativeState_fieldConvertersNative(t *testing.T) {
 				convertAll: true,
 			},
 			wantHex: nil,
-			errMsg:  "Incorrect type used for state roots",
+			errMsg:  "Wanted type of customtypes.StateRoots but got int",
 		},
 		{
 			name: "StateRoots [][]bytes convert all false",
@@ -260,7 +260,7 @@ func TestFieldTrie_NativeState_fieldConvertersNative(t *testing.T) {
 				convertAll: true,
 			},
 			wantHex: nil,
-			errMsg:  "Incorrect type used for randao mixes",
+			errMsg:  "Wanted type of customtypes.RandaoMixes but got int",
 		},
 		{
 			name: "Eth1DataVotes type not found",

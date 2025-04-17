@@ -22,6 +22,7 @@ import (
 	doublylinkedtree "github.com/prysmaticlabs/prysm/v4/beacon-chain/forkchoice/doubly-linked-tree"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/state/stategen"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/container/trie"
 	contracts "github.com/prysmaticlabs/prysm/v4/contracts/deposit"
 	"github.com/prysmaticlabs/prysm/v4/contracts/deposit/mock"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
@@ -374,6 +375,7 @@ func TestInitDepositCacheWithFinalization_OK(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{0}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
+					Contract:              make([]byte, 20),
 				},
 			},
 		},
@@ -385,6 +387,7 @@ func TestInitDepositCacheWithFinalization_OK(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{1}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
+					Contract:              make([]byte, 20),
 				},
 			},
 		},
@@ -396,6 +399,7 @@ func TestInitDepositCacheWithFinalization_OK(t *testing.T) {
 					PublicKey:             bytesutil.PadTo([]byte{2}, 48),
 					WithdrawalCredentials: make([]byte, 32),
 					Signature:             make([]byte, 96),
+					Contract:              make([]byte, 20),
 				},
 			},
 		},
@@ -433,8 +437,9 @@ func TestInitDepositCacheWithFinalization_OK(t *testing.T) {
 
 	s.chainStartData.Chainstarted = true
 	require.NoError(t, s.initDepositCaches(context.Background(), ctrs))
-	fDeposits := s.cfg.depositCache.FinalizedDeposits(ctx)
-	deps := s.cfg.depositCache.NonFinalizedDeposits(context.Background(), fDeposits.MerkleTrieIndex, nil)
+	fDeposits, err := s.cfg.depositCache.FinalizedDeposits(ctx)
+	require.NoError(t, err)
+	deps := s.cfg.depositCache.NonFinalizedDeposits(context.Background(), fDeposits.MerkleTrieIndex(), nil)
 	assert.Equal(t, 0, len(deps))
 }
 
@@ -770,7 +775,8 @@ func TestService_FollowBlock(t *testing.T) {
 	h, err := s.followedBlockHeight(context.Background())
 	assert.NoError(t, err)
 	// With a much higher blocktime, the follow height is respectively shortened.
-	assert.Equal(t, uint64(2283), h)
+	// h = (3000 * 40 - 2048*12)/ 40
+	assert.Equal(t, uint64(2385), h)
 }
 
 type slowRPCClient struct {
@@ -800,4 +806,51 @@ func (s *slowRPCClient) BatchCall(b []rpc.BatchElem) error {
 
 func (s *slowRPCClient) CallContext(_ context.Context, _ interface{}, _ string, _ ...interface{}) error {
 	panic("implement me")
+}
+
+func TestService_migrateOldDepositTree(t *testing.T) {
+	beaconDB := dbutil.SetupDB(t)
+	cache, err := depositcache.New()
+	require.NoError(t, err)
+
+	srv, endpoint, err := mockExecution.SetupRPCServer()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		srv.Stop()
+	})
+	s, err := NewService(context.Background(),
+		WithHttpEndpoint(endpoint),
+		WithDatabase(beaconDB),
+		WithDepositCache(cache),
+	)
+	require.NoError(t, err)
+	eth1Data := &ethpb.ETH1ChainData{
+		BeaconState: &ethpb.BeaconState{
+			Eth1Data: &ethpb.Eth1Data{
+				DepositCount: 800,
+			},
+		},
+		CurrentEth1Data: &ethpb.LatestETH1Data{
+			BlockHeight: 100,
+		},
+	}
+
+	totalDeposits := 1000
+	input := bytesutil.ToBytes32([]byte("foo"))
+	dt, err := trie.NewTrie(32)
+	require.NoError(t, err)
+
+	for i := 0; i < totalDeposits; i++ {
+		err := dt.Insert(input[:], i)
+		require.NoError(t, err)
+	}
+	eth1Data.Trie = dt.ToProto()
+
+	err = s.migrateOldDepositTree(eth1Data)
+	require.NoError(t, err)
+	oldDepositTreeRoot, err := dt.HashTreeRoot()
+	require.NoError(t, err)
+	newDepositTreeRoot, err := s.depositTrie.HashTreeRoot()
+	require.NoError(t, err)
+	require.DeepEqual(t, oldDepositTreeRoot, newDepositTreeRoot)
 }

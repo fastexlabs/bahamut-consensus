@@ -1,7 +1,6 @@
 package blocks_test
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/blocks"
@@ -199,6 +198,95 @@ func Test_IsMergeComplete(t *testing.T) {
 			require.NoError(t, err)
 			if got != tt.want {
 				t.Errorf("mergeComplete() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_IsCapellaTransitionComplete(t *testing.T) {
+	tests := []struct {
+		name    string
+		payload interfaces.ExecutionData
+		want    bool
+	}{
+		{
+			name: "empty header",
+			payload: func() interfaces.ExecutionData {
+				h, err := emptyPayloadHeaderCapella()
+				require.NoError(t, err)
+				return h
+			}(),
+			want: false,
+		},
+		{
+			name: "bellatrix header",
+			payload: func() interfaces.ExecutionData {
+				h, err := emptyPayloadHeader()
+				require.NoError(t, err)
+				return h
+			}(),
+			want: false,
+		},
+		{
+			name: "empty activities root and transactions count",
+			payload: func() interfaces.ExecutionData {
+				h, err := emptyPayloadHeaderCapella()
+				require.NoError(t, err)
+				p, ok := h.Proto().(*enginev1.ExecutionPayloadHeaderCapella)
+				require.Equal(t, true, ok)
+				p.ParentHash = bytesutil.PadTo([]byte("parent_hash"), fieldparams.RootLength)
+				p.FeeRecipient = bytesutil.PadTo([]byte("fee_recipient"), fieldparams.FeeRecipientLength)
+				p.StateRoot = bytesutil.PadTo([]byte("state_root"), fieldparams.RootLength)
+				p.ReceiptsRoot = bytesutil.PadTo([]byte("receipts_root"), fieldparams.RootLength)
+				p.LogsBloom = bytesutil.PadTo([]byte("logs_bloom"), fieldparams.LogsBloomLength)
+				p.PrevRandao = bytesutil.PadTo([]byte("prev_randao"), fieldparams.RootLength)
+				p.BlockNumber = 1
+				p.GasLimit = 1
+				p.GasUsed = 1
+				p.Timestamp = 1
+				p.ExtraData = bytesutil.PadTo([]byte("extra_data"), fieldparams.RootLength)
+				p.BaseFeePerGas = bytesutil.PadTo([]byte("base_fee_per_gas"), fieldparams.RootLength)
+				p.BlockHash = bytesutil.PadTo([]byte("block_hash"), fieldparams.RootLength)
+				p.TransactionsRoot = bytesutil.PadTo([]byte("transactions_root"), fieldparams.RootLength)
+				p.WithdrawalsRoot = bytesutil.PadTo([]byte("withdrawals_root"), fieldparams.RootLength)
+				return h
+			}(),
+			want: false,
+		},
+		{
+			name: "has activities root",
+			payload: func() interfaces.ExecutionData {
+				h, err := emptyPayloadHeaderCapella()
+				require.NoError(t, err)
+				p, ok := h.Proto().(*enginev1.ExecutionPayloadHeaderCapella)
+				require.Equal(t, true, ok)
+				p.ActivitiesRoot = bytesutil.PadTo([]byte("activities_root"), fieldparams.RootLength)
+				return h
+			}(),
+			want: true,
+		},
+		{
+			name: "has transactions count",
+			payload: func() interfaces.ExecutionData {
+				h, err := emptyPayloadHeaderCapella()
+				require.NoError(t, err)
+				p, ok := h.Proto().(*enginev1.ExecutionPayloadHeaderCapella)
+				require.Equal(t, true, ok)
+				p.TransactionsCount = 1
+				return h
+			}(),
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st, _ := util.DeterministicGenesisStateCapella(t, 1)
+			require.NoError(t, st.SetLatestExecutionPayloadHeader(tt.payload))
+			got, err := blocks.IsCapellaTransitionComplete(st)
+			require.NoError(t, err)
+			if got != tt.want {
+				t.Errorf("cappellaMergeComplete() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -610,7 +698,7 @@ func Test_ProcessPayloadCapella(t *testing.T) {
 	random, err := helpers.RandaoMix(st, time.CurrentEpoch(st))
 	require.NoError(t, err)
 	payload.PrevRandao = random
-	wrapped, err := consensusblocks.WrappedExecutionPayloadCapella(payload, big.NewInt(0))
+	wrapped, err := consensusblocks.WrappedExecutionPayloadCapella(payload, 0)
 	require.NoError(t, err)
 	_, err = blocks.ProcessPayload(st, wrapped)
 	require.NoError(t, err)
@@ -867,6 +955,7 @@ func emptyPayloadHeaderCapella() (interfaces.ExecutionData, error) {
 		FeeRecipient:     make([]byte, fieldparams.FeeRecipientLength),
 		StateRoot:        make([]byte, fieldparams.RootLength),
 		ReceiptsRoot:     make([]byte, fieldparams.RootLength),
+		ActivitiesRoot:   make([]byte, fieldparams.RootLength),
 		LogsBloom:        make([]byte, fieldparams.LogsBloomLength),
 		PrevRandao:       make([]byte, fieldparams.RootLength),
 		BaseFeePerGas:    make([]byte, fieldparams.RootLength),
@@ -874,7 +963,7 @@ func emptyPayloadHeaderCapella() (interfaces.ExecutionData, error) {
 		TransactionsRoot: make([]byte, fieldparams.RootLength),
 		WithdrawalsRoot:  make([]byte, fieldparams.RootLength),
 		ExtraData:        make([]byte, 0),
-	}, big.NewInt(0))
+	}, 0)
 }
 
 func emptyPayload() *enginev1.ExecutionPayload {
@@ -894,16 +983,17 @@ func emptyPayload() *enginev1.ExecutionPayload {
 
 func emptyPayloadCapella() *enginev1.ExecutionPayloadCapella {
 	return &enginev1.ExecutionPayloadCapella{
-		ParentHash:    make([]byte, fieldparams.RootLength),
-		FeeRecipient:  make([]byte, fieldparams.FeeRecipientLength),
-		StateRoot:     make([]byte, fieldparams.RootLength),
-		ReceiptsRoot:  make([]byte, fieldparams.RootLength),
-		LogsBloom:     make([]byte, fieldparams.LogsBloomLength),
-		PrevRandao:    make([]byte, fieldparams.RootLength),
-		BaseFeePerGas: make([]byte, fieldparams.RootLength),
-		BlockHash:     make([]byte, fieldparams.RootLength),
-		Transactions:  make([][]byte, 0),
-		Withdrawals:   make([]*enginev1.Withdrawal, 0),
-		ExtraData:     make([]byte, 0),
+		ParentHash:     make([]byte, fieldparams.RootLength),
+		FeeRecipient:   make([]byte, fieldparams.FeeRecipientLength),
+		StateRoot:      make([]byte, fieldparams.RootLength),
+		ReceiptsRoot:   make([]byte, fieldparams.RootLength),
+		ActivitiesRoot: make([]byte, fieldparams.RootLength),
+		LogsBloom:      make([]byte, fieldparams.LogsBloomLength),
+		PrevRandao:     make([]byte, fieldparams.RootLength),
+		BaseFeePerGas:  make([]byte, fieldparams.RootLength),
+		BlockHash:      make([]byte, fieldparams.RootLength),
+		Transactions:   make([][]byte, 0),
+		Withdrawals:    make([]*enginev1.Withdrawal, 0),
+		ExtraData:      make([]byte, 0),
 	}
 }

@@ -25,6 +25,7 @@ import (
 //	- Let signature be the result of bls_sign of the signing_root(deposit_data) with domain=compute_domain(DOMAIN_DEPOSIT). (Deposits are valid regardless of fork version, compute_domain will default to zeroes there).
 //	- Send a transaction on the Ethereum 1.0 chain to DEPOSIT_CONTRACT_ADDRESS executing `deposit(pubkey: bytes[48], withdrawal_credentials: bytes[32], signature: bytes[96])` along with a deposit of amount Gwei.
 //
+// todo unit act
 // See: https://github.com/ethereum/consensus-specs/blob/master/specs/validator/0_beacon-chain-validator.md#submit-deposit
 func DepositInput(depositKey, withdrawalKey bls.SecretKey, contract []byte, amountInGwei uint64) (*ethpb.Deposit_Data, [32]byte, error) {
 	depositMessage := &ethpb.DepositMessage{
@@ -81,6 +82,7 @@ func WithdrawalCredentialsHash(withdrawalKey bls.SecretKey) []byte {
 	return append([]byte{params.BeaconConfig().BLSWithdrawalPrefixByte}, h[1:]...)[:32]
 }
 
+// todo unit act
 // VerifyDepositSignature verifies the correctness of Eth1 deposit BLS signature
 func VerifyDepositSignature(dd *ethpb.Deposit_Data, domain []byte) error {
 	ddCopy := ethpb.CopyDepositData(dd)

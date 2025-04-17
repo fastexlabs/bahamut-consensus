@@ -5,6 +5,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/p2p/peers/peerdata"
+	"github.com/sirupsen/logrus"
 )
 
 var _ Scorer = (*BadResponsesScorer)(nil)
@@ -100,7 +101,7 @@ func (s *BadResponsesScorer) count(pid peer.ID) (int, error) {
 
 // Increment increments the number of bad responses we have received from the given remote peer.
 // If peer doesn't exist this method is no-op.
-func (s *BadResponsesScorer) Increment(pid peer.ID) {
+func (s *BadResponsesScorer) Increment(pid peer.ID, reason string) {
 	s.store.Lock()
 	defer s.store.Unlock()
 
@@ -112,6 +113,15 @@ func (s *BadResponsesScorer) Increment(pid peer.ID) {
 		return
 	}
 	peerData.BadResponses++
+
+	logger().WithFields(logrus.Fields{
+		"scorer":      badResponsesScorerName,
+		"badResponse": peerData.BadResponses,
+		"message":     "Incrementing score by.",
+		"delta":       1,
+		"peer":        pid.Loggable(),
+		"reason":      reason,
+	}).Debug()
 }
 
 // IsBadPeer states if the peer is to be considered bad.
@@ -151,9 +161,17 @@ func (s *BadResponsesScorer) Decay() {
 	s.store.Lock()
 	defer s.store.Unlock()
 
-	for _, peerData := range s.store.Peers() {
+	for pid, peerData := range s.store.Peers() {
 		if peerData.BadResponses > 0 {
 			peerData.BadResponses--
+
+			logger().WithFields(logrus.Fields{
+				"scorer":      badResponsesScorerName,
+				"badResponse": peerData.BadResponses,
+				"message":     "Decaying score.",
+				"delta":       -1,
+				"peer":        pid.Loggable(),
+			}).Debug()
 		}
 	}
 }

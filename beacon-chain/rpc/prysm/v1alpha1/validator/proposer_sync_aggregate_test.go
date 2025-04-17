@@ -6,11 +6,13 @@ import (
 	"testing"
 
 	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
+	"github.com/prysmaticlabs/prysm/v4/config/params"
 	v2 "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/testing/assert"
 )
 
 func TestProposerSyncContributions_FilterByBlockRoot(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	rootA := [32]byte{'a'}
 	rootB := [32]byte{'b'}
 	var aggBits [fieldparams.SyncCommitteeAggregationBytesLength]byte
@@ -64,6 +66,7 @@ func TestProposerSyncContributions_FilterByBlockRoot(t *testing.T) {
 }
 
 func TestProposerSyncContributions_FilterBySubcommitteeID(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	rootA := [32]byte{'a'}
 	rootB := [32]byte{'b'}
 	var aggBits [fieldparams.SyncCommitteeAggregationBytesLength]byte
@@ -117,6 +120,7 @@ func TestProposerSyncContributions_FilterBySubcommitteeID(t *testing.T) {
 }
 
 func TestProposerSyncContributions_Dedup(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	// Prepare aggregation bits for all scenarios
 	var aggBits1, aggBits2_1, aggBits2_2, aggBits3, aggBits4_1, aggBits4_2, aggBits4_3, aggBits4_4, aggBits4_5, aggBits5_1, aggBits5_2, aggBits5_3, aggBits5_4, aggBits5_5, aggBits6, aggBits7_1, aggBits7_2, aggBits7_3, aggBits7_4, aggBits7_5, aggBits8_1, aggBits8_2, aggBits8_3, aggBits8_4, aggBits8_5, aggBits8_6, aggBits9_1, aggBits9_2, aggBits9_3, aggBits9_4, aggBits10_1, aggBits10_2, aggBits10_3, aggBits10_4, aggBits10_5, aggBits11_1, aggBits11_2, aggBits11_3, aggBits11_4, aggBits12_1, aggBits12_2, aggBits12_3, aggBits12_4, aggBits12_5, aggBits13_1, aggBits13_2 [fieldparams.SyncCommitteeAggregationBytesLength]byte
 	b2_1, b2_2 := []byte{0b10111110, 0x01}, []byte{0b01111111, 0x01}
@@ -407,6 +411,7 @@ func TestProposerSyncContributions_Dedup(t *testing.T) {
 }
 
 func TestProposerSyncContributions_MostProfitable(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	// Prepare aggregation bits for all scenarios.
 	var aggBits1, aggBits2_1, aggBits2_2, aggBits3_1, aggBits3_2, aggBits4_1, aggBits4_2 [fieldparams.SyncCommitteeAggregationBytesLength]byte
 	b1 := []byte{0b01}

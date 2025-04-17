@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v4/async"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/signing"
@@ -25,7 +26,6 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/validator/client/iface"
 	"github.com/sirupsen/logrus"
 	"go.opencensus.io/trace"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const domainDataErr = "could not get domain data"
@@ -121,16 +121,59 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 		return
 	}
 
-	// Propose and broadcast block via beacon node
-	proposal, err := blk.PbGenericBlock()
-	if err != nil {
-		log.WithError(err).Error("Failed to create proposal request")
-		if v.emitAccountMetrics {
-			ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
+	var genericSignedBlock *ethpb.GenericSignedBeaconBlock
+	if blk.Version() >= version.Deneb {
+		if !blk.IsBlinded() {
+			signedBlobs, err := v.signDenebBlobs(ctx, b.GetDeneb().Blobs, pubKey)
+			if err != nil {
+				log.WithError(err).Error("Failed to sign blobs")
+				return
+			}
+			denebBlock, err := blk.PbDenebBlock()
+			if err != nil {
+				log.WithError(err).Error("Failed to get deneb block")
+				return
+			}
+			genericSignedBlock = &ethpb.GenericSignedBeaconBlock{
+				Block: &ethpb.GenericSignedBeaconBlock_Deneb{
+					Deneb: &ethpb.SignedBeaconBlockAndBlobsDeneb{
+						Block: denebBlock,
+						Blobs: signedBlobs,
+					},
+				},
+			}
+		} else {
+			signedBlindBlobs, err := v.signBlindedDenebBlobs(ctx, b.GetBlindedDeneb().Blobs, pubKey)
+			if err != nil {
+				log.WithError(err).Error("Failed to sign blinded blob sidecar")
+				return
+			}
+			blindedDenebBlock, err := blk.PbBlindedDenebBlock()
+			if err != nil {
+				log.WithError(err).Error("Failed to get blinded deneb block")
+				return
+			}
+			genericSignedBlock = &ethpb.GenericSignedBeaconBlock{
+				Block: &ethpb.GenericSignedBeaconBlock_BlindedDeneb{
+					BlindedDeneb: &ethpb.SignedBlindedBeaconBlockAndBlobsDeneb{
+						SignedBlindedBlock:        blindedDenebBlock,
+						SignedBlindedBlobSidecars: signedBlindBlobs,
+					},
+				},
+			}
 		}
-		return
+	} else {
+		genericSignedBlock, err = blk.PbGenericBlock()
+		if err != nil {
+			log.WithError(err).Error("Failed to create proposal request")
+			if v.emitAccountMetrics {
+				ValidatorProposeFailVec.WithLabelValues(fmtKey).Inc()
+			}
+			return
+		}
 	}
-	blkResp, err := v.validatorClient.ProposeBeaconBlock(ctx, proposal)
+
+	blkResp, err := v.validatorClient.ProposeBeaconBlock(ctx, genericSignedBlock)
 	if err != nil {
 		log.WithField("blockSlot", slot).WithError(err).Error("Failed to propose block")
 		if v.emitAccountMetrics {
@@ -175,6 +218,15 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 			}
 			log = log.WithField("withdrawalCount", len(withdrawals))
 		}
+		if blk.Version() >= version.Deneb {
+			kzgs, err := blk.Block().Body().BlobKzgCommitments()
+			if err != nil {
+				log.WithError(err).Error("Failed to get blob KZG commitments")
+				return
+			} else if len(kzgs) != 0 {
+				log = log.WithField("kzgCommitmentCount", len(kzgs))
+			}
+		}
 	}
 
 	blkRoot := fmt.Sprintf("%#x", bytesutil.Trunc(blkResp.BlockRoot))
@@ -198,14 +250,14 @@ func (v *validator) ProposeBlock(ctx context.Context, slot primitives.Slot, pubK
 func ProposeExit(
 	ctx context.Context,
 	validatorClient iface.ValidatorClient,
-	nodeClient iface.NodeClient,
 	signer iface.SigningFunc,
 	pubKey []byte,
+	epoch primitives.Epoch,
 ) error {
 	ctx, span := trace.StartSpan(ctx, "validator.ProposeExit")
 	defer span.End()
 
-	signedExit, err := CreateSignedVoluntaryExit(ctx, validatorClient, nodeClient, signer, pubKey)
+	signedExit, err := CreateSignedVoluntaryExit(ctx, validatorClient, signer, pubKey, epoch)
 	if err != nil {
 		return errors.Wrap(err, "failed to create signed voluntary exit")
 	}
@@ -217,16 +269,22 @@ func ProposeExit(
 	span.AddAttributes(
 		trace.StringAttribute("exitRoot", fmt.Sprintf("%#x", exitResp.ExitRoot)),
 	)
-
 	return nil
+}
+
+func CurrentEpoch(genesisTime *timestamp.Timestamp) (primitives.Epoch, error) {
+	totalSecondsPassed := prysmTime.Now().Unix() - genesisTime.Seconds
+	currentSlot := primitives.Slot((uint64(totalSecondsPassed)) / params.BeaconConfig().SecondsPerSlot)
+	currentEpoch := slots.ToEpoch(currentSlot)
+	return currentEpoch, nil
 }
 
 func CreateSignedVoluntaryExit(
 	ctx context.Context,
 	validatorClient iface.ValidatorClient,
-	nodeClient iface.NodeClient,
 	signer iface.SigningFunc,
 	pubKey []byte,
+	epoch primitives.Epoch,
 ) (*ethpb.SignedVoluntaryExit, error) {
 	ctx, span := trace.StartSpan(ctx, "validator.CreateSignedVoluntaryExit")
 	defer span.End()
@@ -235,15 +293,12 @@ func CreateSignedVoluntaryExit(
 	if err != nil {
 		return nil, errors.Wrap(err, "gRPC call to get validator index failed")
 	}
-	genesisResponse, err := nodeClient.GetGenesis(ctx, &emptypb.Empty{})
+	exit := &ethpb.VoluntaryExit{Epoch: epoch, ValidatorIndex: indexResponse.Index}
+	slot, err := slots.EpochStart(epoch)
 	if err != nil {
-		return nil, errors.Wrap(err, "gRPC call to get genesis time failed")
+		return nil, errors.Wrap(err, "failed to retrieve slot")
 	}
-	totalSecondsPassed := prysmTime.Now().Unix() - genesisResponse.GenesisTime.Seconds
-	currentEpoch := primitives.Epoch(uint64(totalSecondsPassed) / uint64(params.BeaconConfig().SlotsPerEpoch.Mul(params.BeaconConfig().SecondsPerSlot)))
-	currentSlot := slots.CurrentSlot(uint64(genesisResponse.GenesisTime.AsTime().Unix()))
-	exit := &ethpb.VoluntaryExit{Epoch: currentEpoch, ValidatorIndex: indexResponse.Index}
-	sig, err := signVoluntaryExit(ctx, validatorClient, signer, pubKey, exit, currentSlot)
+	sig, err := signVoluntaryExit(ctx, validatorClient, signer, pubKey, exit, slot)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to sign voluntary exit")
 	}

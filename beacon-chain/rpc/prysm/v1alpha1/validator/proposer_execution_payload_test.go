@@ -3,7 +3,6 @@ package validator
 import (
 	"context"
 	"errors"
-	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -38,6 +37,7 @@ func TestServer_activationEpochNotReached(t *testing.T) {
 }
 
 func TestServer_getExecutionPayload(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	beaconDB := dbTest.SetupDB(t)
 	nonTransitionSt, _ := util.DeterministicGenesisStateBellatrix(t, 1)
 	b1pb := util.NewBeaconBlock()
@@ -61,7 +61,7 @@ func TestServer_getExecutionPayload(t *testing.T) {
 	}))
 
 	capellaTransitionState, _ := util.DeterministicGenesisStateCapella(t, 1)
-	wrappedHeaderCapella, err := blocks.WrappedExecutionPayloadHeaderCapella(&pb.ExecutionPayloadHeaderCapella{BlockNumber: 1}, big.NewInt(0))
+	wrappedHeaderCapella, err := blocks.WrappedExecutionPayloadHeaderCapella(&pb.ExecutionPayloadHeaderCapella{BlockNumber: 1}, 0)
 	require.NoError(t, err)
 	require.NoError(t, capellaTransitionState.SetLatestExecutionPayloadHeader(wrappedHeaderCapella))
 	b2pbCapella := util.NewBeaconBlockCapella()
@@ -83,6 +83,8 @@ func TestServer_getExecutionPayload(t *testing.T) {
 		terminalBlockHash common.Hash
 		activationEpoch   primitives.Epoch
 		validatorIndx     primitives.ValidatorIndex
+		override          bool
+		wantedOverride    bool
 	}{
 		{
 			name:      "transition completed, nil payload id",
@@ -128,6 +130,13 @@ func TestServer_getExecutionPayload(t *testing.T) {
 			terminalBlockHash: [32]byte{0x1},
 			activationEpoch:   1,
 		},
+		{
+			name:           "local client override",
+			st:             transitionSt,
+			validatorIndx:  100,
+			override:       true,
+			wantedOverride: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -137,17 +146,25 @@ func TestServer_getExecutionPayload(t *testing.T) {
 			params.OverrideBeaconConfig(cfg)
 
 			vs := &Server{
-				ExecutionEngineCaller:  &powtesting.EngineClient{PayloadIDBytes: tt.payloadID, ErrForkchoiceUpdated: tt.forkchoiceErr, ExecutionPayload: &pb.ExecutionPayload{}},
+				ExecutionEngineCaller:  &powtesting.EngineClient{PayloadIDBytes: tt.payloadID, ErrForkchoiceUpdated: tt.forkchoiceErr, ExecutionPayload: &pb.ExecutionPayload{}, BuilderOverride: tt.override},
 				HeadFetcher:            &chainMock.ChainService{State: tt.st},
 				FinalizationFetcher:    &chainMock.ChainService{},
 				BeaconDB:               beaconDB,
 				ProposerSlotIndexCache: cache.NewProposerPayloadIDsCache(),
 			}
 			vs.ProposerSlotIndexCache.SetProposerAndPayloadIDs(tt.st.Slot(), 100, [8]byte{100}, [32]byte{'a'})
-			_, err := vs.getExecutionPayload(context.Background(), tt.st.Slot(), tt.validatorIndx, [32]byte{'a'}, tt.st)
+			blk := util.NewBeaconBlockBellatrix()
+			blk.Block.Slot = tt.st.Slot()
+			blk.Block.ProposerIndex = tt.validatorIndx
+			blk.Block.ParentRoot = bytesutil.PadTo([]byte{'a'}, 32)
+			b, err := blocks.NewSignedBeaconBlock(blk)
+			require.NoError(t, err)
+			var gotOverride bool
+			_, _, gotOverride, err = vs.getLocalPayloadAndBlobs(context.Background(), b.Block(), tt.st)
 			if tt.errString != "" {
 				require.ErrorContains(t, tt.errString, err)
 			} else {
+				require.Equal(t, tt.wantedOverride, gotOverride)
 				require.NoError(t, err)
 			}
 		})
@@ -155,6 +172,7 @@ func TestServer_getExecutionPayload(t *testing.T) {
 }
 
 func TestServer_getExecutionPayloadContextTimeout(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	beaconDB := dbTest.SetupDB(t)
 	nonTransitionSt, _ := util.DeterministicGenesisStateBellatrix(t, 1)
 	b1pb := util.NewBeaconBlock()
@@ -180,11 +198,18 @@ func TestServer_getExecutionPayloadContextTimeout(t *testing.T) {
 	}
 	vs.ProposerSlotIndexCache.SetProposerAndPayloadIDs(nonTransitionSt.Slot(), 100, [8]byte{100}, [32]byte{'a'})
 
-	_, err = vs.getExecutionPayload(context.Background(), nonTransitionSt.Slot(), 100, [32]byte{'a'}, nonTransitionSt)
+	blk := util.NewBeaconBlockBellatrix()
+	blk.Block.Slot = nonTransitionSt.Slot()
+	blk.Block.ProposerIndex = 100
+	blk.Block.ParentRoot = bytesutil.PadTo([]byte{'a'}, 32)
+	b, err := blocks.NewSignedBeaconBlock(blk)
+	require.NoError(t, err)
+	_, _, _, err = vs.getLocalPayloadAndBlobs(context.Background(), b.Block(), nonTransitionSt)
 	require.NoError(t, err)
 }
 
 func TestServer_getExecutionPayload_UnexpectedFeeRecipient(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	hook := logTest.NewGlobal()
 	beaconDB := dbTest.SetupDB(t)
 	nonTransitionSt, _ := util.DeterministicGenesisStateBellatrix(t, 1)
@@ -226,7 +251,13 @@ func TestServer_getExecutionPayload_UnexpectedFeeRecipient(t *testing.T) {
 		BeaconDB:               beaconDB,
 		ProposerSlotIndexCache: cache.NewProposerPayloadIDsCache(),
 	}
-	gotPayload, err := vs.getExecutionPayload(context.Background(), transitionSt.Slot(), 0, [32]byte{}, transitionSt)
+
+	blk := util.NewBeaconBlockBellatrix()
+	blk.Block.Slot = transitionSt.Slot()
+	blk.Block.ParentRoot = bytesutil.PadTo([]byte{}, 32)
+	b, err := blocks.NewSignedBeaconBlock(blk)
+	require.NoError(t, err)
+	gotPayload, _, _, err := vs.getLocalPayloadAndBlobs(context.Background(), b.Block(), transitionSt)
 	require.NoError(t, err)
 	require.NotNil(t, gotPayload)
 
@@ -238,7 +269,7 @@ func TestServer_getExecutionPayload_UnexpectedFeeRecipient(t *testing.T) {
 	payload.FeeRecipient = evilRecipientAddress[:]
 	vs.ProposerSlotIndexCache = cache.NewProposerPayloadIDsCache()
 
-	gotPayload, err = vs.getExecutionPayload(context.Background(), transitionSt.Slot(), 0, [32]byte{}, transitionSt)
+	gotPayload, _, _, err = vs.getLocalPayloadAndBlobs(context.Background(), b.Block(), transitionSt)
 	require.NoError(t, err)
 	require.NotNil(t, gotPayload)
 

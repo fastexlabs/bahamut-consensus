@@ -40,7 +40,7 @@ func TestScorers_PeerStatus_Score(t *testing.T) {
 				scorer.SetPeerStatus("peer1", &pb.Status{
 					HeadRoot: make([]byte, 32),
 					HeadSlot: 64,
-				}, p2ptypes.ErrWrongForkDigestVersion)
+				}, p2ptypes.ErrWrongForkDigestVersion, "reson")
 			},
 			check: func(scorer *scorers.PeerStatusScorer) {
 				assert.Equal(t, scorers.BadPeerScore, scorer.Score("peer1"), "Unexpected score")
@@ -53,7 +53,7 @@ func TestScorers_PeerStatus_Score(t *testing.T) {
 				scorer.SetPeerStatus("peer1", &pb.Status{
 					HeadRoot: make([]byte, 32),
 					HeadSlot: 64,
-				}, nil)
+				}, nil, "reson")
 			},
 			check: func(scorer *scorers.PeerStatusScorer) {
 				assert.Equal(t, 1.0, scorer.Score("peer1"), "Unexpected score")
@@ -66,7 +66,7 @@ func TestScorers_PeerStatus_Score(t *testing.T) {
 				scorer.SetPeerStatus("peer1", &pb.Status{
 					HeadRoot: make([]byte, 32),
 					HeadSlot: 64,
-				}, nil)
+				}, nil, "reson")
 			},
 			check: func(scorer *scorers.PeerStatusScorer) {
 				assert.Equal(t, 0.0, scorer.Score("peer1"), "Unexpected score")
@@ -80,12 +80,12 @@ func TestScorers_PeerStatus_Score(t *testing.T) {
 				scorer.SetPeerStatus("peer1", &pb.Status{
 					HeadRoot: make([]byte, 32),
 					HeadSlot: headSlot + 64,
-				}, nil)
+				}, nil, "reson")
 				// Set another peer to a higher score.
 				scorer.SetPeerStatus("peer2", &pb.Status{
 					HeadRoot: make([]byte, 32),
 					HeadSlot: headSlot + 128,
-				}, nil)
+				}, nil, "reson")
 			},
 			check: func(scorer *scorers.PeerStatusScorer) {
 				headSlot := uint64(128)
@@ -100,7 +100,7 @@ func TestScorers_PeerStatus_Score(t *testing.T) {
 				scorer.SetPeerStatus("peer1", &pb.Status{
 					HeadRoot: make([]byte, 32),
 					HeadSlot: headSlot + 64,
-				}, nil)
+				}, nil, "reson")
 			},
 			check: func(scorer *scorers.PeerStatusScorer) {
 				assert.Equal(t, 1.0, scorer.Score("peer1"), "Unexpected score")
@@ -113,7 +113,7 @@ func TestScorers_PeerStatus_Score(t *testing.T) {
 				scorer.SetPeerStatus("peer1", &pb.Status{
 					HeadRoot: make([]byte, 32),
 					HeadSlot: 0,
-				}, nil)
+				}, nil, "reson")
 			},
 			check: func(scorer *scorers.PeerStatusScorer) {
 				assert.Equal(t, 0.0, scorer.Score("peer1"), "Unexpected score")
@@ -143,7 +143,7 @@ func TestScorers_PeerStatus_IsBadPeer(t *testing.T) {
 	assert.Equal(t, false, peerStatuses.Scorers().IsBadPeer(pid))
 	assert.Equal(t, false, peerStatuses.Scorers().PeerStatusScorer().IsBadPeer(pid))
 
-	peerStatuses.Scorers().PeerStatusScorer().SetPeerStatus(pid, &pb.Status{}, p2ptypes.ErrWrongForkDigestVersion)
+	peerStatuses.Scorers().PeerStatusScorer().SetPeerStatus(pid, &pb.Status{}, p2ptypes.ErrWrongForkDigestVersion, "reson")
 	assert.Equal(t, true, peerStatuses.Scorers().IsBadPeer(pid))
 	assert.Equal(t, true, peerStatuses.Scorers().PeerStatusScorer().IsBadPeer(pid))
 }
@@ -162,9 +162,9 @@ func TestScorers_PeerStatus_BadPeers(t *testing.T) {
 	assert.Equal(t, false, peerStatuses.Scorers().IsBadPeer(pid3))
 	assert.Equal(t, false, peerStatuses.Scorers().PeerStatusScorer().IsBadPeer(pid3))
 
-	peerStatuses.Scorers().PeerStatusScorer().SetPeerStatus(pid1, &pb.Status{}, p2ptypes.ErrWrongForkDigestVersion)
-	peerStatuses.Scorers().PeerStatusScorer().SetPeerStatus(pid2, &pb.Status{}, nil)
-	peerStatuses.Scorers().PeerStatusScorer().SetPeerStatus(pid3, &pb.Status{}, p2ptypes.ErrWrongForkDigestVersion)
+	peerStatuses.Scorers().PeerStatusScorer().SetPeerStatus(pid1, &pb.Status{}, p2ptypes.ErrWrongForkDigestVersion, "reson")
+	peerStatuses.Scorers().PeerStatusScorer().SetPeerStatus(pid2, &pb.Status{}, nil, "reson")
+	peerStatuses.Scorers().PeerStatusScorer().SetPeerStatus(pid3, &pb.Status{}, p2ptypes.ErrWrongForkDigestVersion, "reson")
 	assert.Equal(t, true, peerStatuses.Scorers().IsBadPeer(pid1))
 	assert.Equal(t, true, peerStatuses.Scorers().PeerStatusScorer().IsBadPeer(pid1))
 	assert.Equal(t, false, peerStatuses.Scorers().IsBadPeer(pid2))
@@ -185,10 +185,10 @@ func TestScorers_PeerStatus_PeerStatus(t *testing.T) {
 
 	peerStatuses.Scorers().PeerStatusScorer().SetPeerStatus("peer1", &pb.Status{
 		HeadSlot: 128,
-	}, nil)
+	}, nil, "reson")
 	peerStatuses.Scorers().PeerStatusScorer().SetPeerStatus("peer2", &pb.Status{
 		HeadSlot: 128,
-	}, p2ptypes.ErrInvalidEpoch)
+	}, p2ptypes.ErrInvalidEpoch, "reson")
 	status, err = peerStatuses.Scorers().PeerStatusScorer().PeerStatus("peer1")
 	require.NoError(t, err)
 	assert.Equal(t, primitives.Slot(128), status.HeadSlot)

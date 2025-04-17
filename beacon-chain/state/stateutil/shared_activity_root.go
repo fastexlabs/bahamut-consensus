@@ -12,7 +12,7 @@ import (
 // SharedActivityRootWithHasher returns the hash tree root of input `sharedActivity`
 func SharedActivityRootWithHasher(sharedActivity *ethpb.SharedActivity) ([32]byte, error) {
 	if sharedActivity == nil {
-		return [32]byte{}, errors.New("nil shared activity")
+		return [32]byte{}, errors.New("empty shared activity")
 	}
 
 	fieldRoots := make([][32]byte, 4)

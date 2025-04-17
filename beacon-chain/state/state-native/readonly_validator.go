@@ -23,11 +23,11 @@ var _ = state.ReadOnlyValidator(readOnlyValidator{})
 
 // NewValidator initializes the read only wrapper for validator.
 func NewValidator(v *ethpb.Validator) (state.ReadOnlyValidator, error) {
+	if v == nil {
+		return nil, ErrNilWrappedValidator
+	}
 	rov := readOnlyValidator{
 		validator: v,
-	}
-	if rov.IsNil() {
-		return nil, ErrNilWrappedValidator
 	}
 	return rov, nil
 }
@@ -60,6 +60,14 @@ func (v readOnlyValidator) ActivationEpoch() primitives.Epoch {
 // read only validator.
 func (v readOnlyValidator) WithdrawableEpoch() primitives.Epoch {
 	return v.validator.WithdrawableEpoch
+}
+
+// Contract returns the contract of the
+// read only validator.
+func (v readOnlyValidator) Contract() [fieldparams.ContractAddressLength]byte {
+	var contract [fieldparams.ContractAddressLength]byte
+	copy(contract[:], v.validator.Contract)
+	return contract
 }
 
 // ExitEpoch returns the exit epoch of the

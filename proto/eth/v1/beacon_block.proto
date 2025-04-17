@@ -66,7 +66,7 @@ message BeaconBlockBody {
     bytes graffiti = 3 [(ethereum.eth.ext.ssz_size) = "32"];
 
     // Block operations
-    // Refer to spec constants at https://github.com/ethereum/consensus-specs/blob/dev/specs/core/0_beacon-chain.md#max-operations-per-block
+    // Refer to spec constants at https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#max-operations-per-block
 
     // At most MAX_PROPOSER_SLASHINGS.
     repeated ProposerSlashing proposer_slashings = 4 [(ethereum.eth.ext.ssz_max) = "16"];
@@ -180,7 +180,7 @@ message ActivityChange {
     bytes contract_address = 1 [(ethereum.eth.ext.ssz_size) = "20"];
 
     // The amount of gas used by the smart contract during its execution
-	uint64 delta_activity = 2;
+	  uint64 delta_activity = 2;
 }
 
 // A beacon block header is essentially a beacon block with only a reference to

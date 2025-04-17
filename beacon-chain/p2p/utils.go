@@ -22,13 +22,16 @@ import (
 	pb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1/metadata"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
 )
 
-const keyPath = "network-keys"
-const metaDataPath = "metaData"
+const (
+	keyPath      = "network-keys"
+	metaDataPath = "metaData.ssz"
+)
 
 const dialTimeout = 1 * time.Second
+
+var ErrInvalidMetaData = errors.New("invalid metaData type")
 
 // SerializeENR takes the enr record in its key-value form and serializes it.
 func SerializeENR(record *enr.Record) (string, error) {
@@ -109,43 +112,71 @@ func privKeyFromFile(path string) (*ecdsa.PrivateKey, error) {
 
 // Retrieves node p2p metadata from a set of configuration values
 // from the p2p service.
-// TODO: Figure out how to do a v1/v2 check.
 func metaDataFromConfig(cfg *Config) (metadata.Metadata, error) {
-	defaultKeyPath := path.Join(cfg.DataDir, metaDataPath)
-	metaDataPath := cfg.MetaDataDir
+	metaDataPath := path.Join(cfg.DataDir, metaDataPath)
+	if cfg.MetaDataDir != "" {
+		metaDataPath = cfg.MetaDataDir
+	}
 
-	_, err := os.Stat(defaultKeyPath)
-	defaultMetadataExist := !os.IsNotExist(err)
-	if err != nil && defaultMetadataExist {
+	_, err := os.Stat(metaDataPath)
+	metadataExist := !os.IsNotExist(err)
+	if err != nil && metadataExist {
 		return nil, err
 	}
-	if metaDataPath == "" && !defaultMetadataExist {
+	if !metadataExist {
 		metaData := &pb.MetaDataV0{
 			SeqNumber: 0,
 			Attnets:   bitfield.NewBitvector64(),
 		}
-		dst, err := proto.Marshal(metaData)
+		dst, err := metaData.MarshalSSZ()
 		if err != nil {
 			return nil, err
 		}
-		if err := file.WriteFile(defaultKeyPath, dst); err != nil {
+		if err := file.WriteFile(metaDataPath, dst); err != nil {
 			return nil, err
 		}
 		return wrapper.WrappedMetadataV0(metaData), nil
 	}
-	if defaultMetadataExist && metaDataPath == "" {
-		metaDataPath = defaultKeyPath
-	}
+
 	src, err := os.ReadFile(metaDataPath) // #nosec G304
 	if err != nil {
 		log.WithError(err).Error("Error reading metadata from file")
 		return nil, err
 	}
-	metaData := &pb.MetaDataV0{}
-	if err := proto.Unmarshal(src, metaData); err != nil {
-		return nil, err
+
+	metaDataV0 := &pb.MetaDataV0{}
+	if err := metaDataV0.UnmarshalSSZ(src); err == nil {
+		return wrapper.WrappedMetadataV0(metaDataV0), nil
 	}
-	return wrapper.WrappedMetadataV0(metaData), nil
+	metaDataV1 := &pb.MetaDataV1{}
+	if err := metaDataV1.UnmarshalSSZ(src); err == nil {
+		return wrapper.WrappedMetadataV1(metaDataV1), nil
+	}
+	return nil, ErrInvalidMetaData
+}
+
+func writeMetaData(cfg *Config, metaData metadata.Metadata) (err error) {
+	if metaData == nil || metaData.IsNil() {
+		return errors.New("nil metaData provided")
+	}
+
+	metaDataPath := path.Join(cfg.DataDir, metaDataPath)
+	if cfg.MetaDataDir != "" {
+		metaDataPath = cfg.MetaDataDir
+	}
+
+	_, err = os.Stat(metaDataPath)
+	metadataExist := !os.IsNotExist(err)
+	if err != nil && metadataExist {
+		return err
+	}
+
+	dst, err := metaData.MarshalSSZ()
+	if err != nil {
+		return err
+	}
+
+	return file.WriteFile(metaDataPath, dst)
 }
 
 // Attempt to dial an address to verify its connectivity

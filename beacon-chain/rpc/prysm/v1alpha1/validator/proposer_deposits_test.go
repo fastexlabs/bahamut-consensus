@@ -1,8 +1,13 @@
 package validator
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/prysmaticlabs/prysm/v4/config/params"
+)
 
 func TestShouldFallback(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	tests := []struct {
 		name            string
 		totalDepCount   uint64

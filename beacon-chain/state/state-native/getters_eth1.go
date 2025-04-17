@@ -65,6 +65,7 @@ func (b *BeaconState) Eth1DepositIndex() uint64 {
 
 // SharedActivity corresponds to the consensus activity params
 // shared amond all validators.
+// todo unit act
 func (b *BeaconState) SharedActivity() *ethpb.SharedActivity {
 	if b.sharedActivity == nil {
 		return nil

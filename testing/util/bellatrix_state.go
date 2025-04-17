@@ -1,3 +1,4 @@
+// todo unit act
 package util
 
 import (
@@ -69,6 +70,7 @@ func emptyGenesisStateBellatrix() (state.BeaconState, error) {
 		// Validator registry fields.
 		Validators:       []*ethpb.Validator{},
 		Balances:         []uint64{},
+		Activities:       []uint64{},
 		InactivityScores: []uint64{},
 
 		JustificationBits:          []byte{0},
@@ -156,6 +158,7 @@ func buildGenesisBeaconStateBellatrix(genesisTime uint64, preState state.BeaconS
 		// Validator registry fields.
 		Validators:                 preState.Validators(),
 		Balances:                   preState.Balances(),
+		Activities:                 preState.Activities(),
 		PreviousEpochParticipation: prevEpochParticipation,
 		CurrentEpochParticipation:  currEpochParticipation,
 		InactivityScores:           scores,

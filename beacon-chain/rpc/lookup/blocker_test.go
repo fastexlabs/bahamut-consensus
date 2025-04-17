@@ -3,9 +3,9 @@ package lookup
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	mock "github.com/prysmaticlabs/prysm/v4/beacon-chain/blockchain/testing"
 	dbtesting "github.com/prysmaticlabs/prysm/v4/beacon-chain/db/testing"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/testutil"
@@ -117,6 +117,11 @@ func TestGetBlock(t *testing.T) {
 			want:    nil,
 		},
 		{
+			name:    "hex",
+			blockID: []byte(hexutil.Encode(blkContainers[20].BlockRoot)),
+			want:    blkContainers[20].Block.(*ethpbalpha.BeaconBlockContainer_Phase0Block).Phase0Block,
+		},
+		{
 			name:    "no block",
 			blockID: []byte("105"),
 			want:    nil,
@@ -136,9 +141,7 @@ func TestGetBlock(t *testing.T) {
 			require.NoError(t, err)
 			pbBlock, err := result.PbPhase0Block()
 			require.NoError(t, err)
-			if !reflect.DeepEqual(pbBlock, tt.want) {
-				t.Error("Expected blocks to equal")
-			}
+			require.DeepEqual(t, tt.want, pbBlock)
 		})
 	}
 }

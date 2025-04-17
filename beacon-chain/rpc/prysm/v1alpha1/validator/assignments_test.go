@@ -17,6 +17,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/helpers"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/transition"
 	mockExecution "github.com/prysmaticlabs/prysm/v4/beacon-chain/execution/testing"
+	"github.com/prysmaticlabs/prysm/v4/beacon-chain/rpc/core"
 	mockSync "github.com/prysmaticlabs/prysm/v4/beacon-chain/sync/initial-sync/testing"
 	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
@@ -38,6 +39,7 @@ func pubKey(i uint64) []byte {
 }
 
 func TestGetDuties_OK(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	genesis := util.NewBeaconBlock()
 	depChainStart := params.BeaconConfig().MinGenesisActiveValidatorCount
 	deposits, _, err := util.DeterministicDepositsAndKeys(depChainStart)
@@ -105,6 +107,7 @@ func TestGetAltairDuties_SyncCommitteeOK(t *testing.T) {
 	params.SetupTestConfigCleanup(t)
 	cfg := params.BeaconConfig().Copy()
 	cfg.AltairForkEpoch = primitives.Epoch(0)
+	cfg.EpochsPerHistoricalVector = 65536
 	params.OverrideBeaconConfig(cfg)
 
 	genesis := util.NewBeaconBlock()
@@ -208,6 +211,7 @@ func TestGetBellatrixDuties_SyncCommitteeOK(t *testing.T) {
 	cfg := params.BeaconConfig().Copy()
 	cfg.AltairForkEpoch = primitives.Epoch(0)
 	cfg.BellatrixForkEpoch = primitives.Epoch(1)
+	cfg.EpochsPerHistoricalVector = 65536
 	params.OverrideBeaconConfig(cfg)
 
 	genesis := util.NewBeaconBlock()
@@ -362,6 +366,7 @@ func TestGetAltairDuties_UnknownPubkey(t *testing.T) {
 }
 
 func TestGetDuties_SlotOutOfUpperBound(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	chain := &mockChain.ChainService{
 		Genesis: time.Now(),
 	}
@@ -376,6 +381,7 @@ func TestGetDuties_SlotOutOfUpperBound(t *testing.T) {
 }
 
 func TestGetDuties_CurrentEpoch_ShouldNotFail(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	genesis := util.NewBeaconBlock()
 	depChainStart := params.BeaconConfig().MinGenesisActiveValidatorCount
 	deposits, _, err := util.DeterministicDepositsAndKeys(depChainStart)
@@ -417,6 +423,7 @@ func TestGetDuties_CurrentEpoch_ShouldNotFail(t *testing.T) {
 }
 
 func TestGetDuties_MultipleKeys_OK(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	genesis := util.NewBeaconBlock()
 	depChainStart := uint64(64)
 
@@ -456,11 +463,12 @@ func TestGetDuties_MultipleKeys_OK(t *testing.T) {
 	res, err := vs.GetDuties(context.Background(), req)
 	require.NoError(t, err, "Could not call epoch committee assignment")
 	assert.Equal(t, 2, len(res.CurrentEpochDuties))
-	assert.Equal(t, primitives.Slot(4), res.CurrentEpochDuties[0].AttesterSlot)
-	assert.Equal(t, primitives.Slot(4), res.CurrentEpochDuties[1].AttesterSlot)
+	assert.Equal(t, primitives.Slot(6), res.CurrentEpochDuties[0].AttesterSlot)
+	assert.Equal(t, primitives.Slot(1), res.CurrentEpochDuties[1].AttesterSlot)
 }
 
 func TestGetDuties_SyncNotReady(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	vs := &Server{
 		SyncChecker: &mockSync.Sync{IsSyncing: true},
 	}
@@ -469,6 +477,7 @@ func TestGetDuties_SyncNotReady(t *testing.T) {
 }
 
 func TestStreamDuties_SyncNotReady(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	vs := &Server{
 		SyncChecker: &mockSync.Sync{IsSyncing: true},
 	}
@@ -479,6 +488,7 @@ func TestStreamDuties_SyncNotReady(t *testing.T) {
 }
 
 func TestStreamDuties_OK(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	genesis := util.NewBeaconBlock()
 	depChainStart := params.BeaconConfig().MinGenesisActiveValidatorCount
 	deposits, _, err := util.DeterministicDepositsAndKeys(depChainStart)
@@ -537,6 +547,7 @@ func TestStreamDuties_OK(t *testing.T) {
 }
 
 func TestStreamDuties_OK_ChainReorg(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	genesis := util.NewBeaconBlock()
 	depChainStart := params.BeaconConfig().MinGenesisActiveValidatorCount
 	deposits, _, err := util.DeterministicDepositsAndKeys(depChainStart)
@@ -604,10 +615,10 @@ func TestStreamDuties_OK_ChainReorg(t *testing.T) {
 }
 
 func TestAssignValidatorToSubnet(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	k := pubKey(3)
 
-	vs := Server{}
-	vs.AssignValidatorToSubnet(k, ethpb.ValidatorStatus_ACTIVE)
+	core.AssignValidatorToSubnetProto(k, ethpb.ValidatorStatus_ACTIVE)
 	coms, ok, exp := cache.SubnetIDs.GetPersistentSubnets(k)
 	require.Equal(t, true, ok, "No cache entry found for validator")
 	assert.Equal(t, params.BeaconConfig().RandomSubnetsPerValidator, uint64(len(coms)))
@@ -620,6 +631,7 @@ func TestAssignValidatorToSubnet(t *testing.T) {
 }
 
 func TestAssignValidatorToSyncSubnet(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	k := pubKey(3)
 	committee := make([][]byte, 0)
 
@@ -642,7 +654,6 @@ func TestAssignValidatorToSyncSubnet(t *testing.T) {
 }
 
 func BenchmarkCommitteeAssignment(b *testing.B) {
-
 	genesis := util.NewBeaconBlock()
 	depChainStart := uint64(8192 * 2)
 	deposits, _, err := util.DeterministicDepositsAndKeys(depChainStart)

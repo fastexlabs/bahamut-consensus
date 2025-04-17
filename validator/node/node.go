@@ -35,6 +35,7 @@ import (
 	fieldparams "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
 	validatorServiceConfig "github.com/prysmaticlabs/prysm/v4/config/validator/service"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/validator"
 	"github.com/prysmaticlabs/prysm/v4/container/slice"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 	"github.com/prysmaticlabs/prysm/v4/io/file"
@@ -50,6 +51,7 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 	"github.com/prysmaticlabs/prysm/v4/validator/accounts/wallet"
 	"github.com/prysmaticlabs/prysm/v4/validator/client"
+	"github.com/prysmaticlabs/prysm/v4/validator/db/iface"
 	"github.com/prysmaticlabs/prysm/v4/validator/db/kv"
 	g "github.com/prysmaticlabs/prysm/v4/validator/graffiti"
 	"github.com/prysmaticlabs/prysm/v4/validator/keymanager/local"
@@ -60,7 +62,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/protobuf/encoding/protojson"
-	"gopkg.in/yaml.v2"
+	"k8s.io/apimachinery/pkg/util/yaml"
 )
 
 // ValidatorClient defines an instance of an Ethereum validator that manages
@@ -225,12 +227,12 @@ func (c *ValidatorClient) initializeFromCLI(cliCtx *cli.Context) error {
 		if dataDir == "" && c.wallet != nil {
 			dataDir = c.wallet.AccountsDir()
 			if dataDir == "" {
+				// skipcq: RVV-A0003
 				log.Fatal(
 					"Could not determine your system'c HOME path, please specify a --datadir you wish " +
 						"to use for your validator data",
 				)
 			}
-
 		}
 		if err := clearDB(cliCtx.Context, dataDir, forceClearFlag); err != nil {
 			return err
@@ -309,12 +311,12 @@ func (c *ValidatorClient) initializeForWeb(cliCtx *cli.Context) error {
 		if dataDir == "" {
 			dataDir = cmd.DefaultDataDir()
 			if dataDir == "" {
+				// skipcq: RVV-A0003
 				log.Fatal(
 					"Could not determine your system'c HOME path, please specify a --datadir you wish " +
 						"to use for your validator data",
 				)
 			}
-
 		}
 		if err := clearDB(cliCtx.Context, dataDir, forceClearFlag); err != nil {
 			return err
@@ -376,7 +378,6 @@ func (c *ValidatorClient) registerPrometheusService(cliCtx *cli.Context) error {
 }
 
 func (c *ValidatorClient) registerValidatorService(cliCtx *cli.Context) error {
-
 	endpoint := c.cliCtx.String(flags.BeaconRPCProviderFlag.Name)
 	dataDir := c.cliCtx.String(cmd.DataDirFlag.Name)
 	logValidatorBalances := !c.cliCtx.Bool(flags.DisablePenaltyRewardLogFlag.Name)
@@ -409,7 +410,7 @@ func (c *ValidatorClient) registerValidatorService(cliCtx *cli.Context) error {
 		return err
 	}
 
-	bpc, err := proposerSettings(c.cliCtx)
+	bpc, err := proposerSettings(c.cliCtx, c.db)
 	if err != nil {
 		return err
 	}
@@ -491,27 +492,26 @@ func Web3SignerConfig(cliCtx *cli.Context) (*remoteweb3signer.SetupConfig, error
 	return web3signerConfig, nil
 }
 
-func proposerSettings(cliCtx *cli.Context) (*validatorServiceConfig.ProposerSettings, error) {
-	var fileConfig *validatorServiceConfig.ProposerSettingsPayload
+func proposerSettings(cliCtx *cli.Context, db iface.ValidatorDB) (*validatorServiceConfig.ProposerSettings, error) {
+	var fileConfig *validatorpb.ProposerSettingsPayload
 
 	if cliCtx.IsSet(flags.ProposerSettingsFlag.Name) && cliCtx.IsSet(flags.ProposerSettingsURLFlag.Name) {
 		return nil, errors.New("cannot specify both " + flags.ProposerSettingsFlag.Name + " and " + flags.ProposerSettingsURLFlag.Name)
 	}
-
+	builderConfigFromFlag, err := BuilderSettingsFromFlags(cliCtx)
+	if err != nil {
+		return nil, err
+	}
 	// is overridden by file and URL flags
 	if cliCtx.IsSet(flags.SuggestedFeeRecipientFlag.Name) &&
 		!cliCtx.IsSet(flags.ProposerSettingsFlag.Name) &&
 		!cliCtx.IsSet(flags.ProposerSettingsURLFlag.Name) {
 		suggestedFee := cliCtx.String(flags.SuggestedFeeRecipientFlag.Name)
-		builderConfig, err := BuilderSettingsFromFlags(cliCtx)
-		if err != nil {
-			return nil, err
-		}
-		fileConfig = &validatorServiceConfig.ProposerSettingsPayload{
+		fileConfig = &validatorpb.ProposerSettingsPayload{
 			ProposerConfig: nil,
-			DefaultConfig: &validatorServiceConfig.ProposerOptionPayload{
-				FeeRecipient:  suggestedFee,
-				BuilderConfig: builderConfig,
+			DefaultConfig: &validatorpb.ProposerOptionPayload{
+				FeeRecipient: suggestedFee,
+				Builder:      builderConfigFromFlag.ToPayload(),
 			},
 		}
 	}
@@ -527,10 +527,13 @@ func proposerSettings(cliCtx *cli.Context) (*validatorServiceConfig.ProposerSett
 		}
 	}
 
-	// nothing is set, so just return nil
+	// this condition triggers if SuggestedFeeRecipientFlag,ProposerSettingsFlag or ProposerSettingsURLFlag did not create any settings
 	if fileConfig == nil {
-		return nil, nil
+		// Checks the db or enable builder settings before starting the node without proposer settings
+		// starting the node without proposer settings, will skip API calls for push proposer settings and register validator
+		return handleNoProposerSettingsFlagsProvided(cliCtx, db, builderConfigFromFlag)
 	}
+
 	// convert file config to proposer config for internal use
 	vpSettings := &validatorServiceConfig.ProposerSettings{}
 
@@ -541,6 +544,10 @@ func proposerSettings(cliCtx *cli.Context) (*validatorServiceConfig.ProposerSett
 	if !common.IsHexAddress(fileConfig.DefaultConfig.FeeRecipient) {
 		return nil, errors.New("default fileConfig fee recipient is not a valid eth1 address")
 	}
+	psExists, err := db.ProposerSettingsExists(cliCtx.Context)
+	if err != nil {
+		return nil, err
+	}
 	if err := warnNonChecksummedAddress(fileConfig.DefaultConfig.FeeRecipient); err != nil {
 		return nil, err
 	}
@@ -548,21 +555,27 @@ func proposerSettings(cliCtx *cli.Context) (*validatorServiceConfig.ProposerSett
 		FeeRecipientConfig: &validatorServiceConfig.FeeRecipientConfig{
 			FeeRecipient: common.HexToAddress(fileConfig.DefaultConfig.FeeRecipient),
 		},
-		BuilderConfig: fileConfig.DefaultConfig.BuilderConfig,
-	}
-	if vpSettings.DefaultConfig.BuilderConfig == nil {
-		builderConfig, err := BuilderSettingsFromFlags(cliCtx)
-		if err != nil {
-			return nil, err
-		}
-		vpSettings.DefaultConfig.BuilderConfig = builderConfig
+		BuilderConfig: validatorServiceConfig.ToBuilderConfig(fileConfig.DefaultConfig.Builder),
 	}
 
-	if vpSettings.DefaultConfig.BuilderConfig != nil {
+	if builderConfigFromFlag != nil {
+		config := builderConfigFromFlag.Clone()
+		if config.GasLimit == validator.Uint64(params.BeaconConfig().DefaultBuilderGasLimit) && vpSettings.DefaultConfig.BuilderConfig != nil {
+			config.GasLimit = vpSettings.DefaultConfig.BuilderConfig.GasLimit
+		}
+		vpSettings.DefaultConfig.BuilderConfig = config
+	} else if vpSettings.DefaultConfig.BuilderConfig != nil {
 		vpSettings.DefaultConfig.BuilderConfig.GasLimit = reviewGasLimit(vpSettings.DefaultConfig.BuilderConfig.GasLimit)
 	}
 
-	if fileConfig.ProposerConfig != nil {
+	if psExists {
+		// if settings exist update the default
+		if err := db.UpdateProposerSettingsDefault(cliCtx.Context, vpSettings.DefaultConfig); err != nil {
+			return nil, err
+		}
+	}
+
+	if fileConfig.ProposerConfig != nil && len(fileConfig.ProposerConfig) != 0 {
 		vpSettings.ProposeConfig = make(map[[fieldparams.BLSPubkeyLength]byte]*validatorServiceConfig.ProposerOption)
 		for key, option := range fileConfig.ProposerConfig {
 			decodedKey, err := hexutil.Decode(key)
@@ -572,40 +585,103 @@ func proposerSettings(cliCtx *cli.Context) (*validatorServiceConfig.ProposerSett
 			if len(decodedKey) != fieldparams.BLSPubkeyLength {
 				return nil, fmt.Errorf("%v  is not a bls public key", key)
 			}
-			if option == nil {
-				return nil, fmt.Errorf("fee recipient is required for proposer %s", key)
-			}
-			if !common.IsHexAddress(option.FeeRecipient) {
-				return nil, errors.New("fee recipient is not a valid eth1 address")
-			}
-			if err := warnNonChecksummedAddress(option.FeeRecipient); err != nil {
+			if err := verifyOption(key, option); err != nil {
 				return nil, err
 			}
-			if option.BuilderConfig != nil {
-				option.BuilderConfig.GasLimit = reviewGasLimit(option.BuilderConfig.GasLimit)
-			} else {
-				builderConfig, err := BuilderSettingsFromFlags(cliCtx)
-				if err != nil {
-					return nil, err
+			currentBuilderConfig := validatorServiceConfig.ToBuilderConfig(option.Builder)
+			if builderConfigFromFlag != nil {
+				config := builderConfigFromFlag.Clone()
+				if config.GasLimit == validator.Uint64(params.BeaconConfig().DefaultBuilderGasLimit) && currentBuilderConfig != nil {
+					config.GasLimit = currentBuilderConfig.GasLimit
 				}
-				option.BuilderConfig = builderConfig
+				currentBuilderConfig = config
+			} else if currentBuilderConfig != nil {
+				currentBuilderConfig.GasLimit = reviewGasLimit(currentBuilderConfig.GasLimit)
 			}
-			vpSettings.ProposeConfig[bytesutil.ToBytes48(decodedKey)] = &validatorServiceConfig.ProposerOption{
+			o := &validatorServiceConfig.ProposerOption{
 				FeeRecipientConfig: &validatorServiceConfig.FeeRecipientConfig{
 					FeeRecipient: common.HexToAddress(option.FeeRecipient),
 				},
-				BuilderConfig: option.BuilderConfig,
+				BuilderConfig: currentBuilderConfig,
 			}
-
+			pubkeyB := bytesutil.ToBytes48(decodedKey)
+			vpSettings.ProposeConfig[pubkeyB] = o
+		}
+		if psExists {
+			// override the existing saved settings if providing values via fileConfig.ProposerConfig
+			if err := db.SaveProposerSettings(cliCtx.Context, vpSettings); err != nil {
+				return nil, err
+			}
 		}
 	}
-
+	if !psExists {
+		// if no proposer settings ever existed in the db just save the settings
+		if err := db.SaveProposerSettings(cliCtx.Context, vpSettings); err != nil {
+			return nil, err
+		}
+	}
 	return vpSettings, nil
+}
+
+func verifyOption(key string, option *validatorpb.ProposerOptionPayload) error {
+	if option == nil {
+		return fmt.Errorf("fee recipient is required for proposer %s", key)
+	}
+	if !common.IsHexAddress(option.FeeRecipient) {
+		return errors.New("fee recipient is not a valid eth1 address")
+	}
+	if err := warnNonChecksummedAddress(option.FeeRecipient); err != nil {
+		return err
+	}
+	return nil
+}
+
+func handleNoProposerSettingsFlagsProvided(cliCtx *cli.Context,
+	db iface.ValidatorDB,
+	builderConfigFromFlag *validatorServiceConfig.BuilderConfig) (*validatorServiceConfig.ProposerSettings, error) {
+	log.Info("no proposer settings files have been provided, attempting to load from db.")
+	// checks db if proposer settings exist if none is provided.
+	settings, err := db.ProposerSettings(cliCtx.Context)
+	if err == nil {
+		// process any overrides to builder settings
+		overrideBuilderSettings(settings, builderConfigFromFlag)
+		// if settings are empty
+		log.Info("successfully loaded proposer settings from db.")
+		return settings, nil
+	} else {
+		log.WithError(err).Warn("no proposer settings will be loaded from the db")
+	}
+
+	if cliCtx.Bool(flags.EnableBuilderFlag.Name) {
+		// if there are no proposer settings provided, create a default where fee recipient is not populated, this will be skipped for validator registration on validators that don't have a fee recipient set.
+		// skip saving to DB if only builder settings are provided until a trigger like keymanager API updates with fee recipient values
+		return &validatorServiceConfig.ProposerSettings{
+			DefaultConfig: &validatorServiceConfig.ProposerOption{
+				BuilderConfig: builderConfigFromFlag,
+			},
+		}, nil
+	}
+	return nil, nil
+}
+
+func overrideBuilderSettings(settings *validatorServiceConfig.ProposerSettings, builderConfigFromFlag *validatorServiceConfig.BuilderConfig) {
+	// override the db settings with the results based on whether the --enable-builder flag is provided.
+	if builderConfigFromFlag == nil {
+		log.Infof("proposer settings loaded from db. validator registration to builder is not enabled, please use the --%s flag if you wish to use a builder.", flags.EnableBuilderFlag.Name)
+	}
+	if settings.ProposeConfig != nil {
+		for key := range settings.ProposeConfig {
+			settings.ProposeConfig[key].BuilderConfig = builderConfigFromFlag
+		}
+	}
+	if settings.DefaultConfig != nil {
+		settings.DefaultConfig.BuilderConfig = builderConfigFromFlag
+	}
 }
 
 func BuilderSettingsFromFlags(cliCtx *cli.Context) (*validatorServiceConfig.BuilderConfig, error) {
 	if cliCtx.Bool(flags.EnableBuilderFlag.Name) {
-		gasLimit := validatorServiceConfig.Uint64(params.BeaconConfig().DefaultBuilderGasLimit)
+		gasLimit := validator.Uint64(params.BeaconConfig().DefaultBuilderGasLimit)
 		sgl := cliCtx.String(flags.BuilderGasLimitFlag.Name)
 
 		if sgl != "" {
@@ -613,7 +689,7 @@ func BuilderSettingsFromFlags(cliCtx *cli.Context) (*validatorServiceConfig.Buil
 			if err != nil {
 				return nil, errors.New("Gas Limit is not a uint64")
 			}
-			gasLimit = reviewGasLimit(validatorServiceConfig.Uint64(gl))
+			gasLimit = reviewGasLimit(validator.Uint64(gl))
 		}
 		return &validatorServiceConfig.BuilderConfig{
 			Enabled:  true,
@@ -637,10 +713,10 @@ func warnNonChecksummedAddress(feeRecipient string) error {
 	return nil
 }
 
-func reviewGasLimit(gasLimit validatorServiceConfig.Uint64) validatorServiceConfig.Uint64 {
+func reviewGasLimit(gasLimit validator.Uint64) validator.Uint64 {
 	// sets gas limit to default if not defined or set to 0
 	if gasLimit == 0 {
-		return validatorServiceConfig.Uint64(params.BeaconConfig().DefaultBuilderGasLimit)
+		return validator.Uint64(params.BeaconConfig().DefaultBuilderGasLimit)
 	}
 	// TODO(10810): add in warning for ranges
 	return gasLimit

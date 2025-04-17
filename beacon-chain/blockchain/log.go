@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prysmaticlabs/prysm/v4/beacon-chain/core/blocks"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
-	consensusBlocks "github.com/prysmaticlabs/prysm/v4/consensus-types/blocks"
+	consensus_types "github.com/prysmaticlabs/prysm/v4/consensus-types"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/interfaces"
 	"github.com/prysmaticlabs/prysm/v4/encoding/bytesutil"
 	ethpb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
@@ -53,14 +53,21 @@ func logStateTransitionData(b interfaces.ReadOnlyBeaconBlock) error {
 		log = log.WithField("payloadHash", fmt.Sprintf("%#x", bytesutil.Trunc(p.BlockHash())))
 		txs, err := p.Transactions()
 		switch {
-		case errors.Is(err, consensusBlocks.ErrUnsupportedGetter):
+		case errors.Is(err, consensus_types.ErrUnsupportedField):
 		case err != nil:
 			return err
 		default:
 			log = log.WithField("txCount", len(txs))
 			txsPerSlotCount.Set(float64(len(txs)))
 		}
-
+	}
+	if b.Version() >= version.Deneb {
+		kzgs, err := b.Body().BlobKzgCommitments()
+		if err != nil {
+			log.WithError(err).Error("Failed to get blob KZG commitments")
+		} else if len(kzgs) > 0 {
+			log = log.WithField("kzgCommitmentCount", len(kzgs))
+		}
 	}
 	log.Info("Finished applying state transition")
 	return nil
@@ -74,7 +81,7 @@ func logBlockSyncStatus(block interfaces.ReadOnlyBeaconBlock, blockRoot [32]byte
 	level := log.Logger.GetLevel()
 	if level >= logrus.DebugLevel {
 		parentRoot := block.ParentRoot()
-		log.WithFields(logrus.Fields{
+		lf := logrus.Fields{
 			"slot":                      block.Slot(),
 			"slotInEpoch":               block.Slot() % params.BeaconConfig().SlotsPerEpoch,
 			"block":                     fmt.Sprintf("0x%s...", hex.EncodeToString(blockRoot[:])[:8]),
@@ -88,7 +95,8 @@ func logBlockSyncStatus(block interfaces.ReadOnlyBeaconBlock, blockRoot [32]byte
 			"sinceSlotStartTime":        prysmTime.Now().Sub(startTime),
 			"chainServiceProcessedTime": prysmTime.Now().Sub(receivedTime),
 			"deposits":                  len(block.Body().Deposits()),
-		}).Debug("Synced new block")
+		}
+		log.WithFields(lf).Debug("Synced new block")
 	} else {
 		log.WithFields(logrus.Fields{
 			"slot":           block.Slot(),
@@ -121,7 +129,7 @@ func logPayload(block interfaces.ReadOnlyBeaconBlock) error {
 	fields := logrus.Fields{
 		"blockHash":   fmt.Sprintf("%#x", bytesutil.Trunc(payload.BlockHash())),
 		"parentHash":  fmt.Sprintf("%#x", bytesutil.Trunc(payload.ParentHash())),
-		"blockNumber": payload.BlockNumber,
+		"blockNumber": payload.BlockNumber(),
 		"gasUtilized": fmt.Sprintf("%.2f", gasUtilized),
 	}
 	if block.Version() >= version.Capella {
@@ -138,4 +146,16 @@ func logPayload(block interfaces.ReadOnlyBeaconBlock) error {
 	}
 	log.WithFields(fields).Debug("Synced new payload")
 	return nil
+}
+
+func logBlobSidecar(scs []*ethpb.BlobSidecar, startTime time.Time) {
+	if len(scs) == 0 {
+		return
+	}
+	log.WithFields(logrus.Fields{
+		"count":          len(scs),
+		"slot":           scs[0].Slot,
+		"block":          hex.EncodeToString(scs[0].BlockRoot),
+		"validationTime": time.Since(startTime),
+	}).Debug("Synced new blob sidecars")
 }

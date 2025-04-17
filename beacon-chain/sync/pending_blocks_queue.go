@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -37,7 +38,7 @@ func (s *Service) processPendingBlocksQueue() {
 	locker := new(sync.Mutex)
 	async.RunEvery(s.ctx, processPendingBlocksPeriod, func() {
 		// Don't process the pending blocks if genesis time has not been set. The chain is not ready.
-		if !s.isGenesisTimeSet() {
+		if !s.chainIsStarted() {
 			return
 		}
 		locker.Lock()
@@ -69,7 +70,7 @@ func (s *Service) processPendingBlocks(ctx context.Context) error {
 	for _, slot := range ss {
 		// process the blocks during their respective slot.
 		// otherwise wait for the right slot to process the block.
-		if slot > s.cfg.chain.CurrentSlot() {
+		if slot > s.cfg.clock.CurrentSlot() {
 			continue
 		}
 
@@ -99,6 +100,12 @@ func (s *Service) processPendingBlocks(ctx context.Context) error {
 				span.End()
 				return err
 			}
+			// No need to process the same block if we are already processing it
+			if s.cfg.chain.BlockBeingSynced(blkRoot) {
+				rootString := fmt.Sprintf("%#x", blkRoot)
+				log.WithField("BlockRoot", rootString).Info("Skipping pending block already being processed")
+				continue
+			}
 
 			inDB := s.cfg.beaconDB.HasBlock(ctx, blkRoot)
 			// No need to process the same block twice.
@@ -125,12 +132,12 @@ func (s *Service) processPendingBlocks(ctx context.Context) error {
 				continue
 			}
 
-			parentInDb := s.cfg.beaconDB.HasBlock(ctx, b.Block().ParentRoot())
+			parentRoot := b.Block().ParentRoot()
+			parentInDb := s.cfg.beaconDB.HasBlock(ctx, parentRoot)
 			hasPeer := len(pids) != 0
 
 			// Only request for missing parent block if it's not in beaconDB, not in pending cache
 			// and has peer in the peer list.
-			parentRoot := b.Block().ParentRoot()
 			if !inPendingQueue && !parentInDb && hasPeer {
 				log.WithFields(logrus.Fields{
 					"currentSlot": b.Block().Slot(),
@@ -152,7 +159,6 @@ func (s *Service) processPendingBlocks(ctx context.Context) error {
 			case errors.Is(ErrOptimisticParent, err): // Ok to continue process block with parent that is an optimistic candidate.
 			case err != nil:
 				log.WithError(err).WithField("slot", b.Block().Slot()).Debug("Could not validate block")
-				s.setBadBlock(ctx, blkRoot)
 				tracing.AnnotateError(span, err)
 				span.End()
 				continue
@@ -240,6 +246,12 @@ func (s *Service) sendBatchRootRequest(ctx context.Context, roots [][32]byte, ra
 	ctx, span := trace.StartSpan(ctx, "sendBatchRootRequest")
 	defer span.End()
 
+	roots = dedupRoots(roots)
+	for i := len(roots) - 1; i >= 0; i-- {
+		if s.cfg.chain.BlockBeingSynced(roots[i]) {
+			roots = append(roots[:i], roots[i+1:]...)
+		}
+	}
 	if len(roots) == 0 {
 		return nil
 	}
@@ -248,7 +260,6 @@ func (s *Service) sendBatchRootRequest(ctx context.Context, roots [][32]byte, ra
 	if len(bestPeers) == 0 {
 		return nil
 	}
-	roots = s.dedupRoots(roots)
 	// Randomly choose a peer to query from our best peers. If that peer cannot return
 	// all the requested blocks, we randomly select another peer.
 	pid := bestPeers[randGen.Int()%len(bestPeers)]
@@ -445,12 +456,6 @@ func (s *Service) addPendingBlockToCache(b interfaces.ReadOnlySignedBeaconBlock)
 	return nil
 }
 
-// Returns true if the genesis time has been set in chain service.
-// Without the genesis time, the chain does not start.
-func (s *Service) isGenesisTimeSet() bool {
-	return s.cfg.chain.GenesisTime().Unix() != 0
-}
-
 // This converts input string to slot.
 func cacheKeyToSlot(s string) primitives.Slot {
 	b := []byte(s)
@@ -461,4 +466,17 @@ func cacheKeyToSlot(s string) primitives.Slot {
 func slotToCacheKey(s primitives.Slot) string {
 	b := bytesutil.SlotToBytesBigEndian(s)
 	return string(b)
+}
+
+func dedupRoots(roots [][32]byte) [][32]byte {
+	newRoots := make([][32]byte, 0, len(roots))
+	rootMap := make(map[[32]byte]bool, len(roots))
+	for i, r := range roots {
+		if rootMap[r] {
+			continue
+		}
+		rootMap[r] = true
+		newRoots = append(newRoots, roots[i])
+	}
+	return newRoots
 }

@@ -146,10 +146,10 @@ func TestScorers_Service_Score(t *testing.T) {
 		penalty := (-10 / float64(s.BadResponsesScorer().Params().Threshold)) * 0.3
 
 		// Update peers' stats and test the effect on peer order.
-		s.BadResponsesScorer().Increment("peer2")
+		s.BadResponsesScorer().Increment("peer2", "reason")
 		assert.DeepEqual(t, pack(s, startScore, startScore+penalty, startScore), peerScores(s, pids))
-		s.BadResponsesScorer().Increment("peer1")
-		s.BadResponsesScorer().Increment("peer1")
+		s.BadResponsesScorer().Increment("peer1", "reason")
+		s.BadResponsesScorer().Increment("peer1", "reason")
 		assert.DeepEqual(t, pack(s, startScore+2*penalty, startScore+penalty, startScore), peerScores(s, pids))
 
 		// See how decaying affects order of peers.
@@ -203,11 +203,11 @@ func TestScorers_Service_Score(t *testing.T) {
 		s1.IncrementProcessedBlocks("peer1", batchSize*5)
 		assert.Equal(t, float64(0), s.Score("peer1"))
 		// Now, adjust score by introducing penalty for bad responses.
-		s2.Increment("peer1")
-		s2.Increment("peer1")
+		s2.Increment("peer1", "reason")
+		s2.Increment("peer1", "reason")
 		assert.Equal(t, roundScore(2*penalty), s.Score("peer1"), "Unexpected overall score")
 		// If peer continues to misbehave, score becomes negative.
-		s2.Increment("peer1")
+		s2.Increment("peer1", "reason")
 		assert.Equal(t, roundScore(3*penalty), s.Score("peer1"), "Unexpected overall score")
 	})
 }
@@ -235,7 +235,7 @@ func TestScorers_Service_loop(t *testing.T) {
 	pid1 := peer.ID("peer1")
 	peerStatuses.Add(nil, pid1, nil, network.DirUnknown)
 	for i := 0; i < s1.Params().Threshold+5; i++ {
-		s1.Increment(pid1)
+		s1.Increment(pid1, "reason")
 	}
 	assert.Equal(t, true, s1.IsBadPeer(pid1), "Peer should be marked as bad")
 
@@ -279,8 +279,8 @@ func TestScorers_Service_IsBadPeer(t *testing.T) {
 	})
 
 	assert.Equal(t, false, peerStatuses.Scorers().IsBadPeer("peer1"))
-	peerStatuses.Scorers().BadResponsesScorer().Increment("peer1")
-	peerStatuses.Scorers().BadResponsesScorer().Increment("peer1")
+	peerStatuses.Scorers().BadResponsesScorer().Increment("peer1", "reason")
+	peerStatuses.Scorers().BadResponsesScorer().Increment("peer1", "reason")
 	assert.Equal(t, true, peerStatuses.Scorers().IsBadPeer("peer1"))
 }
 
@@ -300,8 +300,8 @@ func TestScorers_Service_BadPeers(t *testing.T) {
 	assert.Equal(t, false, peerStatuses.Scorers().IsBadPeer("peer3"))
 	assert.Equal(t, 0, len(peerStatuses.Scorers().BadPeers()))
 	for _, pid := range []peer.ID{"peer1", "peer3"} {
-		peerStatuses.Scorers().BadResponsesScorer().Increment(pid)
-		peerStatuses.Scorers().BadResponsesScorer().Increment(pid)
+		peerStatuses.Scorers().BadResponsesScorer().Increment(pid, "reason")
+		peerStatuses.Scorers().BadResponsesScorer().Increment(pid, "reason")
 	}
 	assert.Equal(t, true, peerStatuses.Scorers().IsBadPeer("peer1"))
 	assert.Equal(t, false, peerStatuses.Scorers().IsBadPeer("peer2"))

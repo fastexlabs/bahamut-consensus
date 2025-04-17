@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"runtime/debug"
 
@@ -33,7 +34,7 @@ type rpcHandler func(context.Context, interface{}, libp2pcore.Stream) error
 
 // registerRPCHandlers for p2p RPC.
 func (s *Service) registerRPCHandlers() {
-	currEpoch := slots.ToEpoch(s.cfg.chain.CurrentSlot())
+	currEpoch := slots.ToEpoch(s.cfg.clock.CurrentSlot())
 	// Register V2 handlers if we are past altair fork epoch.
 	if currEpoch >= params.BeaconConfig().AltairForkEpoch {
 		s.registerRPC(
@@ -49,6 +50,9 @@ func (s *Service) registerRPCHandlers() {
 			s.pingHandler,
 		)
 		s.registerRPCHandlersAltair()
+		if currEpoch >= params.BeaconConfig().DenebForkEpoch {
+			s.registerRPCHandlersDeneb()
+		}
 		return
 	}
 	s.registerRPC(
@@ -93,6 +97,17 @@ func (s *Service) registerRPCHandlersAltair() {
 	)
 }
 
+func (s *Service) registerRPCHandlersDeneb() {
+	s.registerRPC(
+		p2p.RPCBlobSidecarsByRangeTopicV1,
+		s.blobSidecarsByRangeRPCHandler,
+	)
+	s.registerRPC(
+		p2p.RPCBlobSidecarsByRootTopicV1,
+		s.blobSidecarByRootRPCHandler,
+	)
+}
+
 // Remove all v1 Stream handlers that are no longer supported
 // from altair onwards.
 func (s *Service) unregisterPhase0Handlers() {
@@ -112,10 +127,13 @@ func (s *Service) registerRPC(baseTopic string, handle rpcHandler) {
 	s.cfg.p2p.SetStreamHandler(topic, func(stream network.Stream) {
 		defer func() {
 			if r := recover(); r != nil {
-				log.WithField("error", r).Error("Panic occurred")
-				log.Errorf("%s", debug.Stack())
+				log.WithField("error", r).
+					WithField("recovered_at", "registerRPC").
+					WithField("stack", string(debug.Stack())).
+					Error("Panic occurred")
 			}
 		}()
+
 		ctx, cancel := context.WithTimeout(s.ctx, ttfbTimeout)
 		defer cancel()
 
@@ -191,7 +209,7 @@ func (s *Service) registerRPC(baseTopic string, handle rpcHandler) {
 			if err := s.cfg.p2p.Encoding().DecodeWithMaxLength(stream, msg); err != nil {
 				log.WithError(err).WithField("topic", topic).Debug("Could not decode stream message")
 				tracing.AnnotateError(span, err)
-				s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(stream.Conn().RemotePeer())
+				s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(stream.Conn().RemotePeer(), fmt.Sprintf("registerRPC() Could not decode stream message :%v", err))
 				return
 			}
 			if err := handle(ctx, msg, stream); err != nil {
@@ -211,7 +229,7 @@ func (s *Service) registerRPC(baseTopic string, handle rpcHandler) {
 			if err := s.cfg.p2p.Encoding().DecodeWithMaxLength(stream, msg); err != nil {
 				log.WithError(err).WithField("topic", topic).Debug("Could not decode stream message")
 				tracing.AnnotateError(span, err)
-				s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(stream.Conn().RemotePeer())
+				s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(stream.Conn().RemotePeer(), fmt.Sprintf("registerRPC() Could not decode stream message :%v", err))
 				return
 			}
 			if err := handle(ctx, nTyp.Elem().Interface(), stream); err != nil {

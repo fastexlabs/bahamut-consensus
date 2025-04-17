@@ -1,8 +1,6 @@
 package interfaces
 
 import (
-	"math/big"
-
 	ssz "github.com/prysmaticlabs/fastssz"
 	field_params "github.com/prysmaticlabs/prysm/v4/config/fieldparams"
 	"github.com/prysmaticlabs/prysm/v4/consensus-types/primitives"
@@ -27,11 +25,14 @@ type ReadOnlySignedBeaconBlock interface {
 	PbBellatrixBlock() (*ethpb.SignedBeaconBlockBellatrix, error)
 	PbBlindedBellatrixBlock() (*ethpb.SignedBlindedBeaconBlockBellatrix, error)
 	PbCapellaBlock() (*ethpb.SignedBeaconBlockCapella, error)
+	PbDenebBlock() (*ethpb.SignedBeaconBlockDeneb, error)
 	PbBlindedCapellaBlock() (*ethpb.SignedBlindedBeaconBlockCapella, error)
+	PbBlindedDenebBlock() (*ethpb.SignedBlindedBeaconBlockDeneb, error)
 	ssz.Marshaler
 	ssz.Unmarshaler
 	Version() int
 	IsBlinded() bool
+	ValueInGwei() uint64
 	Header() (*ethpb.SignedBeaconBlockHeader, error)
 }
 
@@ -75,12 +76,14 @@ type ReadOnlyBeaconBlockBody interface {
 	Proto() (proto.Message, error)
 	Execution() (ExecutionData, error)
 	BLSToExecutionChanges() ([]*ethpb.SignedBLSToExecutionChange, error)
+	BlobKzgCommitments() ([][]byte, error)
 }
 
 type SignedBeaconBlock interface {
 	ReadOnlySignedBeaconBlock
 	SetExecution(ExecutionData) error
 	SetBLSToExecutionChanges([]*ethpb.SignedBLSToExecutionChange) error
+	SetBlobKzgCommitments(c [][]byte) error
 	SetSyncAggregate(*ethpb.SyncAggregate) error
 	SetBaseFee(uint64)
 	SetTransactionsCount(uint64)
@@ -114,6 +117,8 @@ type ExecutionData interface {
 	FeeRecipient() []byte
 	StateRoot() []byte
 	ReceiptsRoot() []byte
+	ActivitiesRoot() ([]byte, error)
+	TransactionsCount() (uint64, error)
 	LogsBloom() []byte
 	PrevRandao() []byte
 	BlockNumber() uint64
@@ -122,6 +127,8 @@ type ExecutionData interface {
 	Timestamp() uint64
 	ExtraData() []byte
 	BaseFeePerGas() []byte
+	BlobGasUsed() (uint64, error)
+	ExcessBlobGas() (uint64, error)
 	BlockHash() []byte
 	Transactions() ([][]byte, error)
 	TransactionsRoot() ([]byte, error)
@@ -129,5 +136,5 @@ type ExecutionData interface {
 	WithdrawalsRoot() ([]byte, error)
 	PbCapella() (*enginev1.ExecutionPayloadCapella, error)
 	PbBellatrix() (*enginev1.ExecutionPayload, error)
-	Value() (*big.Int, error)
+	ValueInGwei() (uint64, error)
 }

@@ -19,87 +19,6 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/time/slots"
 )
 
-func TestWrapAttestationArray(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SubmitAttestationRequestJson{},
-		}
-		unwrappedAtts := []*AttestationJson{{AggregationBits: "1010"}}
-		unwrappedAttsJson, err := json.Marshal(unwrappedAtts)
-		require.NoError(t, err)
-
-		var body bytes.Buffer
-		_, err = body.Write(unwrappedAttsJson)
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapAttestationsArray(endpoint, nil, request)
-		require.Equal(t, true, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		wrappedAtts := &SubmitAttestationRequestJson{}
-		require.NoError(t, json.NewDecoder(request.Body).Decode(wrappedAtts))
-		require.Equal(t, 1, len(wrappedAtts.Data), "wrong number of wrapped items")
-		assert.Equal(t, "1010", wrappedAtts.Data[0].AggregationBits)
-	})
-
-	t.Run("invalid_body", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SubmitAttestationRequestJson{},
-		}
-		var body bytes.Buffer
-		_, err := body.Write([]byte("invalid"))
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapAttestationsArray(endpoint, nil, request)
-		require.Equal(t, false, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(false), runDefault)
-		assert.Equal(t, true, strings.Contains(errJson.Msg(), "could not decode body"))
-		assert.Equal(t, http.StatusInternalServerError, errJson.StatusCode())
-	})
-}
-
-func TestWrapValidatorIndicesArray(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &ValidatorIndicesJson{},
-		}
-		unwrappedIndices := []string{"1", "2"}
-		unwrappedIndicesJson, err := json.Marshal(unwrappedIndices)
-		require.NoError(t, err)
-
-		var body bytes.Buffer
-		_, err = body.Write(unwrappedIndicesJson)
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapValidatorIndicesArray(endpoint, nil, request)
-		require.Equal(t, true, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		wrappedIndices := &ValidatorIndicesJson{}
-		require.NoError(t, json.NewDecoder(request.Body).Decode(wrappedIndices))
-		require.Equal(t, 2, len(wrappedIndices.Index), "wrong number of wrapped items")
-		assert.Equal(t, "1", wrappedIndices.Index[0])
-		assert.Equal(t, "2", wrappedIndices.Index[1])
-	})
-
-	t.Run("invalid_body", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &ValidatorIndicesJson{},
-		}
-		var body bytes.Buffer
-		_, err := body.Write([]byte("invalid"))
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapValidatorIndicesArray(endpoint, nil, request)
-		require.Equal(t, false, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(false), runDefault)
-		assert.Equal(t, true, strings.Contains(errJson.Msg(), "could not decode body"))
-		assert.Equal(t, http.StatusInternalServerError, errJson.StatusCode())
-	})
-}
-
 func TestWrapBLSChangesArray(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		endpoint := &apimiddleware.Endpoint{
@@ -140,279 +59,19 @@ func TestWrapBLSChangesArray(t *testing.T) {
 	})
 }
 
-func TestWrapSignedAggregateAndProofArray(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SubmitAggregateAndProofsRequestJson{},
-		}
-		unwrappedAggs := []*SignedAggregateAttestationAndProofJson{{Signature: "sig"}}
-		unwrappedAggsJson, err := json.Marshal(unwrappedAggs)
-		require.NoError(t, err)
-
-		var body bytes.Buffer
-		_, err = body.Write(unwrappedAggsJson)
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapSignedAggregateAndProofArray(endpoint, nil, request)
-		require.Equal(t, true, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		wrappedAggs := &SubmitAggregateAndProofsRequestJson{}
-		require.NoError(t, json.NewDecoder(request.Body).Decode(wrappedAggs))
-		require.Equal(t, 1, len(wrappedAggs.Data), "wrong number of wrapped items")
-		assert.Equal(t, "sig", wrappedAggs.Data[0].Signature)
-	})
-
-	t.Run("invalid_body", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SubmitAggregateAndProofsRequestJson{},
-		}
-		var body bytes.Buffer
-		_, err := body.Write([]byte("invalid"))
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapSignedAggregateAndProofArray(endpoint, nil, request)
-		require.Equal(t, false, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(false), runDefault)
-		assert.Equal(t, true, strings.Contains(errJson.Msg(), "could not decode body"))
-		assert.Equal(t, http.StatusInternalServerError, errJson.StatusCode())
-	})
-}
-
-func TestWrapBeaconCommitteeSubscriptionsArray(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SubmitBeaconCommitteeSubscriptionsRequestJson{},
-		}
-		unwrappedSubs := []*BeaconCommitteeSubscribeJson{{
-			ValidatorIndex:   "1",
-			CommitteeIndex:   "1",
-			CommitteesAtSlot: "1",
-			Slot:             "1",
-			IsAggregator:     true,
-		}}
-		unwrappedSubsJson, err := json.Marshal(unwrappedSubs)
-		require.NoError(t, err)
-
-		var body bytes.Buffer
-		_, err = body.Write(unwrappedSubsJson)
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapBeaconCommitteeSubscriptionsArray(endpoint, nil, request)
-		require.Equal(t, true, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		wrappedSubs := &SubmitBeaconCommitteeSubscriptionsRequestJson{}
-		require.NoError(t, json.NewDecoder(request.Body).Decode(wrappedSubs))
-		require.Equal(t, 1, len(wrappedSubs.Data), "wrong number of wrapped items")
-		assert.Equal(t, "1", wrappedSubs.Data[0].ValidatorIndex)
-		assert.Equal(t, "1", wrappedSubs.Data[0].CommitteeIndex)
-		assert.Equal(t, "1", wrappedSubs.Data[0].CommitteesAtSlot)
-		assert.Equal(t, "1", wrappedSubs.Data[0].Slot)
-		assert.Equal(t, true, wrappedSubs.Data[0].IsAggregator)
-	})
-
-	t.Run("invalid_body", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SubmitBeaconCommitteeSubscriptionsRequestJson{},
-		}
-		var body bytes.Buffer
-		_, err := body.Write([]byte("invalid"))
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapBeaconCommitteeSubscriptionsArray(endpoint, nil, request)
-		require.Equal(t, false, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(false), runDefault)
-		assert.Equal(t, true, strings.Contains(errJson.Msg(), "could not decode body"))
-		assert.Equal(t, http.StatusInternalServerError, errJson.StatusCode())
-	})
-}
-
-func TestWrapSyncCommitteeSubscriptionsArray(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SubmitSyncCommitteeSubscriptionRequestJson{},
-		}
-		unwrappedSubs := []*SyncCommitteeSubscriptionJson{
-			{
-				ValidatorIndex:       "1",
-				SyncCommitteeIndices: []string{"1", "2"},
-				UntilEpoch:           "1",
-			},
-			{
-				ValidatorIndex:       "2",
-				SyncCommitteeIndices: []string{"3", "4"},
-				UntilEpoch:           "2",
-			},
-		}
-		unwrappedSubsJson, err := json.Marshal(unwrappedSubs)
-		require.NoError(t, err)
-
-		var body bytes.Buffer
-		_, err = body.Write(unwrappedSubsJson)
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapSyncCommitteeSubscriptionsArray(endpoint, nil, request)
-		require.Equal(t, true, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		wrappedSubs := &SubmitSyncCommitteeSubscriptionRequestJson{}
-		require.NoError(t, json.NewDecoder(request.Body).Decode(wrappedSubs))
-		require.Equal(t, 2, len(wrappedSubs.Data), "wrong number of wrapped items")
-		assert.Equal(t, "1", wrappedSubs.Data[0].ValidatorIndex)
-		require.Equal(t, 2, len(wrappedSubs.Data[0].SyncCommitteeIndices), "wrong number of committee indices")
-		assert.Equal(t, "1", wrappedSubs.Data[0].SyncCommitteeIndices[0])
-		assert.Equal(t, "2", wrappedSubs.Data[0].SyncCommitteeIndices[1])
-		assert.Equal(t, "1", wrappedSubs.Data[0].UntilEpoch)
-	})
-
-	t.Run("invalid_body", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SubmitSyncCommitteeSubscriptionRequestJson{},
-		}
-		var body bytes.Buffer
-		_, err := body.Write([]byte("invalid"))
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapSyncCommitteeSubscriptionsArray(endpoint, nil, request)
-		require.Equal(t, false, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(false), runDefault)
-		assert.Equal(t, true, strings.Contains(errJson.Msg(), "could not decode body"))
-		assert.Equal(t, http.StatusInternalServerError, errJson.StatusCode())
-	})
-}
-
-func TestWrapSyncCommitteeSignaturesArray(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SubmitSyncCommitteeSignaturesRequestJson{},
-		}
-		unwrappedSigs := []*SyncCommitteeMessageJson{{
-			Slot:            "1",
-			BeaconBlockRoot: "root",
-			ValidatorIndex:  "1",
-			Signature:       "sig",
-		}}
-		unwrappedSigsJson, err := json.Marshal(unwrappedSigs)
-		require.NoError(t, err)
-
-		var body bytes.Buffer
-		_, err = body.Write(unwrappedSigsJson)
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapSyncCommitteeSignaturesArray(endpoint, nil, request)
-		require.Equal(t, true, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		wrappedSigs := &SubmitSyncCommitteeSignaturesRequestJson{}
-		require.NoError(t, json.NewDecoder(request.Body).Decode(wrappedSigs))
-		require.Equal(t, 1, len(wrappedSigs.Data), "wrong number of wrapped items")
-		assert.Equal(t, "1", wrappedSigs.Data[0].Slot)
-		assert.Equal(t, "root", wrappedSigs.Data[0].BeaconBlockRoot)
-		assert.Equal(t, "1", wrappedSigs.Data[0].ValidatorIndex)
-		assert.Equal(t, "sig", wrappedSigs.Data[0].Signature)
-	})
-
-	t.Run("invalid_body", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SubmitSyncCommitteeSignaturesRequestJson{},
-		}
-		var body bytes.Buffer
-		_, err := body.Write([]byte("invalid"))
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapSyncCommitteeSignaturesArray(endpoint, nil, request)
-		require.Equal(t, false, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(false), runDefault)
-		assert.Equal(t, true, strings.Contains(errJson.Msg(), "could not decode body"))
-		assert.Equal(t, http.StatusInternalServerError, errJson.StatusCode())
-	})
-}
-
-func TestWrapSignedContributionAndProofsArray(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SubmitContributionAndProofsRequestJson{},
-		}
-		unwrapped := []*SignedContributionAndProofJson{
-			{
-				Message: &ContributionAndProofJson{
-					AggregatorIndex: "1",
-					Contribution: &SyncCommitteeContributionJson{
-						Slot:              "1",
-						BeaconBlockRoot:   "root",
-						SubcommitteeIndex: "1",
-						AggregationBits:   "bits",
-						Signature:         "sig",
-					},
-					SelectionProof: "proof",
-				},
-				Signature: "sig",
-			},
-			{
-				Message:   &ContributionAndProofJson{},
-				Signature: "sig",
-			},
-		}
-		unwrappedJson, err := json.Marshal(unwrapped)
-		require.NoError(t, err)
-
-		var body bytes.Buffer
-		_, err = body.Write(unwrappedJson)
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapSignedContributionAndProofsArray(endpoint, nil, request)
-		require.Equal(t, true, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		wrapped := &SubmitContributionAndProofsRequestJson{}
-		require.NoError(t, json.NewDecoder(request.Body).Decode(wrapped))
-		require.Equal(t, 2, len(wrapped.Data), "wrong number of wrapped items")
-		assert.Equal(t, "sig", wrapped.Data[0].Signature)
-		require.NotNil(t, wrapped.Data[0].Message)
-		msg := wrapped.Data[0].Message
-		assert.Equal(t, "1", msg.AggregatorIndex)
-		assert.Equal(t, "proof", msg.SelectionProof)
-		require.NotNil(t, msg.Contribution)
-		assert.Equal(t, "1", msg.Contribution.Slot)
-		assert.Equal(t, "root", msg.Contribution.BeaconBlockRoot)
-		assert.Equal(t, "1", msg.Contribution.SubcommitteeIndex)
-		assert.Equal(t, "bits", msg.Contribution.AggregationBits)
-		assert.Equal(t, "sig", msg.Contribution.Signature)
-	})
-
-	t.Run("invalid_body", func(t *testing.T) {
-		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SubmitContributionAndProofsRequestJson{},
-		}
-		var body bytes.Buffer
-		_, err := body.Write([]byte("invalid"))
-		require.NoError(t, err)
-		request := httptest.NewRequest("POST", "http://foo.example", &body)
-
-		runDefault, errJson := wrapSignedContributionAndProofsArray(endpoint, nil, request)
-		require.Equal(t, false, errJson == nil)
-		assert.Equal(t, apimiddleware.RunDefault(false), runDefault)
-		assert.Equal(t, true, strings.Contains(errJson.Msg(), "could not decode body"))
-		assert.Equal(t, http.StatusInternalServerError, errJson.StatusCode())
-	})
-}
-
 func TestSetInitialPublishBlockPostRequest(t *testing.T) {
 	params.SetupTestConfigCleanup(t)
 	cfg := params.BeaconConfig().Copy()
 	cfg.BellatrixForkEpoch = params.BeaconConfig().AltairForkEpoch + 1
+	cfg.CapellaForkEpoch = params.BeaconConfig().BellatrixForkEpoch + 1
+	cfg.DenebForkEpoch = params.BeaconConfig().CapellaForkEpoch + 1
 	params.OverrideBeaconConfig(cfg)
 
 	endpoint := &apimiddleware.Endpoint{}
 	s := struct {
 		Message struct {
 			Slot string
-		}
+		} `json:"message"`
 	}{}
 	t.Run("Phase 0", func(t *testing.T) {
 		s.Message = struct{ Slot string }{Slot: "0"}
@@ -425,7 +84,7 @@ func TestSetInitialPublishBlockPostRequest(t *testing.T) {
 		runDefault, errJson := setInitialPublishBlockPostRequest(endpoint, nil, request)
 		require.Equal(t, true, errJson == nil)
 		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockContainerJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
+		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
 	})
 	t.Run("Altair", func(t *testing.T) {
 		slot, err := slots.EpochStart(params.BeaconConfig().AltairForkEpoch)
@@ -440,7 +99,7 @@ func TestSetInitialPublishBlockPostRequest(t *testing.T) {
 		runDefault, errJson := setInitialPublishBlockPostRequest(endpoint, nil, request)
 		require.Equal(t, true, errJson == nil)
 		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockAltairContainerJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
+		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockAltairJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
 	})
 	t.Run("Bellatrix", func(t *testing.T) {
 		slot, err := slots.EpochStart(params.BeaconConfig().BellatrixForkEpoch)
@@ -455,12 +114,14 @@ func TestSetInitialPublishBlockPostRequest(t *testing.T) {
 		runDefault, errJson := setInitialPublishBlockPostRequest(endpoint, nil, request)
 		require.Equal(t, true, errJson == nil)
 		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockBellatrixContainerJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
+		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockBellatrixJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
 	})
 	t.Run("Capella", func(t *testing.T) {
 		params.SetupTestConfigCleanup(t)
 		cfg := params.BeaconConfig()
 		cfg.CapellaForkEpoch = cfg.BellatrixForkEpoch.Add(2)
+		cfg.DenebForkEpoch = cfg.CapellaForkEpoch.Add(2)
+		// cfg.DenebForkEpoch = cfg.FarFutureEpoch
 		params.OverrideBeaconConfig(cfg)
 
 		slot, err := slots.EpochStart(params.BeaconConfig().CapellaForkEpoch)
@@ -475,14 +136,49 @@ func TestSetInitialPublishBlockPostRequest(t *testing.T) {
 		runDefault, errJson := setInitialPublishBlockPostRequest(endpoint, nil, request)
 		require.Equal(t, true, errJson == nil)
 		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockCapellaContainerJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
+		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockCapellaJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
+	})
+	t.Run("Deneb", func(t *testing.T) {
+		params.SetupTestConfigCleanup(t)
+		cfg := params.BeaconConfig()
+		cfg.CapellaForkEpoch = cfg.BellatrixForkEpoch.Add(2)
+		cfg.DenebForkEpoch = cfg.CapellaForkEpoch.Add(2)
+		params.OverrideBeaconConfig(cfg)
+		slot, err := slots.EpochStart(params.BeaconConfig().DenebForkEpoch)
+		require.NoError(t, err)
+		denebS := struct {
+			SignedBlock struct {
+				Message struct {
+					Slot string
+				} `json:"message"`
+			} `json:"signed_block"`
+		}{}
+		denebS.SignedBlock = struct {
+			Message struct {
+				Slot string
+			} `json:"message"`
+		}{
+			Message: struct {
+				Slot string
+			}{Slot: strconv.FormatUint(uint64(slot), 10)},
+		}
+		j, err := json.Marshal(denebS)
+		require.NoError(t, err)
+		var body bytes.Buffer
+		_, err = body.Write(j)
+		require.NoError(t, err)
+		request := httptest.NewRequest("POST", "http://foo.example", &body)
+		runDefault, errJson := setInitialPublishBlockPostRequest(endpoint, nil, request)
+		require.Equal(t, true, errJson == nil)
+		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
+		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockContentsDenebJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
 	})
 }
 
 func TestPreparePublishedBlock(t *testing.T) {
 	t.Run("Phase 0", func(t *testing.T) {
 		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SignedBeaconBlockContainerJson{
+			PostRequest: &SignedBeaconBlockJson{
 				Message: &BeaconBlockJson{
 					Body: &BeaconBlockBodyJson{},
 				},
@@ -496,7 +192,7 @@ func TestPreparePublishedBlock(t *testing.T) {
 
 	t.Run("Altair", func(t *testing.T) {
 		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SignedBeaconBlockAltairContainerJson{
+			PostRequest: &SignedBeaconBlockAltairJson{
 				Message: &BeaconBlockAltairJson{
 					Body: &BeaconBlockBodyAltairJson{},
 				},
@@ -510,7 +206,7 @@ func TestPreparePublishedBlock(t *testing.T) {
 
 	t.Run("Bellatrix", func(t *testing.T) {
 		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SignedBeaconBlockBellatrixContainerJson{
+			PostRequest: &SignedBeaconBlockBellatrixJson{
 				Message: &BeaconBlockBellatrixJson{
 					Body: &BeaconBlockBodyBellatrixJson{},
 				},
@@ -532,13 +228,16 @@ func TestSetInitialPublishBlindedBlockPostRequest(t *testing.T) {
 	params.SetupTestConfigCleanup(t)
 	cfg := params.BeaconConfig().Copy()
 	cfg.BellatrixForkEpoch = params.BeaconConfig().AltairForkEpoch + 1
+	cfg.CapellaForkEpoch = params.BeaconConfig().BellatrixForkEpoch + 1
+	cfg.DenebForkEpoch = params.BeaconConfig().CapellaForkEpoch + 1
 	params.OverrideBeaconConfig(cfg)
+	params.BeaconConfig().InitializeForkSchedule()
 
 	endpoint := &apimiddleware.Endpoint{}
 	s := struct {
 		Message struct {
 			Slot string
-		}
+		} `json:"message"`
 	}{}
 	t.Run("Phase 0", func(t *testing.T) {
 		s.Message = struct{ Slot string }{Slot: "0"}
@@ -551,7 +250,7 @@ func TestSetInitialPublishBlindedBlockPostRequest(t *testing.T) {
 		runDefault, errJson := setInitialPublishBlindedBlockPostRequest(endpoint, nil, request)
 		require.Equal(t, true, errJson == nil)
 		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockContainerJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
+		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
 	})
 	t.Run("Altair", func(t *testing.T) {
 		slot, err := slots.EpochStart(params.BeaconConfig().AltairForkEpoch)
@@ -566,7 +265,7 @@ func TestSetInitialPublishBlindedBlockPostRequest(t *testing.T) {
 		runDefault, errJson := setInitialPublishBlindedBlockPostRequest(endpoint, nil, request)
 		require.Equal(t, true, errJson == nil)
 		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockAltairContainerJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
+		assert.Equal(t, reflect.TypeOf(SignedBeaconBlockAltairJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
 	})
 	t.Run("Bellatrix", func(t *testing.T) {
 		slot, err := slots.EpochStart(params.BeaconConfig().BellatrixForkEpoch)
@@ -581,14 +280,62 @@ func TestSetInitialPublishBlindedBlockPostRequest(t *testing.T) {
 		runDefault, errJson := setInitialPublishBlindedBlockPostRequest(endpoint, nil, request)
 		require.Equal(t, true, errJson == nil)
 		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
-		assert.Equal(t, reflect.TypeOf(SignedBlindedBeaconBlockBellatrixContainerJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
+		assert.Equal(t, reflect.TypeOf(SignedBlindedBeaconBlockBellatrixJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
+	})
+	t.Run("Capella", func(t *testing.T) {
+		cfg.DenebForkEpoch = params.BeaconConfig().CapellaForkEpoch + 1
+		params.OverrideBeaconConfig(cfg)
+		params.BeaconConfig().InitializeForkSchedule()
+		slot, err := slots.EpochStart(params.BeaconConfig().CapellaForkEpoch)
+		require.NoError(t, err)
+		s.Message = struct{ Slot string }{Slot: strconv.FormatUint(uint64(slot), 10)}
+		j, err := json.Marshal(s)
+		require.NoError(t, err)
+		var body bytes.Buffer
+		_, err = body.Write(j)
+		require.NoError(t, err)
+		request := httptest.NewRequest("POST", "http://foo.example", &body)
+		runDefault, errJson := setInitialPublishBlindedBlockPostRequest(endpoint, nil, request)
+		require.Equal(t, true, errJson == nil)
+		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
+		assert.Equal(t, reflect.TypeOf(SignedBlindedBeaconBlockCapellaJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
+	})
+	t.Run("Deneb", func(t *testing.T) {
+		slot, err := slots.EpochStart(params.BeaconConfig().DenebForkEpoch)
+		require.NoError(t, err)
+		denebS := struct {
+			SignedBlindedBlock struct {
+				Message struct {
+					Slot string
+				} `json:"message"`
+			} `json:"signed_blinded_block"`
+		}{}
+		denebS.SignedBlindedBlock = struct {
+			Message struct {
+				Slot string
+			} `json:"message"`
+		}{
+			Message: struct {
+				Slot string
+			}{Slot: strconv.FormatUint(uint64(slot), 10)},
+		}
+		j, err := json.Marshal(denebS)
+		require.NoError(t, err)
+		var body bytes.Buffer
+		_, err = body.Write(j)
+		require.NoError(t, err)
+		request := httptest.NewRequest("POST", "http://foo.example", &body)
+		runDefault, errJson := setInitialPublishBlindedBlockPostRequest(endpoint, nil, request)
+		require.Equal(t, true, errJson == nil)
+		assert.Equal(t, apimiddleware.RunDefault(true), runDefault)
+		assert.Equal(t, reflect.TypeOf(SignedBlindedBeaconBlockContentsDenebJson{}).Name(), reflect.Indirect(reflect.ValueOf(endpoint.PostRequest)).Type().Name())
 	})
 }
 
 func TestPreparePublishedBlindedBlock(t *testing.T) {
 	t.Run("Phase 0", func(t *testing.T) {
 		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SignedBeaconBlockContainerJson{
+			PostRequest: &SignedBeaconBlockJson{
 				Message: &BeaconBlockJson{
 					Body: &BeaconBlockBodyJson{},
 				},
@@ -602,7 +349,7 @@ func TestPreparePublishedBlindedBlock(t *testing.T) {
 
 	t.Run("Altair", func(t *testing.T) {
 		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SignedBeaconBlockAltairContainerJson{
+			PostRequest: &SignedBeaconBlockAltairJson{
 				Message: &BeaconBlockAltairJson{
 					Body: &BeaconBlockBodyAltairJson{},
 				},
@@ -616,7 +363,7 @@ func TestPreparePublishedBlindedBlock(t *testing.T) {
 
 	t.Run("Bellatrix", func(t *testing.T) {
 		endpoint := &apimiddleware.Endpoint{
-			PostRequest: &SignedBlindedBeaconBlockBellatrixContainerJson{
+			PostRequest: &SignedBlindedBeaconBlockBellatrixJson{
 				Message: &BlindedBeaconBlockBellatrixJson{
 					Body: &BlindedBeaconBlockBodyBellatrixJson{},
 				},
@@ -627,7 +374,34 @@ func TestPreparePublishedBlindedBlock(t *testing.T) {
 		_, ok := endpoint.PostRequest.(*bellatrixPublishBlindedBlockRequestJson)
 		assert.Equal(t, true, ok)
 	})
+	t.Run("Capella", func(t *testing.T) {
+		endpoint := &apimiddleware.Endpoint{
+			PostRequest: &SignedBlindedBeaconBlockCapellaJson{
+				Message: &BlindedBeaconBlockCapellaJson{
+					Body: &BlindedBeaconBlockBodyCapellaJson{},
+				},
+			},
+		}
+		errJson := preparePublishedBlindedBlock(endpoint, nil, nil)
+		require.Equal(t, true, errJson == nil)
+		_, ok := endpoint.PostRequest.(*capellaPublishBlindedBlockRequestJson)
+		assert.Equal(t, true, ok)
+	})
 
+	t.Run("Deneb", func(t *testing.T) {
+		endpoint := &apimiddleware.Endpoint{
+			PostRequest: &SignedBlindedBeaconBlockContentsDenebJson{
+				SignedBlindedBlock: &SignedBlindedBeaconBlockDenebJson{
+					Message: &BlindedBeaconBlockDenebJson{},
+				},
+				SignedBlindedBlobSidecars: []*SignedBlindedBlobSidecarJson{},
+			},
+		}
+		errJson := preparePublishedBlindedBlock(endpoint, nil, nil)
+		require.Equal(t, true, errJson == nil)
+		_, ok := endpoint.PostRequest.(*denebPublishBlindedBlockRequestJson)
+		assert.Equal(t, true, ok)
+	})
 	t.Run("unsupported block type", func(t *testing.T) {
 		errJson := preparePublishedBlock(&apimiddleware.Endpoint{}, nil, nil)
 		assert.Equal(t, true, strings.Contains(errJson.Msg(), "unsupported block type"))
@@ -1158,6 +932,56 @@ func TestSerializeProducedV2Block(t *testing.T) {
 		assert.Equal(t, "root", beaconBlock.ParentRoot)
 		assert.Equal(t, "root", beaconBlock.StateRoot)
 		require.NotNil(t, beaconBlock.Body)
+	})
+	t.Run("Deneb", func(t *testing.T) {
+		response := &ProduceBlockResponseV2Json{
+			Version: ethpbv2.Version_DENEB.String(),
+			Data: &BeaconBlockContainerV2Json{
+				DenebContents: &BeaconBlockContentsDenebJson{
+					Block: &BeaconBlockDenebJson{
+						Slot:          "1",
+						ProposerIndex: "1",
+						ParentRoot:    "root",
+						StateRoot:     "root",
+						Body:          &BeaconBlockBodyDenebJson{},
+					},
+					BlobSidecars: []*BlobSidecarJson{{
+						BlockRoot:       "root",
+						Index:           "1",
+						Slot:            "1",
+						BlockParentRoot: "root",
+						ProposerIndex:   "1",
+						Blob:            "blob",
+						KzgCommitment:   "kzgcommitment",
+						KzgProof:        "kzgproof",
+					}},
+				},
+			},
+		}
+		runDefault, j, errJson := serializeProducedV2Block(response)
+		require.Equal(t, nil, errJson)
+		require.Equal(t, apimiddleware.RunDefault(false), runDefault)
+		require.NotNil(t, j)
+		resp := &denebProduceBlockResponseJson{}
+		require.NoError(t, json.Unmarshal(j, resp))
+		require.NotNil(t, resp.Data)
+		require.NotNil(t, resp.Data)
+		beaconBlock := resp.Data.Block
+		assert.Equal(t, "1", beaconBlock.Slot)
+		assert.Equal(t, "1", beaconBlock.ProposerIndex)
+		assert.Equal(t, "root", beaconBlock.ParentRoot)
+		assert.Equal(t, "root", beaconBlock.StateRoot)
+		assert.NotNil(t, beaconBlock.Body)
+		require.Equal(t, 1, len(resp.Data.BlobSidecars))
+		sidecar := resp.Data.BlobSidecars[0]
+		assert.Equal(t, "root", sidecar.BlockRoot)
+		assert.Equal(t, "1", sidecar.Index)
+		assert.Equal(t, "1", sidecar.Slot)
+		assert.Equal(t, "root", sidecar.BlockParentRoot)
+		assert.Equal(t, "1", sidecar.ProposerIndex)
+		assert.Equal(t, "blob", sidecar.Blob)
+		assert.Equal(t, "kzgcommitment", sidecar.KzgCommitment)
+		assert.Equal(t, "kzgproof", sidecar.KzgProof)
 	})
 	t.Run("incorrect response type", func(t *testing.T) {
 		response := &types.Empty{}

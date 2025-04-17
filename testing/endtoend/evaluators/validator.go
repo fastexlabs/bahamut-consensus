@@ -69,7 +69,7 @@ func validatorsAreActive(ec *types.EvaluationContext, conns ...*grpc.ClientConn)
 	expectedCount := params.BeaconConfig().MinGenesisActiveValidatorCount
 	receivedCount := uint64(len(validators.ValidatorList))
 	if expectedCount != receivedCount {
-		return fmt.Errorf("expected validator count to be %d, recevied %d", expectedCount, receivedCount)
+		return fmt.Errorf("expected validator count to be %d, received %d", expectedCount, receivedCount)
 	}
 
 	effBalanceLowCount := 0
@@ -289,6 +289,12 @@ func syncCompatibleBlockFromCtr(container *ethpb.BeaconBlockContainer) (interfac
 	}
 	if container.GetBlindedCapellaBlock() != nil {
 		return blocks.NewSignedBeaconBlock(container.GetBlindedCapellaBlock())
+	}
+	if container.GetDenebBlock() != nil {
+		return blocks.NewSignedBeaconBlock(container.GetDenebBlock())
+	}
+	if container.GetBlindedDenebBlock() != nil {
+		return blocks.NewSignedBeaconBlock(container.GetBlindedDenebBlock())
 	}
 	return nil, errors.New("no supported block type in container")
 }

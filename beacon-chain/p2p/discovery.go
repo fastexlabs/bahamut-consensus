@@ -84,6 +84,9 @@ func (s *Service) RefreshENR() {
 		}
 		s.updateSubnetRecordWithMetadata(bitV)
 	}
+	if err := writeMetaData(s.cfg, s.metaData); err != nil {
+		log.WithError(err).Error("Failed to write metaData into file")
+	}
 	// ping all peers to inform them of new metadata
 	s.pingPeers()
 }
@@ -458,6 +461,19 @@ func convertToUdpMultiAddr(node *enode.Node) ([]ma.Multiaddr, error) {
 	}
 
 	return addresses, nil
+}
+
+func peerIdsFromMultiAddrs(addrs []ma.Multiaddr) []peer.ID {
+	peers := []peer.ID{}
+	for _, a := range addrs {
+		info, err := peer.AddrInfoFromP2pAddr(a)
+		if err != nil {
+			log.WithError(err).Errorf("Could not derive peer info from multiaddress %s", a.String())
+			continue
+		}
+		peers = append(peers, info.ID)
+	}
+	return peers
 }
 
 func multiAddrFromString(address string) (ma.Multiaddr, error) {

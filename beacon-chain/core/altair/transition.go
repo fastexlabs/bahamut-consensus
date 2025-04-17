@@ -85,7 +85,7 @@ func ProcessEpoch(ctx context.Context, state state.BeaconState) (state.BeaconSta
 	if err != nil {
 		return nil, err
 	}
-	state, err = e.ProcessEffectiveActivityUpdates(state)
+	state, err = e.ProcessEffectiveActivityUpdates(ctx, state)
 	if err != nil {
 		return nil, err
 	}

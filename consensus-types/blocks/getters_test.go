@@ -1,7 +1,6 @@
 package blocks
 
 import (
-	"math/big"
 	"testing"
 
 	ssz "github.com/prysmaticlabs/fastssz"
@@ -213,6 +212,37 @@ func Test_BeaconBlock_Copy(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, cp, b)
 	assert.NotEqual(t, cp.Body(), bb)
+
+	payload := &pb.ExecutionPayloadDeneb{ExcessBlobGas: 123}
+	header := &pb.ExecutionPayloadHeaderDeneb{ExcessBlobGas: 223}
+	payloadInterface, err := WrappedExecutionPayloadDeneb(payload, 123)
+	require.NoError(t, err)
+	headerInterface, err := WrappedExecutionPayloadHeaderDeneb(header, 123)
+	require.NoError(t, err)
+	bb = &BeaconBlockBody{executionPayload: payloadInterface, executionPayloadHeader: headerInterface, randaoReveal: bytesutil.ToBytes96([]byte{246}), graffiti: bytesutil.ToBytes32([]byte("graffiti"))}
+	b = &BeaconBlock{body: bb, slot: 123, proposerIndex: 456, parentRoot: bytesutil.ToBytes32([]byte("parentroot")), stateRoot: bytesutil.ToBytes32([]byte("stateroot"))}
+	b.version = version.Deneb
+	b.body.version = b.version
+	cp, err = b.Copy()
+	require.NoError(t, err)
+	assert.NotEqual(t, cp, b)
+	assert.NotEqual(t, cp.Body(), bb)
+	e, err := cp.Body().Execution()
+	require.NoError(t, err)
+	gas, err := e.ExcessBlobGas()
+	require.NoError(t, err)
+	require.DeepEqual(t, gas, uint64(123))
+
+	b.body.isBlinded = true
+	cp, err = b.Copy()
+	require.NoError(t, err)
+	assert.NotEqual(t, cp, b)
+	assert.NotEqual(t, cp.Body(), bb)
+	e, err = cp.Body().Execution()
+	require.NoError(t, err)
+	gas, err = e.ExcessBlobGas()
+	require.NoError(t, err)
+	require.DeepEqual(t, gas, uint64(223))
 }
 
 func Test_BeaconBlock_IsNil(t *testing.T) {
@@ -363,6 +393,13 @@ func Test_BeaconBlockBody_VoluntaryExits(t *testing.T) {
 	assert.DeepSSZEqual(t, ve, bb.Block().Body().VoluntaryExits())
 }
 
+func Test_BeaconBlockBody_ActivityChanges(t *testing.T) {
+	ac := make([]*eth.ActivityChange, 0)
+	bb := &SignedBeaconBlock{block: &BeaconBlock{body: &BeaconBlockBody{}}}
+	bb.SetActivityChanges(ac)
+	assert.DeepSSZEqual(t, ac, bb.Block().Body().ActivityChanges())
+}
+
 func Test_BeaconBlockBody_SyncAggregate(t *testing.T) {
 	sa := &eth.SyncAggregate{}
 	bb := &SignedBeaconBlock{version: version.Altair, block: &BeaconBlock{version: version.Altair, body: &BeaconBlockBody{version: version.Altair}}}
@@ -392,7 +429,7 @@ func Test_BeaconBlockBody_Execution(t *testing.T) {
 	assert.DeepEqual(t, result, e)
 
 	executionCapella := &pb.ExecutionPayloadCapella{BlockNumber: 1}
-	eCapella, err := WrappedExecutionPayloadCapella(executionCapella, big.NewInt(0))
+	eCapella, err := WrappedExecutionPayloadCapella(executionCapella, 0)
 	require.NoError(t, err)
 	bb = &SignedBeaconBlock{version: version.Capella, block: &BeaconBlock{body: &BeaconBlockBody{version: version.Capella}}}
 	require.NoError(t, bb.SetExecution(eCapella))
@@ -401,13 +438,37 @@ func Test_BeaconBlockBody_Execution(t *testing.T) {
 	assert.DeepEqual(t, result, eCapella)
 
 	executionCapellaHeader := &pb.ExecutionPayloadHeaderCapella{BlockNumber: 1}
-	eCapellaHeader, err := WrappedExecutionPayloadHeaderCapella(executionCapellaHeader, big.NewInt(0))
+	eCapellaHeader, err := WrappedExecutionPayloadHeaderCapella(executionCapellaHeader, 0)
 	require.NoError(t, err)
 	bb = &SignedBeaconBlock{version: version.Capella, block: &BeaconBlock{version: version.Capella, body: &BeaconBlockBody{version: version.Capella, isBlinded: true}}}
 	require.NoError(t, bb.SetExecution(eCapellaHeader))
 	result, err = bb.Block().Body().Execution()
 	require.NoError(t, err)
 	assert.DeepEqual(t, result, eCapellaHeader)
+
+	executionDeneb := &pb.ExecutionPayloadDeneb{BlockNumber: 1, ExcessBlobGas: 123}
+	eDeneb, err := WrappedExecutionPayloadDeneb(executionDeneb, 0)
+	require.NoError(t, err)
+	bb = &SignedBeaconBlock{version: version.Deneb, block: &BeaconBlock{body: &BeaconBlockBody{version: version.Deneb}}}
+	require.NoError(t, bb.SetExecution(eDeneb))
+	result, err = bb.Block().Body().Execution()
+	require.NoError(t, err)
+	assert.DeepEqual(t, result, eDeneb)
+	gas, err := eDeneb.ExcessBlobGas()
+	require.NoError(t, err)
+	require.DeepEqual(t, gas, uint64(123))
+
+	executionDenebHeader := &pb.ExecutionPayloadHeaderDeneb{BlockNumber: 1, ExcessBlobGas: 223}
+	eDenebHeader, err := WrappedExecutionPayloadHeaderDeneb(executionDenebHeader, 0)
+	require.NoError(t, err)
+	bb = &SignedBeaconBlock{version: version.Deneb, block: &BeaconBlock{version: version.Deneb, body: &BeaconBlockBody{version: version.Deneb, isBlinded: true}}}
+	require.NoError(t, bb.SetExecution(eDenebHeader))
+	result, err = bb.Block().Body().Execution()
+	require.NoError(t, err)
+	assert.DeepEqual(t, result, eDenebHeader)
+	gas, err = eDenebHeader.ExcessBlobGas()
+	require.NoError(t, err)
+	require.DeepEqual(t, gas, uint64(223))
 }
 
 func Test_BeaconBlockBody_HashTreeRoot(t *testing.T) {

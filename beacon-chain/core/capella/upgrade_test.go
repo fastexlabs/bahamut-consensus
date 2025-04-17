@@ -80,6 +80,7 @@ func TestUpgradeToCapella(t *testing.T) {
 		FeeRecipient:     prevHeader.FeeRecipient(),
 		StateRoot:        prevHeader.StateRoot(),
 		ReceiptsRoot:     prevHeader.ReceiptsRoot(),
+		ActivitiesRoot:   make([]byte, 32),
 		LogsBloom:        prevHeader.LogsBloom(),
 		PrevRandao:       prevHeader.PrevRandao(),
 		BlockNumber:      prevHeader.BlockNumber(),

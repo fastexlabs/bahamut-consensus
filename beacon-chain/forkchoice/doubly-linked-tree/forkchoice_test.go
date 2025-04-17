@@ -1,3 +1,4 @@
+// todo unit act
 package doublylinkedtree
 
 import (
@@ -751,13 +752,8 @@ func TestForkChoice_UnrealizedJustifiedPayloadBlockHash(t *testing.T) {
 	require.NoError(t, f.InsertNode(ctx, st, blkRoot))
 
 	f.store.unrealizedJustifiedCheckpoint.Root = [32]byte{'a'}
-	got, err := f.UnrealizedJustifiedPayloadBlockHash()
-	require.NoError(t, err)
+	got := f.UnrealizedJustifiedPayloadBlockHash()
 	require.Equal(t, [32]byte{'A'}, got)
-
-	f.store.unrealizedJustifiedCheckpoint.Root = [32]byte{'b'}
-	_, err = f.UnrealizedJustifiedPayloadBlockHash()
-	require.ErrorIs(t, err, ErrNilNode)
 }
 
 func TestForkChoiceIsViableForCheckpoint(t *testing.T) {

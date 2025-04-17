@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// todo unit act
 // UnpackDepositLogData unpacks the data from a deposit log using the ABI decoder.
 func UnpackDepositLogData(data []byte) (pubkey, withdrawalCredentials, contractAddress, amount, signature, index []byte, err error) {
 	reader := bytes.NewReader([]byte(DepositContractABI))

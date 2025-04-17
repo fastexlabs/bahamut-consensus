@@ -89,7 +89,7 @@ func processSyncAggregate(ctx context.Context, s state.BeaconState, sync *ethpb.
 	}
 	baseProposerReward, err := BaseProposerReward(s, totalPower, totalEffectivePower)
 	if err != nil {
-		return nil, nil , 0, err
+		return nil, nil, 0, err
 	}
 	proposerReward, participantReward, err := SyncRewards(activeBalance, baseProposerReward)
 	if err != nil {

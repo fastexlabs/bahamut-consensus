@@ -159,6 +159,7 @@ func depositDataFromKeys(privKeys []bls.SecretKey, pubKeys []bls.PublicKey, numO
 	return depositDataItems, dataRoots, nil
 }
 
+// todo unit act
 // Generates a deposit data item from BLS keys and signs the hash tree root of the data.
 func createDepositData(privKey bls.SecretKey, pubKey bls.PublicKey, withExecCreds bool) (*ethpb.Deposit_Data, error) {
 	depositMessage := &ethpb.DepositMessage{

@@ -118,19 +118,20 @@ func GenerateFullBlockCapella(
 	}
 	blockHash := indexToHash(uint64(slot))
 	newExecutionPayloadCapella := &v1.ExecutionPayloadCapella{
-		ParentHash:    parentExecution.BlockHash(),
-		FeeRecipient:  make([]byte, 20),
-		StateRoot:     params.BeaconConfig().ZeroHash[:],
-		ReceiptsRoot:  params.BeaconConfig().ZeroHash[:],
-		LogsBloom:     make([]byte, 256),
-		PrevRandao:    random,
-		BlockNumber:   uint64(slot),
-		ExtraData:     params.BeaconConfig().ZeroHash[:],
-		BaseFeePerGas: params.BeaconConfig().ZeroHash[:],
-		BlockHash:     blockHash[:],
-		Timestamp:     uint64(timestamp.Unix()),
-		Transactions:  newTransactions,
-		Withdrawals:   newWithdrawals,
+		ParentHash:     parentExecution.BlockHash(),
+		FeeRecipient:   make([]byte, 20),
+		StateRoot:      params.BeaconConfig().ZeroHash[:],
+		ReceiptsRoot:   params.BeaconConfig().ZeroHash[:],
+		LogsBloom:      make([]byte, 256),
+		PrevRandao:     random,
+		BlockNumber:    uint64(slot),
+		ExtraData:      params.BeaconConfig().ZeroHash[:],
+		BaseFeePerGas:  params.BeaconConfig().ZeroHash[:],
+		BlockHash:      blockHash[:],
+		Timestamp:      uint64(timestamp.Unix()),
+		Transactions:   newTransactions,
+		Withdrawals:    newWithdrawals,
+		ActivitiesRoot: conf.ActivitiesRoot[:],
 	}
 	var syncCommitteeBits []byte
 	currSize := new(ethpb.SyncAggregate).SyncCommitteeBits.Len()
@@ -196,6 +197,7 @@ func GenerateFullBlockCapella(
 			SyncAggregate:         newSyncAggregate,
 			ExecutionPayload:      newExecutionPayloadCapella,
 			BlsToExecutionChanges: changes,
+			ActivityChanges:       []*ethpb.ActivityChange{},
 		},
 	}
 

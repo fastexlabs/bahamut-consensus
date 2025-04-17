@@ -40,8 +40,10 @@ func TestProcessAttesterSlashings_DataNotSlashable(t *testing.T) {
 		Attestation_2: util.HydrateIndexedAttestation(&ethpb.IndexedAttestation{
 			Data: &ethpb.AttestationData{
 				Source: &ethpb.Checkpoint{Epoch: 1},
-				Target: &ethpb.Checkpoint{Epoch: 1}},
-		})}}
+				Target: &ethpb.Checkpoint{Epoch: 1},
+			},
+		}),
+	}}
 
 	var registry []*ethpb.Validator
 	currentSlot := primitives.Slot(0)
@@ -161,8 +163,8 @@ func TestProcessAttesterSlashings_AppliesCorrectStatus(t *testing.T) {
 		)
 	}
 
-	require.Equal(t, uint64(31750000000), newState.Balances()[1])
-	require.Equal(t, uint64(32000000000), newState.Balances()[2])
+	require.Equal(t, uint64(8128000000000), newState.Balances()[1])
+	require.Equal(t, uint64(8192000000000), newState.Balances()[2])
 }
 
 func TestProcessAttesterSlashings_AppliesCorrectStatusAltair(t *testing.T) {
@@ -230,8 +232,8 @@ func TestProcessAttesterSlashings_AppliesCorrectStatusAltair(t *testing.T) {
 		)
 	}
 
-	require.Equal(t, uint64(31500000000), newState.Balances()[1])
-	require.Equal(t, uint64(32000000000), newState.Balances()[2])
+	require.Equal(t, uint64(8064000000000), newState.Balances()[1])
+	require.Equal(t, uint64(8192000000000), newState.Balances()[2])
 }
 
 func TestProcessAttesterSlashings_AppliesCorrectStatusBellatrix(t *testing.T) {
@@ -299,8 +301,8 @@ func TestProcessAttesterSlashings_AppliesCorrectStatusBellatrix(t *testing.T) {
 		)
 	}
 
-	require.Equal(t, uint64(31000000000), newState.Balances()[1])
-	require.Equal(t, uint64(32000000000), newState.Balances()[2])
+	require.Equal(t, uint64(7936000000000), newState.Balances()[1])
+	require.Equal(t, uint64(8192000000000), newState.Balances()[2])
 }
 
 func TestProcessAttesterSlashings_AppliesCorrectStatusCapella(t *testing.T) {
@@ -368,6 +370,6 @@ func TestProcessAttesterSlashings_AppliesCorrectStatusCapella(t *testing.T) {
 		)
 	}
 
-	require.Equal(t, uint64(31000000000), newState.Balances()[1])
-	require.Equal(t, uint64(32000000000), newState.Balances()[2])
+	require.Equal(t, uint64(7936000000000), newState.Balances()[1])
+	require.Equal(t, uint64(8192000000000), newState.Balances()[2])
 }

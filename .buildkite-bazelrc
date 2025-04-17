@@ -12,7 +12,8 @@
 #build:remote-cache --disk_cache=
 build:remote-cache --remote_download_toplevel
 build:remote-cache --remote_cache=grpc://bazel-remote-cache:9092
-build:remote-cache --experimental_remote_downloader=grpc://bazel-remote-cache:9092
+# Does not work with rules_oci. See https://github.com/bazel-contrib/rules_oci/issues/292
+#build:remote-cache --experimental_remote_downloader=grpc://bazel-remote-cache:9092
 build:remote-cache --remote_local_fallback
 build:remote-cache --experimental_remote_cache_async
 build:remote-cache --experimental_remote_merkle_tree_cache
@@ -43,4 +44,12 @@ build --flaky_test_attempts=5
 
 # Better caching
 build:nostamp --nostamp
-build:nostamp --workspace_status_command=./hack/workspace_status_ci.sh
+
+# Build metadata
+build --build_metadata=ROLE=CI
+build --build_metadata=REPO_URL=https://github.com/prysmaticlabs/prysm.git
+build --workspace_status_command=./hack/workspace_status_ci.sh
+
+# Buildbuddy
+build --bes_results_url=https://app.buildbuddy.io/invocation/
+build --bes_backend=grpcs://remote.buildbuddy.io

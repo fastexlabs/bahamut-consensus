@@ -29,12 +29,12 @@ func TestScorers_BadResponses_Score(t *testing.T) {
 	scorer := peerStatuses.Scorers().BadResponsesScorer()
 
 	assert.Equal(t, 0.0, scorer.Score("peer1"), "Unexpected score for unregistered peer")
-	scorer.Increment("peer1")
+	scorer.Increment("peer1", "reason")
 	assert.Equal(t, -2.5, scorer.Score("peer1"))
-	scorer.Increment("peer1")
+	scorer.Increment("peer1", "reason")
 	assert.Equal(t, float64(-5), scorer.Score("peer1"))
-	scorer.Increment("peer1")
-	scorer.Increment("peer1")
+	scorer.Increment("peer1", "reason")
+	scorer.Increment("peer1", "reason")
 	assert.Equal(t, -100.0, scorer.Score("peer1"))
 	assert.Equal(t, true, scorer.IsBadPeer("peer1"))
 }
@@ -101,7 +101,7 @@ func TestScorers_BadResponses_Decay(t *testing.T) {
 	// Peer 2 has 1 bad response.
 	pid2 := peer.ID("peer2")
 	peerStatuses.Add(nil, pid2, nil, network.DirUnknown)
-	scorer.Increment(pid2)
+	scorer.Increment(pid2, "reason")
 	badResponses, err = scorer.Count(pid2)
 	require.NoError(t, err)
 	assert.Equal(t, 1, badResponses)
@@ -109,8 +109,8 @@ func TestScorers_BadResponses_Decay(t *testing.T) {
 	// Peer 3 has 2 bad response.
 	pid3 := peer.ID("peer3")
 	peerStatuses.Add(nil, pid3, nil, network.DirUnknown)
-	scorer.Increment(pid3)
-	scorer.Increment(pid3)
+	scorer.Increment(pid3, "reason")
+	scorer.Increment(pid3, "reason")
 	badResponses, err = scorer.Count(pid3)
 	require.NoError(t, err)
 	assert.Equal(t, 2, badResponses)
@@ -148,7 +148,7 @@ func TestScorers_BadResponses_IsBadPeer(t *testing.T) {
 	assert.Equal(t, false, scorer.IsBadPeer(pid))
 
 	for i := 0; i < scorers.DefaultBadResponsesThreshold; i++ {
-		scorer.Increment(pid)
+		scorer.Increment(pid, "reason")
 		if i == scorers.DefaultBadResponsesThreshold-1 {
 			assert.Equal(t, true, scorer.IsBadPeer(pid), "Unexpected peer status")
 		} else {
@@ -171,9 +171,9 @@ func TestScorers_BadResponses_BadPeers(t *testing.T) {
 		peerStatuses.Add(nil, pids[i], nil, network.DirUnknown)
 	}
 	for i := 0; i < scorers.DefaultBadResponsesThreshold; i++ {
-		scorer.Increment(pids[1])
-		scorer.Increment(pids[2])
-		scorer.Increment(pids[4])
+		scorer.Increment(pids[1], "reason")
+		scorer.Increment(pids[2], "reason")
+		scorer.Increment(pids[4], "reason")
 	}
 	assert.Equal(t, false, scorer.IsBadPeer(pids[0]), "Invalid peer status")
 	assert.Equal(t, true, scorer.IsBadPeer(pids[1]), "Invalid peer status")

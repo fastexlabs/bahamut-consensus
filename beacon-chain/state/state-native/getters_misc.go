@@ -6,6 +6,11 @@ import (
 	"github.com/prysmaticlabs/prysm/v4/runtime/version"
 )
 
+// Id is the identifier of the beacon state.
+func (b *BeaconState) Id() uint64 {
+	return b.id
+}
+
 // GenesisTime of the beacon state as a uint64.
 func (b *BeaconState) GenesisTime() uint64 {
 	b.lock.RLock()
@@ -79,26 +84,6 @@ func (b *BeaconState) HistoricalRoots() ([][]byte, error) {
 	return b.historicalRoots.Slice(), nil
 }
 
-// balancesLength returns the length of the balances slice.
-// This assumes that a lock is already held on BeaconState.
-func (b *BeaconState) balancesLength() int {
-	if b.balances == nil {
-		return 0
-	}
-
-	return len(b.balances)
-}
-
-// activitiesLength returns the length of the activities slice.
-// This assumes that a lock is already held on BeaconState.
-func (b *BeaconState) activitiesLength() int {
-	if b.activities == nil {
-		return 0
-	}
-
-	return len(b.activities)
-}
-
 // HistoricalSummaries of the beacon state.
 func (b *BeaconState) HistoricalSummaries() ([]*ethpb.HistoricalSummary, error) {
 	if b.version < version.Capella {
@@ -119,4 +104,14 @@ func (b *BeaconState) HistoricalSummaries() ([]*ethpb.HistoricalSummary, error) 
 // This assumes that a lock is already held on BeaconState.
 func (b *BeaconState) historicalSummariesVal() []*ethpb.HistoricalSummary {
 	return ethpb.CopyHistoricalSummaries(b.historicalSummaries)
+}
+
+// activitiesLength returns the length of the activities slice.
+// This assumes that a lock is already held on BeaconState.
+func (b *BeaconState) activitiesLength() int {
+	if b.activities == nil {
+		return 0
+	}
+
+	return len(b.activities)
 }

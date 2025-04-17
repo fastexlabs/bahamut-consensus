@@ -265,6 +265,7 @@ func (f *ForkChoice) IsViableForCheckpoint(cp *forkchoicetypes.Checkpoint) (bool
 // validators' latest votes.
 func (f *ForkChoice) updateBalances() error {
 	newBalances := f.justifiedBalances
+	zHash := params.BeaconConfig().ZeroHash
 
 	for index, vote := range f.votes {
 		// Skip if validator has been slashed
@@ -273,7 +274,7 @@ func (f *ForkChoice) updateBalances() error {
 		}
 		// Skip if validator has never voted for current root and next root (i.e. if the
 		// votes are zero hash aka genesis block), there's nothing to compute.
-		if vote.currentRoot == params.BeaconConfig().ZeroHash && vote.nextRoot == params.BeaconConfig().ZeroHash {
+		if vote.currentRoot == zHash && vote.nextRoot == zHash {
 			continue
 		}
 
@@ -293,7 +294,7 @@ func (f *ForkChoice) updateBalances() error {
 			// Ignore the vote if the root is not in fork choice
 			// store, that means we have not seen the block before.
 			nextNode, ok := f.store.nodeByRoot[vote.nextRoot]
-			if ok && vote.nextRoot != params.BeaconConfig().ZeroHash {
+			if ok && vote.nextRoot != zHash {
 				// Protection against nil node
 				if nextNode == nil {
 					return errors.Wrap(ErrNilNode, "could not update balances")
@@ -302,7 +303,7 @@ func (f *ForkChoice) updateBalances() error {
 			}
 
 			currentNode, ok := f.store.nodeByRoot[vote.currentRoot]
-			if ok && vote.currentRoot != params.BeaconConfig().ZeroHash {
+			if ok && vote.currentRoot != zHash {
 				// Protection against nil node
 				if currentNode == nil {
 					return errors.Wrap(ErrNilNode, "could not update balances")
@@ -542,14 +543,14 @@ func (f *ForkChoice) JustifiedPayloadBlockHash() [32]byte {
 }
 
 // UnrealizedJustifiedPayloadBlockHash returns the hash of the payload at the unrealized justified checkpoint
-func (f *ForkChoice) UnrealizedJustifiedPayloadBlockHash() ([32]byte, error) {
+func (f *ForkChoice) UnrealizedJustifiedPayloadBlockHash() [32]byte {
 	root := f.store.unrealizedJustifiedCheckpoint.Root
 	node, ok := f.store.nodeByRoot[root]
 	if !ok || node == nil {
 		// This should not happen
-		return [32]byte{}, ErrNilNode
+		return [32]byte{}
 	}
-	return node.payloadHash, nil
+	return node.payloadHash
 }
 
 // ForkChoiceDump returns a full dump of forkchoice.
@@ -593,7 +594,6 @@ func (f *ForkChoice) ForkChoiceDump(ctx context.Context) (*v1.ForkChoiceDump, er
 		ForkChoiceNodes:               nodes,
 	}
 	return resp, nil
-
 }
 
 // SetBalancesByRooter sets the balanceByRoot handler in forkchoice

@@ -59,7 +59,7 @@ func (s *Service) maintainPeerStatuses() {
 				if prysmTime.Now().After(lastUpdated.Add(interval)) {
 					if err := s.reValidatePeer(s.ctx, id); err != nil {
 						log.WithField("peer", id).WithError(err).Debug("Could not revalidate peer")
-						s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(id)
+						s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(id, fmt.Sprintf("maintainPeerStatuses() Could not revalidate peer: %v", err))
 					}
 				}
 			}(pid)
@@ -93,7 +93,7 @@ func (s *Service) resyncIfBehind() {
 			// Check if the current node is more than 1 epoch behind.
 			if highestEpoch > (syncedEpoch + 1) {
 				log.WithFields(logrus.Fields{
-					"currentEpoch": slots.ToEpoch(s.cfg.chain.CurrentSlot()),
+					"currentEpoch": slots.ToEpoch(s.cfg.clock.CurrentSlot()),
 					"syncedEpoch":  syncedEpoch,
 					"peersEpoch":   highestEpoch,
 				}).Info("Fallen behind peers; reverting to initial sync to catch up")
@@ -110,7 +110,7 @@ func (s *Service) resyncIfBehind() {
 // shouldReSync returns true if the node is not syncing and falls behind two epochs.
 func (s *Service) shouldReSync() bool {
 	syncedEpoch := slots.ToEpoch(s.cfg.chain.HeadSlot())
-	currentEpoch := slots.ToEpoch(s.cfg.chain.CurrentSlot())
+	currentEpoch := slots.ToEpoch(s.cfg.clock.CurrentSlot())
 	prevEpoch := primitives.Epoch(0)
 	if currentEpoch > 1 {
 		prevEpoch = currentEpoch - 1
@@ -140,7 +140,7 @@ func (s *Service) sendRPCStatusRequest(ctx context.Context, id peer.ID) error {
 		HeadRoot:       headRoot,
 		HeadSlot:       s.cfg.chain.HeadSlot(),
 	}
-	topic, err := p2p.TopicFromMessage(p2p.StatusMessageName, slots.ToEpoch(s.cfg.chain.CurrentSlot()))
+	topic, err := p2p.TopicFromMessage(p2p.StatusMessageName, slots.ToEpoch(s.cfg.clock.CurrentSlot()))
 	if err != nil {
 		return err
 	}
@@ -152,23 +152,27 @@ func (s *Service) sendRPCStatusRequest(ctx context.Context, id peer.ID) error {
 
 	code, errMsg, err := ReadStatusCode(stream, s.cfg.p2p.Encoding())
 	if err != nil {
-		s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(stream.Conn().RemotePeer())
+		s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(stream.Conn().RemotePeer(), fmt.Sprintf("sendRPCStatusRequest() failed ReadStatusCode: %v", err))
 		return err
 	}
 
 	if code != 0 {
-		s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(id)
+		s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(id, fmt.Sprintf("sendRPCStatusRequest() ReadStatusCode != 0: %s", errMsg))
 		return errors.New(errMsg)
 	}
 	msg := &pb.Status{}
 	if err := s.cfg.p2p.Encoding().DecodeWithMaxLength(stream, msg); err != nil {
-		s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(stream.Conn().RemotePeer())
+		s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(stream.Conn().RemotePeer(), fmt.Sprintf("sendRPCStatusRequest() failed DecodeWithMaxLength: %v", err))
 		return err
 	}
 
 	// If validation fails, validation error is logged, and peer status scorer will mark peer as bad.
-	err = s.validateStatusMessage(ctx, msg)
-	s.cfg.p2p.Peers().Scorers().PeerStatusScorer().SetPeerStatus(id, msg, err)
+	reason := "Status message validation failed:"
+	if err = s.validateStatusMessage(ctx, msg); err != nil {
+		reason = fmt.Sprintf("%s %v %v", reason, err, msg.String())
+	}
+
+	s.cfg.p2p.Peers().Scorers().PeerStatusScorer().SetPeerStatus(id, msg, err, reason)
 	if s.cfg.p2p.Peers().IsBad(id) {
 		s.disconnectBadPeer(s.ctx, id)
 	}
@@ -216,7 +220,7 @@ func (s *Service) statusRPCHandler(ctx context.Context, msg interface{}, stream 
 			respCode = responseCodeServerError
 		case p2ptypes.ErrWrongForkDigestVersion:
 			// Respond with our status and disconnect with the peer.
-			s.cfg.p2p.Peers().SetChainState(remotePeer, m)
+			s.cfg.p2p.Peers().SetChainState(remotePeer, m, fmt.Sprintf("statusRPCHandler() Invalid status message from peer: %v", err))
 			if err := s.respondWithStatus(ctx, stream); err != nil {
 				return err
 			}
@@ -228,7 +232,7 @@ func (s *Service) statusRPCHandler(ctx context.Context, msg interface{}, stream 
 			return nil
 		default:
 			respCode = responseCodeInvalidRequest
-			s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(remotePeer)
+			s.cfg.p2p.Peers().Scorers().BadResponsesScorer().Increment(remotePeer, fmt.Sprintf("statusRPCHandler() Invalid status message from peer default error case: %v", err))
 		}
 
 		originalErr := err
@@ -245,7 +249,11 @@ func (s *Service) statusRPCHandler(ctx context.Context, msg interface{}, stream 
 		}
 		return originalErr
 	}
-	s.cfg.p2p.Peers().SetChainState(remotePeer, m)
+	reason := "Setting chain status:"
+	if m != nil {
+		reason = fmt.Sprintf("%s %v", reason, m.String())
+	}
+	s.cfg.p2p.Peers().SetChainState(remotePeer, m, reason)
 
 	if err := s.respondWithStatus(ctx, stream); err != nil {
 		return err
@@ -288,7 +296,7 @@ func (s *Service) validateStatusMessage(ctx context.Context, msg *pb.Status) err
 	if !bytes.Equal(forkDigest[:], msg.ForkDigest) {
 		return p2ptypes.ErrWrongForkDigestVersion
 	}
-	genesis := s.cfg.chain.GenesisTime()
+	genesis := s.cfg.clock.GenesisTime()
 	cp := s.cfg.chain.FinalizedCheckpt()
 	finalizedEpoch := cp.Epoch
 	maxEpoch := slots.EpochsSinceGenesis(genesis)

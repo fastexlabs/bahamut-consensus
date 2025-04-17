@@ -29,6 +29,11 @@ import (
 )
 
 func TestServer_ListBeaconCommittees_CurrentEpoch(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
+	cfg := params.BeaconConfig()
+	cfg.EpochsPerSlashingsVector = 8192
+	params.OverrideBeaconConfig(cfg)
+
 	db := dbTest.SetupDB(t)
 	helpers.ClearCache()
 
@@ -83,9 +88,12 @@ func addDefaultReplayerBuilder(s *Server, h stategen.HistoryAccessor) {
 
 func TestServer_ListBeaconCommittees_PreviousEpoch(t *testing.T) {
 	params.SetupTestConfigCleanup(t)
-	params.OverrideBeaconConfig(params.BeaconConfig())
-	ctx := context.Background()
+	cfg := params.BeaconConfig()
+	cfg.EpochsPerSlashingsVector = 8192
+	cfg.EpochsPerHistoricalVector = 65536
+	params.OverrideBeaconConfig(cfg)
 
+	ctx := context.Background()
 	db := dbTest.SetupDB(t)
 	helpers.ClearCache()
 
@@ -156,6 +164,10 @@ func TestServer_ListBeaconCommittees_PreviousEpoch(t *testing.T) {
 }
 
 func TestRetrieveCommitteesForRoot(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
+	cfg := params.BeaconConfig()
+	cfg.EpochsPerSlashingsVector = 8192
+	params.OverrideBeaconConfig(cfg)
 
 	db := dbTest.SetupDB(t)
 	helpers.ClearCache()
@@ -223,6 +235,7 @@ func setupActiveValidators(t *testing.T, count int) state.BeaconState {
 			ActivationEpoch:       0,
 			ExitEpoch:             params.BeaconConfig().FarFutureEpoch,
 			WithdrawalCredentials: make([]byte, 32),
+			Contract:              make([]byte, 20),
 		})
 	}
 	s, err := util.NewBeaconState()

@@ -1,12 +1,17 @@
 package p2p
 
 import (
+	"crypto/rand"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/prysmaticlabs/go-bitfield"
 	"github.com/prysmaticlabs/prysm/v4/config/params"
+	"github.com/prysmaticlabs/prysm/v4/consensus-types/wrapper"
+	pb "github.com/prysmaticlabs/prysm/v4/proto/prysm/v1alpha1"
 	"github.com/prysmaticlabs/prysm/v4/testing/assert"
 	"github.com/prysmaticlabs/prysm/v4/testing/require"
 	logTest "github.com/sirupsen/logrus/hooks/test"
@@ -63,4 +68,66 @@ func TestSerializeENR(t *testing.T) {
 		require.NotNil(t, err)
 		assert.ErrorContains(t, "could not serialize nil record", err)
 	})
+}
+
+func TestMetaDataFromConfig(t *testing.T) {
+	metaDataPath := "./metaDataTest"
+	os.Remove(metaDataPath)
+	cfg := &Config{
+		MetaDataDir: metaDataPath,
+	}
+	emptyMetaData := &pb.MetaDataV0{
+		SeqNumber: 0,
+		Attnets:   bitfield.NewBitvector64(),
+	}
+	// no metadata file
+	t.Log("No metadata file")
+	metaData, err := metaDataFromConfig(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, metaData)
+	require.DeepEqual(t, emptyMetaData, metaData.MetadataObjV0())
+	require.NoError(t, os.Remove(metaDataPath))
+
+	var (
+		attnets  [8]byte
+		syncnets [1]byte
+	)
+	rand.Read(attnets[:])
+	rand.Read(syncnets[:])
+
+	// existring metadata V0
+	t.Log("existring metadata V0")
+	metaDataV0 := &pb.MetaDataV0{
+		SeqNumber: 10,
+		Attnets:   bitfield.Bitvector64(attnets[:]),
+	}
+	require.NoError(t, writeMetaData(cfg, wrapper.WrappedMetadataV0(metaDataV0)))
+	metaData, err = metaDataFromConfig(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, metaData)
+	require.DeepEqual(t, metaDataV0, metaData.MetadataObjV0())
+	require.NoError(t, os.Remove(metaDataPath))
+
+	// existring metadata V1
+	t.Log("existring metadata V1")
+	metaDataV1 := &pb.MetaDataV1{
+		SeqNumber: 11,
+		Attnets:   bitfield.Bitvector64(attnets[:]),
+		Syncnets:  bitfield.Bitvector4(syncnets[:]),
+	}
+	require.NoError(t, writeMetaData(cfg, wrapper.WrappedMetadataV1(metaDataV1)))
+	metaData, err = metaDataFromConfig(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, metaData)
+	require.DeepEqual(t, metaDataV1, metaData.MetadataObjV1())
+	require.NoError(t, os.Remove(metaDataPath))
+
+	// invalid metadata
+	t.Log("Invalid metadata")
+	var buf [32]byte
+	rand.Read(buf[:])
+	require.NoError(t, os.WriteFile(metaDataPath, buf[:], 0o644))
+	metaData, err = metaDataFromConfig(cfg)
+	require.ErrorIs(t, err, ErrInvalidMetaData)
+	require.NoError(t, os.Remove(metaDataPath))
 }

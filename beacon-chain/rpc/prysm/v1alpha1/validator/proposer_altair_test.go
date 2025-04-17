@@ -12,6 +12,7 @@ import (
 )
 
 func TestServer_SetSyncAggregate_EmptyCase(t *testing.T) {
+	params.SetupTestConfigCleanup(t)
 	b, err := blocks.NewSignedBeaconBlock(util.NewBeaconBlockAltair())
 	require.NoError(t, err)
 	s := &Server{} // Sever is not initialized with sync committee pool.
@@ -21,7 +22,7 @@ func TestServer_SetSyncAggregate_EmptyCase(t *testing.T) {
 
 	emptySig := [96]byte{0xC0}
 	want := &ethpb.SyncAggregate{
-		SyncCommitteeBits:      make([]byte, params.BeaconConfig().SyncCommitteeSize),
+		SyncCommitteeBits:      make([]byte, params.BeaconConfig().SyncCommitteeSize/8),
 		SyncCommitteeSignature: emptySig[:],
 	}
 	require.DeepEqual(t, want, agg)
